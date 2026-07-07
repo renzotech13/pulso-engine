@@ -1,0 +1,4 @@
+{
+  "extends": "@pulso/tsconfig/node.json",
+  "include": ["src"]
+}

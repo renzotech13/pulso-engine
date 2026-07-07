@@ -1,0 +1,25 @@
+{
+  "name": "@pulso/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@pulso/shared": "workspace:*",
+    "hono": "^4.6.14",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@pulso/tsconfig": "workspace:*",
+    "@pulso/eslint-config": "workspace:*",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}

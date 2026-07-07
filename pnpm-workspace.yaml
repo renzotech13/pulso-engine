@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tooling/*"
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true
+  sharp: true
+overrides:
+  ioredis: "5.10.1"

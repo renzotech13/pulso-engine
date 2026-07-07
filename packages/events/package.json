@@ -1,0 +1,28 @@
+{
+  "name": "@pulso/events",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./catalog": "./src/catalog.ts",
+    "./publish": "./src/publish.ts",
+    "./realtime": "./src/realtime.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pulso/db": "workspace:*",
+    "@pulso/shared": "workspace:*",
+    "ioredis": "^5.4.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@pulso/tsconfig": "workspace:*",
+    "@pulso/eslint-config": "workspace:*",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
+  }
+}

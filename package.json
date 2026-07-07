@@ -1,0 +1,26 @@
+{
+  "name": "pulso-engine",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:migrate:new": "supabase migration new",
+    "db:seed": "pnpm --filter @pulso/db exec tsx src/seed.ts",
+    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
+  },
+  "devDependencies": {
+    "eslint": "^9.17.0",
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  }
+}
