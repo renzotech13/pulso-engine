@@ -23,6 +23,12 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(1),
 
   SENTRY_DSN: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
+
+  // Local LLM served by LM Studio (OpenAI-compatible endpoint) — replaces a
+  // hosted LLM API entirely, so agents that reason (Planner, later Creative)
+  // require LM Studio running locally with a model loaded.
+  LMSTUDIO_BASE_URL: z.string().url().default("http://127.0.0.1:1234/v1"),
+  LMSTUDIO_MODEL: z.string().min(1),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

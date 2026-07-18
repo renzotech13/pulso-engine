@@ -12,6 +12,11 @@ export default async function OnboardingPage() {
   const { data: memberships } = await supabase.from("memberships").select("tenant_id").limit(1);
   if (memberships && memberships.length > 0) redirect("/agents");
 
+  const { data: categories } = await supabase
+    .from("business_categories")
+    .select("slug, name")
+    .order("name");
+
   return (
     <main className="flex min-h-screen items-center justify-center">
       <form
@@ -33,6 +38,21 @@ export default async function OnboardingPage() {
           pattern="[a-z0-9-]+"
           className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
         />
+        <select
+          name="rubro"
+          required
+          defaultValue=""
+          className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
+        >
+          <option value="" disabled>
+            Rubro del negocio
+          </option>
+          {(categories ?? []).map((c) => (
+            <option key={c.slug} value={c.slug}>
+              {c.name}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           className="w-full rounded bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"

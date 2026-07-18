@@ -6,6 +6,7 @@ import { startDispatcher } from "./dispatcher.js";
 import { getQueue, getRedisConnection, closeAllQueues } from "./queues.js";
 import { runOrchestratorTick } from "./agents/orchestrator.js";
 import { runHelloAgent } from "./agents/hello.js";
+import { runPlannerForTenant, runPlannerTick } from "./agents/planner.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
 
@@ -16,6 +17,10 @@ type EventRow = Database["public"]["Tables"]["events"]["Row"];
 async function processCoreJob(job: Job): Promise<void> {
   if (job.name === "orchestrator.tick") {
     await runOrchestratorTick();
+    return;
+  }
+  if (job.name === "planner.tick") {
+    await runPlannerTick();
     return;
   }
 
@@ -29,6 +34,15 @@ async function processCoreJob(job: Job): Promise<void> {
       logger.info(
         { tenantId: event.tenant_id, correlationId: event.correlation_id },
         "heartbeat cycle closed",
+      );
+      return;
+    case "calendar.plan.requested":
+      await runPlannerForTenant(event.tenant_id, event.type, event.correlation_id, job.id);
+      return;
+    case "calendar.slots.proposed":
+      logger.info(
+        { tenantId: event.tenant_id, correlationId: event.correlation_id },
+        "calendar slots proposed",
       );
       return;
     default:
@@ -53,8 +67,16 @@ async function main(): Promise<void> {
     {},
     { repeat: { every: 60_000 }, jobId: "orchestrator-tick" },
   );
+  // Real "Planner: diario" cadence — to see it run without waiting 24h, use
+  // the dashboard's "Regenerar" button (or call the RPC directly), which
+  // fires the exact same calendar.plan.requested path.
+  await coreQueue.add(
+    "planner.tick",
+    {},
+    { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: "planner-tick" },
+  );
 
-  logger.info("workers bootstrapped: dispatcher + core worker + orchestrator tick running");
+  logger.info("workers bootstrapped: dispatcher + core worker + orchestrator/planner ticks running");
 
   let shuttingDown = false;
   const shutdown = async () => {

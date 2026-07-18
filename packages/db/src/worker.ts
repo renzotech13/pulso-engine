@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { loadConfig } from "@pulso/shared/config";
-import { TenantIsolationError } from "@pulso/shared/errors";
+import { ConfigError, TenantIsolationError } from "@pulso/shared/errors";
 import type { Database } from "./database.types.js";
 
 export type ServiceRoleClient = SupabaseClient<Database>;
@@ -26,6 +26,13 @@ export function createServiceRoleClient(): ServiceRoleClient {
 type AgentRunInsert = Database["public"]["Tables"]["agent_runs"]["Insert"];
 type DecisionLogInsert = Database["public"]["Tables"]["decision_log"]["Insert"];
 type TenantRow = Database["public"]["Tables"]["tenants"]["Row"];
+type EphemerisRow = Database["public"]["Tables"]["ephemerides"]["Row"];
+type PromotionRow = Database["public"]["Tables"]["promotions"]["Row"];
+type ProductRow = Database["public"]["Tables"]["products_services"]["Row"];
+type ContentCalendarRow = Database["public"]["Tables"]["content_calendar"]["Row"];
+type ContentCalendarInsert = Database["public"]["Tables"]["content_calendar"]["Insert"];
+type AgentsRegistryRow = Database["public"]["Tables"]["agents_registry"]["Row"];
+type AgentCallInsert = Database["public"]["Tables"]["agent_calls"]["Insert"];
 
 /**
  * Tenant-scoped handle for agent code. Since service_role bypasses RLS,
@@ -38,6 +45,18 @@ export interface TenantScopedClient {
   getTenant(): Promise<TenantRow>;
   insertAgentRun(row: Omit<AgentRunInsert, "tenant_id">): Promise<void>;
   insertDecisionLog(row: Omit<DecisionLogInsert, "tenant_id">): Promise<void>;
+  /** Global ephemerides (tenant_id null) plus this tenant's custom ones. */
+  listEphemerides(): Promise<EphemerisRow[]>;
+  listActivePromotions(): Promise<PromotionRow[]>;
+  listActiveProducts(): Promise<ProductRow[]>;
+  listContentCalendar(fromDate: string, toDate: string): Promise<ContentCalendarRow[]>;
+  /** No-ops if a slot already exists for that date (unique tenant_id+date) — never overwrites a Planner or human decision. */
+  upsertContentCalendarSlot(row: Omit<ContentCalendarInsert, "tenant_id">): Promise<void>;
+  /** Tenant-specific override takes priority over the global registration of the same name. */
+  getAgentRegistration(agentName: string): Promise<AgentsRegistryRow | null>;
+  sumTokensToday(): Promise<number>;
+  sumTokensForJob(jobId: string): Promise<number>;
+  insertAgentCall(row: Omit<AgentCallInsert, "tenant_id">): Promise<void>;
 }
 
 export function createTenantScopedClient(
@@ -78,5 +97,146 @@ export function createTenantScopedClient(
         );
       }
     },
+
+    async listEphemerides() {
+      const { data, error } = await client
+        .from("ephemerides")
+        .select("*")
+        .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list ephemerides for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async listActivePromotions() {
+      const { data, error } = await client
+        .from("promotions")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("active", true);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list promotions for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async listActiveProducts() {
+      const { data, error } = await client
+        .from("products_services")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("active", true);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list products for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async listContentCalendar(fromDate, toDate) {
+      const { data, error } = await client
+        .from("content_calendar")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .gte("date", fromDate)
+        .lte("date", toDate);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list content_calendar for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async upsertContentCalendarSlot(row) {
+      const { error } = await client
+        .from("content_calendar")
+        .upsert({ ...row, tenant_id: tenantId }, { onConflict: "tenant_id,date", ignoreDuplicates: true });
+
+      if (error) {
+        throw new TenantIsolationError(
+          `failed to upsert content_calendar slot for tenant ${tenantId}`,
+          error,
+        );
+      }
+    },
+
+    async getAgentRegistration(agentName) {
+      const { data, error } = await client
+        .from("agents_registry")
+        .select("*")
+        .eq("name", agentName)
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+
+      if (error) {
+        throw new TenantIsolationError(
+          `failed to look up agent "${agentName}" for tenant ${tenantId}`,
+          error,
+        );
+      }
+      const rows = data ?? [];
+      return rows.find((r) => r.tenant_id === tenantId) ?? rows.find((r) => r.tenant_id === null) ?? null;
+    },
+
+    async sumTokensToday() {
+      const startOfDay = new Date();
+      startOfDay.setUTCHours(0, 0, 0, 0);
+
+      const { data, error } = await client
+        .from("agent_calls")
+        .select("input_tokens, output_tokens")
+        .eq("tenant_id", tenantId)
+        .gte("created_at", startOfDay.toISOString());
+
+      if (error) {
+        throw new TenantIsolationError(`failed to sum today's tokens for tenant ${tenantId}`, error);
+      }
+      return (data ?? []).reduce((sum, row) => sum + row.input_tokens + row.output_tokens, 0);
+    },
+
+    async sumTokensForJob(jobId) {
+      const { data, error } = await client
+        .from("agent_calls")
+        .select("input_tokens, output_tokens")
+        .eq("tenant_id", tenantId)
+        .eq("job_id", jobId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to sum job tokens for tenant ${tenantId}`, error);
+      }
+      return (data ?? []).reduce((sum, row) => sum + row.input_tokens + row.output_tokens, 0);
+    },
+
+    async insertAgentCall(row) {
+      const { error } = await client.from("agent_calls").insert({ ...row, tenant_id: tenantId });
+      if (error) {
+        throw new TenantIsolationError(`failed to insert agent_call for tenant ${tenantId}`, error);
+      }
+    },
   };
+}
+
+/**
+ * Prompts are global (not tenant-scoped), so this reads via the raw
+ * service-role client rather than a TenantScopedClient.
+ */
+export async function getActivePrompt(
+  client: ServiceRoleClient,
+  name: string,
+): Promise<string> {
+  const { data, error } = await client
+    .from("prompts")
+    .select("template")
+    .eq("name", name)
+    .eq("is_active", true)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new ConfigError(`no active prompt found for "${name}"`, error);
+  }
+  return data.template;
 }

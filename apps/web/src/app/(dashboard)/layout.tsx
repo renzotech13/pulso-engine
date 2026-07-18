@@ -16,6 +16,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             <TenantSwitcher memberships={ctx.memberships} activeTenantId={ctx.tenantId} />
           </div>
           <nav className="space-y-1 text-sm">
+            <a href="/calendar" className="block rounded px-2 py-1 hover:bg-neutral-900">
+              Calendario
+            </a>
+            <a href="/catalog" className="block rounded px-2 py-1 hover:bg-neutral-900">
+              Catálogo
+            </a>
             <a href="/agents" className="block rounded px-2 py-1 hover:bg-neutral-900">
               Agent runs
             </a>

@@ -7,14 +7,17 @@
     "./config": "./src/config.ts",
     "./logger": "./src/logger.ts",
     "./errors": "./src/errors.ts",
-    "./ids": "./src/ids.ts"
+    "./ids": "./src/ids.ts",
+    "./llm": "./src/llm.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
+    "openai": "^4.77.0",
     "pino": "^9.6.0",
     "zod": "^3.24.1"
   },
@@ -22,6 +25,7 @@
     "@pulso/tsconfig": "workspace:*",
     "@pulso/eslint-config": "workspace:*",
     "pino-pretty": "^13.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.8"
   }
 }

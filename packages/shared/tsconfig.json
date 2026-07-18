@@ -1,4 +1,7 @@
 {
   "extends": "@pulso/tsconfig/node.json",
-  "include": ["src"]
+  "compilerOptions": {
+    "rootDir": "."
+  },
+  "include": ["src", "tests"]
 }

@@ -2,9 +2,8 @@ import { z } from "zod";
 
 /**
  * One entry per event type the bus carries. Add new entries here as later
- * phases introduce them (e.g. `calendar.slot.created` in Fase 1) — this file
- * is the single source of truth the publisher validates against and the
- * dispatcher uses to route to a queue.
+ * phases introduce them — this file is the single source of truth the
+ * publisher validates against and the dispatcher uses to route to a queue.
  */
 export const eventCatalog = {
   "agent.heartbeat.requested": {
@@ -13,6 +12,14 @@ export const eventCatalog = {
   },
   "agent.heartbeat.completed": {
     payload: z.object({ status: z.literal("ok") }),
+    queue: "core",
+  },
+  "calendar.plan.requested": {
+    payload: z.object({}),
+    queue: "core",
+  },
+  "calendar.slots.proposed": {
+    payload: z.object({ count: z.number() }),
     queue: "core",
   },
 } as const;
