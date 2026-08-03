@@ -16,3 +16,10 @@ supabase/.temp/
 
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Client-provided assets and local Supabase Studio scratch — not product
+# source, not needed to build/deploy, and alianza-lima-sullana/ has real
+# client photos that shouldn't leave this machine via a git remote.
+/alianza-lima-sullana/
+/front/
+packages/db/supabase/snippets/

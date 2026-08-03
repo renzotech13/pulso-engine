@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createTenantAction } from "@/lib/actions";
+import { Card } from "@/components/ui/card";
+import { inputClass } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export default async function OnboardingPage() {
   const supabase = await createSupabaseServerClient();
@@ -18,48 +21,34 @@ export default async function OnboardingPage() {
     .order("name");
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form
-        action={createTenantAction}
-        className="w-full max-w-sm space-y-4 rounded-lg border border-neutral-800 p-8"
-      >
-        <h1 className="text-xl font-semibold">Crea tu negocio</h1>
-        <p className="text-sm text-neutral-400">Este será tu primer tenant en Pulso Engine.</p>
-        <input
-          name="name"
-          required
-          placeholder="Nombre del negocio"
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-        />
-        <input
-          name="slug"
-          required
-          placeholder="slug-unico"
-          pattern="[a-z0-9-]+"
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-        />
-        <select
-          name="rubro"
-          required
-          defaultValue=""
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-        >
-          <option value="" disabled>
-            Rubro del negocio
-          </option>
-          {(categories ?? []).map((c) => (
-            <option key={c.slug} value={c.slug}>
-              {c.name}
+    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+      <Card className="w-full max-w-sm p-8">
+        <form action={createTenantAction} className="space-y-4">
+          <h1 className="font-display text-xl text-neutral-100">Crea tu negocio</h1>
+          <p className="text-sm text-neutral-400">Este será tu primer tenant en Pulso Engine.</p>
+          <input name="name" required placeholder="Nombre del negocio" className={inputClass} />
+          <input
+            name="slug"
+            required
+            placeholder="slug-unico"
+            pattern="[a-z0-9-]+"
+            className={inputClass}
+          />
+          <select name="rubro" required defaultValue="" className={inputClass}>
+            <option value="" disabled>
+              Rubro del negocio
             </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="w-full rounded bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500"
-        >
-          Crear
-        </button>
-      </form>
+            {(categories ?? []).map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Button type="submit" className="w-full">
+            Crear
+          </Button>
+        </form>
+      </Card>
     </main>
   );
 }

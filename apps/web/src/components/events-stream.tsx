@@ -55,7 +55,7 @@ export function EventsStream({ tenantId }: { tenantId: string }) {
       </thead>
       <tbody>
         {events.map((event) => (
-          <tr key={event.id} className="border-t border-neutral-800">
+          <tr key={event.id} className="border-t border-ink-700">
             <td className="py-2">{event.type}</td>
             <td className={`py-2 ${STATUS_COLOR[event.status]}`}>{event.status}</td>
             <td className="py-2">{event.attempts}</td>

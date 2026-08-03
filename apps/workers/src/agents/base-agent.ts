@@ -1,4 +1,5 @@
 import { createTenantScopedClient, type TenantScopedClient } from "@pulso/db/worker";
+import type { Json } from "@pulso/db/types";
 import { createLogger, type Logger } from "@pulso/shared/logger";
 import { AgentExecutionError } from "@pulso/shared/errors";
 
@@ -23,7 +24,7 @@ export interface AgentRunParams {
  * 00000000000001) at the cost of not showing "in progress" runs live; for
  * Fase 0's short-lived agents that trade-off is fine.
  */
-export async function executeAgentRun<T extends Record<string, unknown> | void>(
+export async function executeAgentRun<T extends Json | void>(
   params: AgentRunParams,
   handler: (ctx: AgentContext) => Promise<T>,
 ): Promise<T> {
@@ -44,7 +45,7 @@ export async function executeAgentRun<T extends Record<string, unknown> | void>(
       status: "succeeded",
       started_at: startedAt.toISOString(),
       finished_at: new Date().toISOString(),
-      result: (result as Record<string, unknown> | undefined) ?? null,
+      result: (result ?? null) as Json | null,
       correlation_id: params.correlationId,
     });
     logger.info({ durationMs: Date.now() - startedAt.getTime() }, "agent run succeeded");

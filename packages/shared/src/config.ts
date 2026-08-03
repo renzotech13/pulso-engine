@@ -29,6 +29,16 @@ const envSchema = z.object({
   // require LM Studio running locally with a model loaded.
   LMSTUDIO_BASE_URL: z.string().url().default("http://127.0.0.1:1234/v1"),
   LMSTUDIO_MODEL: z.string().min(1),
+
+  // Same service apps/web already reaches via NEXT_PUBLIC_RENDER_TEMPLATES_URL
+  // — apps/workers needs its own copy to trigger eager renders for tenants in
+  // an auto hitl_mode, instead of waiting for someone to view the page.
+  RENDER_TEMPLATES_URL: z.string().url().default("http://localhost:3001"),
+
+  // Optional on purpose: unset means the AI-image-generation fallback in
+  // creative.ts simply never activates (no gradient-vs-photo behavior
+  // changes, no risk of unexpected API spend) until a tenant/operator adds one.
+  GEMINI_API_KEY: z.preprocess((v) => (v === "" ? undefined : v), z.string().min(1).optional()),
 });
 
 export type AppConfig = z.infer<typeof envSchema>;

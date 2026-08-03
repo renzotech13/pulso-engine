@@ -23,7 +23,7 @@ export function TenantSwitcher({
         name="tenantId"
         defaultValue={activeTenantId}
         onChange={handleChange}
-        className="w-full rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs"
+        className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-neutral-200 focus:border-pulso-accent focus:outline-none"
       >
         {memberships.map((m) => (
           <option key={m.tenantId} value={m.tenantId}>

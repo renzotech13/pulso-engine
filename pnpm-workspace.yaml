@@ -5,6 +5,29 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  puppeteer: true
   sharp: true
+minimumReleaseAgeExclude:
+  - '@remotion/bundler@4.0.496'
+  - '@remotion/canvas-capture@4.0.496'
+  - '@remotion/compositor-darwin-arm64@4.0.496'
+  - '@remotion/compositor-darwin-x64@4.0.496'
+  - '@remotion/compositor-linux-arm64-gnu@4.0.496'
+  - '@remotion/compositor-linux-arm64-musl@4.0.496'
+  - '@remotion/compositor-linux-x64-gnu@4.0.496'
+  - '@remotion/compositor-linux-x64-musl@4.0.496'
+  - '@remotion/compositor-win32-x64-msvc@4.0.496'
+  - '@remotion/licensing@4.0.496'
+  - '@remotion/media-parser@4.0.496'
+  - '@remotion/media-utils@4.0.496'
+  - '@remotion/player@4.0.496'
+  - '@remotion/renderer@4.0.496'
+  - '@remotion/streaming@4.0.496'
+  - '@remotion/studio-shared@4.0.496'
+  - '@remotion/studio@4.0.496'
+  - '@remotion/timeline-utils@4.0.496'
+  - '@remotion/web-renderer@4.0.496'
+  - '@remotion/zod-types@4.0.496'
+  - remotion@4.0.496
 overrides:
   ioredis: "5.10.1"

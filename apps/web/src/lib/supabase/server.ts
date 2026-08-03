@@ -1,13 +1,19 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { loadConfig } from "@pulso/shared/config";
 import type { Database } from "@pulso/db/types";
 
+// Deliberately reads process.env directly instead of @pulso/shared's
+// loadConfig() — that validates the full worker env schema (REDIS_URL,
+// LMSTUDIO_MODEL, ...), which apps/web has no business requiring just to
+// render a page. Same NEXT_PUBLIC_* vars middleware.ts and client.ts
+// already use.
 export async function createSupabaseServerClient() {
-  const config = loadConfig();
   const cookieStore = await cookies();
 
-  return createServerClient<Database>(config.SUPABASE_URL, config.SUPABASE_ANON_KEY, {
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
     cookies: {
       getAll() {
         return cookieStore.getAll();

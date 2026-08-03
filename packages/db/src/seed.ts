@@ -63,6 +63,8 @@ const EPHEMERIDES = [
     is_recurring_annually: true,
     relevance_tags: ["general"],
     category: "nacional" as const,
+    accentColorPrimary: "#D91023",
+    accentColorSecondary: "#FFFFFF",
   },
   {
     name: "Día Nacional del Café Peruano",
@@ -98,6 +100,7 @@ const AGENTS_REGISTRY = [
   { name: "hello", allowed_tools: [], prompt_name: null, model: null },
   { name: "orchestrator", allowed_tools: [], prompt_name: null, model: null },
   { name: "planner", allowed_tools: [], prompt_name: "planner.calendar", model: null },
+  { name: "creative", allowed_tools: [], prompt_name: "creative.brief", model: null },
 ] as const;
 
 const PLANNER_PROMPT_V1 = `Eres el planificador de contenido de marketing para un negocio local peruano.
@@ -119,6 +122,45 @@ Catálogo de productos/servicios:
 Para cada fecha libre que tenga sentido llenar (no es obligatorio llenar todas), propone un tema de contenido.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
 {"slots": [{"date": "YYYY-MM-DD", "slot_type": "post"|"carousel"|"story"|"reel", "theme": "string corto", "rationale": "string breve explicando por qué"}]}`;
+
+const CREATIVE_PROMPT_V1 = `Eres el redactor de piezas de marketing para un negocio local peruano.
+
+Tipo de pieza: {{SLOT_TYPE}}
+Tema aprobado para esta pieza: {{THEME}}
+
+Promociones activas del negocio:
+{{PROMOTIONS}}
+
+Catálogo de productos/servicios:
+{{PRODUCTS}}
+
+{{INSTRUCTION}}
+
+Escribe el copy para esta pieza. Sé concreto y usa precios/promociones reales del catálogo cuando calce con el tema.
+Si hay una instrucción adicional del cliente arriba, respétala por encima de tu propio criterio de estilo.
+Si el tema se refiere claramente a un producto específico del catálogo de arriba, incluye su nombre EXACTO tal como aparece ahí en el campo "productName" (así se puede usar su foto real en la pieza). Si no aplica a ningún producto puntual, omite ese campo.
+Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
+{"headline": "string corto y llamativo", "subheadline": "string breve opcional", "priceLabel": "string tipo 'Desde S/ 96', opcional", "productName": "nombre exacto del producto del catálogo, opcional"}`;
+
+const CREATIVE_CAROUSEL_PROMPT_V1 = `Eres el redactor de un carrusel de Instagram/Facebook para un negocio local peruano. Los carruseles con este formato convierten mejor que los reels en el algoritmo actual, especialmente cuando invitan a comentar.
+
+Tema aprobado para esta pieza: {{THEME}}
+
+Promociones activas del negocio:
+{{PROMOTIONS}}
+
+Catálogo de productos/servicios:
+{{PRODUCTS}}
+
+{{INSTRUCTION}}
+
+Escribe entre 5 y 7 slides (frases cortas, una idea por slide) con esta estructura exacta:
+1. Primer slide: un gancho o pregunta llamativa relacionada al tema, que dé ganas de seguir deslizando.
+2. Slides del medio (3 a 5): un tip, dato o idea concreta cada uno — cortos, una sola frase, fáciles de leer de un vistazo.
+3. Último slide: SIEMPRE una pregunta directa invitando explícitamente a comentar (ej. "¿Cuál de estos usas tú? Cuéntanos 👇").
+Si hay una instrucción adicional del cliente arriba, respétala por encima de tu propio criterio de estilo.
+Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
+{"slides": ["string corto", "string corto", "..."]}`;
 
 async function upsertUser(
   client: ReturnType<typeof createServiceRoleClient>,
@@ -202,6 +244,8 @@ async function upsertEphemerides(client: ReturnType<typeof createServiceRoleClie
       relevance_tags: [...ephemeris.relevance_tags],
       category: ephemeris.category,
       country_code: "PE",
+      accent_color_primary: "accentColorPrimary" in ephemeris ? ephemeris.accentColorPrimary : null,
+      accent_color_secondary: "accentColorSecondary" in ephemeris ? ephemeris.accentColorSecondary : null,
     });
     if (error) throw new Error(`failed to seed ephemeris ${ephemeris.name}: ${error.message}`);
   }
@@ -257,6 +301,115 @@ async function upsertDemoCatalog(client: ReturnType<typeof createServiceRoleClie
   }
 }
 
+const RENDER_TEMPLATES = [
+  { name: "social-post", type: "static", engine: "html", component_ref: "social-post" },
+  { name: "reel", type: "video", engine: "remotion", component_ref: "reel" },
+  { name: "story-promo", type: "video", engine: "remotion", component_ref: "story-promo" },
+  { name: "carousel", type: "static", engine: "html", component_ref: "carousel" },
+] as const;
+
+async function upsertRenderTemplates(client: ReturnType<typeof createServiceRoleClient>) {
+  for (const template of RENDER_TEMPLATES) {
+    const { data: existing } = await client
+      .from("render_templates")
+      .select("id")
+      .is("tenant_id", null)
+      .eq("name", template.name)
+      .maybeSingle();
+
+    if (existing) continue;
+
+    const { error } = await client.from("render_templates").insert({ ...template, status: "active" });
+    if (error) throw new Error(`failed to seed render_templates ${template.name}: ${error.message}`);
+  }
+}
+
+async function upsertDemoBrandKit(client: ReturnType<typeof createServiceRoleClient>, tenantId: string) {
+  const { data: existing } = await client
+    .from("brand_kits")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (existing) return;
+
+  const { error } = await client.from("brand_kits").insert({
+    tenant_id: tenantId,
+    color_primary: "#7C6FF0",
+    color_secondary: "#FF8B5E",
+    tone_description: "cercano, relajado, cálido",
+  });
+  if (error) throw new Error(`failed to seed brand_kit for tenant ${tenantId}: ${error.message}`);
+}
+
+/** One real creative to prove the render pipeline end to end against the seeded demo data. */
+async function upsertDemoCreative(client: ReturnType<typeof createServiceRoleClient>, tenantId: string) {
+  const { data: existing } = await client
+    .from("creatives")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("type", "image")
+    .maybeSingle();
+
+  if (existing) return;
+
+  const { data: template } = await client
+    .from("render_templates")
+    .select("id")
+    .eq("name", "social-post")
+    .is("tenant_id", null)
+    .single();
+
+  if (!template) return;
+
+  const { error } = await client.from("creatives").insert({
+    tenant_id: tenantId,
+    template_id: template.id,
+    type: "image",
+    status: "pending",
+    brief: {
+      headline: "20% en masajes",
+      subheadline: "Por Fiestas Patrias — reserva antes del 31 de julio",
+      priceLabel: "Desde S/ 96",
+    },
+  });
+  if (error) throw new Error(`failed to seed demo creative for tenant ${tenantId}: ${error.message}`);
+}
+
+/** Same brief as the demo image creative, but pointed at the "reel" Remotion composition. */
+async function upsertDemoVideoCreative(client: ReturnType<typeof createServiceRoleClient>, tenantId: string) {
+  const { data: existing } = await client
+    .from("creatives")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("type", "video")
+    .maybeSingle();
+
+  if (existing) return;
+
+  const { data: template } = await client
+    .from("render_templates")
+    .select("id")
+    .eq("name", "reel")
+    .is("tenant_id", null)
+    .single();
+
+  if (!template) return;
+
+  const { error } = await client.from("creatives").insert({
+    tenant_id: tenantId,
+    template_id: template.id,
+    type: "video",
+    status: "pending",
+    brief: {
+      headline: "20% en masajes",
+      subheadline: "Por Fiestas Patrias — reserva antes del 31 de julio",
+      priceLabel: "Desde S/ 96",
+    },
+  });
+  if (error) throw new Error(`failed to seed demo video creative for tenant ${tenantId}: ${error.message}`);
+}
+
 async function upsertPlannerPrompt(client: ReturnType<typeof createServiceRoleClient>) {
   const { data: existing } = await client
     .from("prompts")
@@ -274,6 +427,65 @@ async function upsertPlannerPrompt(client: ReturnType<typeof createServiceRoleCl
     is_active: true,
   });
   if (error) throw new Error(`failed to seed planner prompt: ${error.message}`);
+}
+
+/**
+ * Updates the template in place when the row already exists, instead of the
+ * skip-if-exists pattern used elsewhere in this file — this prompt is still
+ * actively being iterated on (e.g. adding productName for photo selection),
+ * and re-seeding is the only way local dev picks up a wording change.
+ */
+async function upsertCreativePrompt(client: ReturnType<typeof createServiceRoleClient>) {
+  const { data: existing } = await client
+    .from("prompts")
+    .select("id")
+    .eq("name", "creative.brief")
+    .eq("version", 1)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await client
+      .from("prompts")
+      .update({ template: CREATIVE_PROMPT_V1 })
+      .eq("id", existing.id);
+    if (error) throw new Error(`failed to update creative prompt: ${error.message}`);
+    return;
+  }
+
+  const { error } = await client.from("prompts").insert({
+    name: "creative.brief",
+    version: 1,
+    template: CREATIVE_PROMPT_V1,
+    is_active: true,
+  });
+  if (error) throw new Error(`failed to seed creative prompt: ${error.message}`);
+}
+
+/** Same update-in-place pattern as upsertCreativePrompt — still being iterated on. */
+async function upsertCarouselPrompt(client: ReturnType<typeof createServiceRoleClient>) {
+  const { data: existing } = await client
+    .from("prompts")
+    .select("id")
+    .eq("name", "creative.brief.carousel")
+    .eq("version", 1)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await client
+      .from("prompts")
+      .update({ template: CREATIVE_CAROUSEL_PROMPT_V1 })
+      .eq("id", existing.id);
+    if (error) throw new Error(`failed to update carousel prompt: ${error.message}`);
+    return;
+  }
+
+  const { error } = await client.from("prompts").insert({
+    name: "creative.brief.carousel",
+    version: 1,
+    template: CREATIVE_CAROUSEL_PROMPT_V1,
+    is_active: true,
+  });
+  if (error) throw new Error(`failed to seed carousel prompt: ${error.message}`);
 }
 
 async function upsertAgentsRegistry(client: ReturnType<typeof createServiceRoleClient>) {
@@ -305,6 +517,8 @@ async function main() {
   await upsertBusinessCategories(client);
   await upsertEphemerides(client);
   await upsertPlannerPrompt(client);
+  await upsertCreativePrompt(client);
+  await upsertCarouselPrompt(client);
   await upsertAgentsRegistry(client);
 
   const userA = await upsertUser(client, SEED_USERS.tenantA.email, SEED_USERS.tenantA.password);
@@ -314,6 +528,10 @@ async function main() {
   const tenantB = await upsertTenant(client, "spa-demo-b", "Spa Demo B", "spa", userB.id);
 
   await upsertDemoCatalog(client, tenantA.id);
+  await upsertRenderTemplates(client);
+  await upsertDemoBrandKit(client, tenantA.id);
+  await upsertDemoCreative(client, tenantA.id);
+  await upsertDemoVideoCreative(client, tenantA.id);
 
   console.log("Seeded tenants:");
   console.log(`  A: ${tenantA.slug} (${tenantA.id}) — owner ${SEED_USERS.tenantA.email}`);

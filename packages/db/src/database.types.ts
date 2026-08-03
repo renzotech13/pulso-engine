@@ -1,397 +1,1119 @@
-/**
- * Hand-written placeholder matching migrations 00000000000001-00000000000004.
- * Regenerate from the real local stack once Docker is running:
- *   pnpm db:types
- * (overwrites this file with `supabase gen types typescript --local`)
- */
-export interface Database {
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   public: {
     Tables: {
-      tenants: {
-        Row: {
-          id: string;
-          name: string;
-          slug: string;
-          rubro: string | null;
-          hitl_mode: "full-auto" | "approve-creatives" | "approve-all";
-          status: "active" | "paused" | "archived";
-          token_limit_daily: number | null;
-          token_limit_per_job: number | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          slug: string;
-          rubro?: string | null;
-          hitl_mode?: "full-auto" | "approve-creatives" | "approve-all";
-          status?: "active" | "paused" | "archived";
-          token_limit_daily?: number | null;
-          token_limit_per_job?: number | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["tenants"]["Insert"]>;
-        Relationships: [];
-      };
-      memberships: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          user_id: string;
-          role: "owner" | "admin" | "viewer";
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          user_id: string;
-          role?: "owner" | "admin" | "viewer";
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["memberships"]["Insert"]>;
-        Relationships: [];
-      };
-      events: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          type: string;
-          payload: Record<string, unknown>;
-          correlation_id: string;
-          status: "pending" | "dispatched" | "failed";
-          attempts: number;
-          last_error: string | null;
-          created_at: string;
-          dispatched_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          type: string;
-          payload?: Record<string, unknown>;
-          correlation_id?: string;
-          status?: "pending" | "dispatched" | "failed";
-          attempts?: number;
-          last_error?: string | null;
-          created_at?: string;
-          dispatched_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["events"]["Insert"]>;
-        Relationships: [];
-      };
-      agent_runs: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          agent: string;
-          trigger: string;
-          status: "running" | "succeeded" | "failed";
-          started_at: string;
-          finished_at: string | null;
-          cost_usd: number;
-          result: Record<string, unknown> | null;
-          error: string | null;
-          correlation_id: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          agent: string;
-          trigger: string;
-          status: "running" | "succeeded" | "failed";
-          started_at?: string;
-          finished_at?: string | null;
-          cost_usd?: number;
-          result?: Record<string, unknown> | null;
-          error?: string | null;
-          correlation_id: string;
-        };
-        // append-only: UPDATE/DELETE are revoked at the grant level, so this
-        // table never has a legitimate Update shape.
-        Update: never;
-        Relationships: [];
-      };
-      decision_log: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          agent: string;
-          observed: Record<string, unknown>;
-          decision: Record<string, unknown>;
-          rationale: string | null;
-          outcome: Record<string, unknown> | null;
-          correlation_id: string;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          agent: string;
-          observed?: Record<string, unknown>;
-          decision?: Record<string, unknown>;
-          rationale?: string | null;
-          outcome?: Record<string, unknown> | null;
-          correlation_id: string;
-          created_at?: string;
-        };
-        // append-only: UPDATE/DELETE are revoked at the grant level, so this
-        // table never has a legitimate Update shape.
-        Update: never;
-        Relationships: [];
-      };
-      alerts: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          severity: "info" | "warning" | "critical";
-          type: string;
-          message: string;
-          created_at: string;
-          acknowledged_at: string | null;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          severity?: "info" | "warning" | "critical";
-          type: string;
-          message: string;
-          created_at?: string;
-          acknowledged_at?: string | null;
-        };
-        Update: Partial<Database["public"]["Tables"]["alerts"]["Insert"]>;
-        Relationships: [];
-      };
-      business_categories: {
-        Row: {
-          slug: string;
-          name: string;
-          created_at: string;
-        };
-        Insert: {
-          slug: string;
-          name: string;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["business_categories"]["Insert"]>;
-        Relationships: [];
-      };
-      ephemerides: {
-        Row: {
-          id: string;
-          tenant_id: string | null;
-          country_code: string | null;
-          name: string;
-          date: string;
-          is_recurring_annually: boolean;
-          relevance_tags: string[];
-          category: "nacional" | "internacional" | "comercial" | "religiosa";
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id?: string | null;
-          country_code?: string | null;
-          name: string;
-          date: string;
-          is_recurring_annually?: boolean;
-          relevance_tags?: string[];
-          category?: "nacional" | "internacional" | "comercial" | "religiosa";
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["ephemerides"]["Insert"]>;
-        Relationships: [];
-      };
-      products_services: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          name: string;
-          description: string | null;
-          price: number | null;
-          currency: string;
-          photo_urls: string[];
-          category: string | null;
-          active: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          name: string;
-          description?: string | null;
-          price?: number | null;
-          currency?: string;
-          photo_urls?: string[];
-          category?: string | null;
-          active?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["products_services"]["Insert"]>;
-        Relationships: [];
-      };
-      promotions: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          name: string;
-          description: string | null;
-          discount_type: "percentage" | "fixed_amount";
-          discount_value: number;
-          starts_at: string;
-          ends_at: string;
-          conditions: string | null;
-          product_ids: string[];
-          active: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          name: string;
-          description?: string | null;
-          discount_type: "percentage" | "fixed_amount";
-          discount_value: number;
-          starts_at: string;
-          ends_at: string;
-          conditions?: string | null;
-          product_ids?: string[];
-          active?: boolean;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["promotions"]["Insert"]>;
-        Relationships: [];
-      };
-      content_calendar: {
-        Row: {
-          id: string;
-          tenant_id: string;
-          date: string;
-          slot_type: "post" | "carousel" | "story" | "reel";
-          theme: string;
-          status: "draft" | "approved" | "skipped";
-          source: Record<string, unknown>;
-          notes: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          tenant_id: string;
-          date: string;
-          slot_type: "post" | "carousel" | "story" | "reel";
-          theme: string;
-          status?: "draft" | "approved" | "skipped";
-          source?: Record<string, unknown>;
-          notes?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["content_calendar"]["Insert"]>;
-        Relationships: [];
-      };
-      prompts: {
-        Row: {
-          id: string;
-          name: string;
-          version: number;
-          template: string;
-          is_active: boolean;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          version: number;
-          template: string;
-          is_active?: boolean;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["prompts"]["Insert"]>;
-        Relationships: [];
-      };
-      agents_registry: {
-        Row: {
-          id: string;
-          name: string;
-          version: number;
-          allowed_tools: unknown[];
-          prompt_name: string | null;
-          model: string | null;
-          status: "active" | "disabled";
-          tenant_id: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          name: string;
-          version?: number;
-          allowed_tools?: unknown[];
-          prompt_name?: string | null;
-          model?: string | null;
-          status?: "active" | "disabled";
-          tenant_id?: string | null;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["agents_registry"]["Insert"]>;
-        Relationships: [];
-      };
       agent_calls: {
         Row: {
-          id: string;
-          agent_id: string | null;
-          agent_name: string;
-          tenant_id: string;
-          job_id: string | null;
-          correlation_id: string | null;
-          input_tokens: number;
-          output_tokens: number;
-          cost_estimated_usd: number;
-          latency_ms: number;
-          status: "success" | "error" | "blocked";
-          error_message: string | null;
-          created_at: string;
-        };
+          agent_id: string | null
+          agent_name: string
+          correlation_id: string | null
+          cost_estimated_usd: number
+          created_at: string
+          error_message: string | null
+          id: string
+          input_tokens: number
+          job_id: string | null
+          latency_ms: number
+          output_tokens: number
+          status: string
+          tenant_id: string
+        }
         Insert: {
-          id?: string;
-          agent_id?: string | null;
-          agent_name: string;
-          tenant_id: string;
-          job_id?: string | null;
-          correlation_id?: string | null;
-          input_tokens?: number;
-          output_tokens?: number;
-          cost_estimated_usd?: number;
-          latency_ms?: number;
-          status: "success" | "error" | "blocked";
-          error_message?: string | null;
-          created_at?: string;
-        };
-        // append-only: UPDATE/DELETE are revoked at the grant level, so this
-        // table never has a legitimate Update shape.
-        Update: never;
-        Relationships: [];
-      };
-    };
-    Views: Record<string, never>;
+          agent_id?: string | null
+          agent_name: string
+          correlation_id?: string | null
+          cost_estimated_usd?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          latency_ms?: number
+          output_tokens?: number
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          agent_id?: string | null
+          agent_name?: string
+          correlation_id?: string | null
+          cost_estimated_usd?: number
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          input_tokens?: number
+          job_id?: string | null
+          latency_ms?: number
+          output_tokens?: number
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_calls_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_runs: {
+        Row: {
+          agent: string
+          correlation_id: string
+          cost_usd: number
+          error: string | null
+          finished_at: string | null
+          id: string
+          result: Json | null
+          started_at: string
+          status: string
+          tenant_id: string
+          trigger: string
+        }
+        Insert: {
+          agent: string
+          correlation_id: string
+          cost_usd?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          result?: Json | null
+          started_at?: string
+          status?: string
+          tenant_id: string
+          trigger: string
+        }
+        Update: {
+          agent?: string
+          correlation_id?: string
+          cost_usd?: number
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          result?: Json | null
+          started_at?: string
+          status?: string
+          tenant_id?: string
+          trigger?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_runs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents_registry: {
+        Row: {
+          allowed_tools: Json
+          created_at: string
+          id: string
+          model: string | null
+          name: string
+          prompt_name: string | null
+          status: string
+          tenant_id: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          allowed_tools?: Json
+          created_at?: string
+          id?: string
+          model?: string | null
+          name: string
+          prompt_name?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          allowed_tools?: Json
+          created_at?: string
+          id?: string
+          model?: string | null
+          name?: string
+          prompt_name?: string | null
+          status?: string
+          tenant_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_registry_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alerts: {
+        Row: {
+          acknowledged_at: string | null
+          created_at: string
+          id: string
+          message: string
+          severity: string
+          tenant_id: string
+          type: string
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          created_at?: string
+          id?: string
+          message: string
+          severity?: string
+          tenant_id: string
+          type: string
+        }
+        Update: {
+          acknowledged_at?: string | null
+          created_at?: string
+          id?: string
+          message?: string
+          severity?: string
+          tenant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_kits: {
+        Row: {
+          brief_document_name: string | null
+          brief_document_url: string | null
+          color_primary: string | null
+          color_secondary: string | null
+          created_at: string
+          font_family: string | null
+          id: string
+          logo_url: string | null
+          tenant_id: string
+          tone_description: string | null
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          brief_document_name?: string | null
+          brief_document_url?: string | null
+          color_primary?: string | null
+          color_secondary?: string | null
+          created_at?: string
+          font_family?: string | null
+          id?: string
+          logo_url?: string | null
+          tenant_id: string
+          tone_description?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          brief_document_name?: string | null
+          brief_document_url?: string | null
+          color_primary?: string | null
+          color_secondary?: string | null
+          created_at?: string
+          font_family?: string | null
+          id?: string
+          logo_url?: string | null
+          tenant_id?: string
+          tone_description?: string | null
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_kits_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_categories: {
+        Row: {
+          created_at: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      content_calendar: {
+        Row: {
+          created_at: string
+          creative_id: string | null
+          date: string
+          id: string
+          notes: string | null
+          published_at: string | null
+          slot_type: string
+          source: Json
+          status: string
+          tenant_id: string
+          theme: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creative_id?: string | null
+          date: string
+          id?: string
+          notes?: string | null
+          published_at?: string | null
+          slot_type: string
+          source?: Json
+          status?: string
+          tenant_id: string
+          theme: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creative_id?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          published_at?: string | null
+          slot_type?: string
+          source?: Json
+          status?: string
+          tenant_id?: string
+          theme?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_calendar_creative_id_fkey"
+            columns: ["creative_id"]
+            isOneToOne: false
+            referencedRelation: "creatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "content_calendar_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      creatives: {
+        Row: {
+          asset_urls: string[]
+          brief: Json
+          calendar_slot_id: string | null
+          created_at: string
+          id: string
+          status: string
+          template_id: string | null
+          tenant_id: string
+          type: string
+          updated_at: string
+          variant_group_id: string | null
+        }
+        Insert: {
+          asset_urls?: string[]
+          brief?: Json
+          calendar_slot_id?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          template_id?: string | null
+          tenant_id: string
+          type: string
+          updated_at?: string
+          variant_group_id?: string | null
+        }
+        Update: {
+          asset_urls?: string[]
+          brief?: Json
+          calendar_slot_id?: string | null
+          created_at?: string
+          id?: string
+          status?: string
+          template_id?: string | null
+          tenant_id?: string
+          type?: string
+          updated_at?: string
+          variant_group_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creatives_calendar_slot_id_fkey"
+            columns: ["calendar_slot_id"]
+            isOneToOne: false
+            referencedRelation: "content_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creatives_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "render_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creatives_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      decision_log: {
+        Row: {
+          agent: string
+          correlation_id: string
+          created_at: string
+          decision: Json
+          id: string
+          observed: Json
+          outcome: Json | null
+          rationale: string | null
+          tenant_id: string
+        }
+        Insert: {
+          agent: string
+          correlation_id: string
+          created_at?: string
+          decision?: Json
+          id?: string
+          observed?: Json
+          outcome?: Json | null
+          rationale?: string | null
+          tenant_id: string
+        }
+        Update: {
+          agent?: string
+          correlation_id?: string
+          created_at?: string
+          decision?: Json
+          id?: string
+          observed?: Json
+          outcome?: Json | null
+          rationale?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ephemerides: {
+        Row: {
+          accent_color_primary: string | null
+          accent_color_secondary: string | null
+          category: string
+          country_code: string | null
+          created_at: string
+          date: string
+          id: string
+          is_recurring_annually: boolean
+          name: string
+          relevance_tags: string[]
+          tenant_id: string | null
+        }
+        Insert: {
+          accent_color_primary?: string | null
+          accent_color_secondary?: string | null
+          category?: string
+          country_code?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          is_recurring_annually?: boolean
+          name: string
+          relevance_tags?: string[]
+          tenant_id?: string | null
+        }
+        Update: {
+          accent_color_primary?: string | null
+          accent_color_secondary?: string | null
+          category?: string
+          country_code?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          is_recurring_annually?: boolean
+          name?: string
+          relevance_tags?: string[]
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ephemerides_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          attempts: number
+          correlation_id: string
+          created_at: string
+          dispatched_at: string | null
+          id: string
+          last_error: string | null
+          payload: Json
+          status: string
+          tenant_id: string
+          type: string
+        }
+        Insert: {
+          attempts?: number
+          correlation_id?: string
+          created_at?: string
+          dispatched_at?: string | null
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          status?: string
+          tenant_id: string
+          type: string
+        }
+        Update: {
+          attempts?: number
+          correlation_id?: string
+          created_at?: string
+          dispatched_at?: string | null
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          status?: string
+          tenant_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      memberships: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products_services: {
+        Row: {
+          active: boolean
+          category: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          name: string
+          photo_urls: string[]
+          price: number | null
+          tenant_id: string
+          updated_at: string
+          video_urls: string[]
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name: string
+          photo_urls?: string[]
+          price?: number | null
+          tenant_id: string
+          updated_at?: string
+          video_urls?: string[]
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          name?: string
+          photo_urls?: string[]
+          price?: number | null
+          tenant_id?: string
+          updated_at?: string
+          video_urls?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_services_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promotions: {
+        Row: {
+          active: boolean
+          conditions: string | null
+          created_at: string
+          description: string | null
+          discount_type: string
+          discount_value: number
+          ends_at: string
+          id: string
+          name: string
+          product_ids: string[]
+          starts_at: string
+          tenant_id: string
+        }
+        Insert: {
+          active?: boolean
+          conditions?: string | null
+          created_at?: string
+          description?: string | null
+          discount_type: string
+          discount_value: number
+          ends_at: string
+          id?: string
+          name: string
+          product_ids?: string[]
+          starts_at: string
+          tenant_id: string
+        }
+        Update: {
+          active?: boolean
+          conditions?: string | null
+          created_at?: string
+          description?: string | null
+          discount_type?: string
+          discount_value?: number
+          ends_at?: string
+          id?: string
+          name?: string
+          product_ids?: string[]
+          starts_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      prompts: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          template: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          template: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          template?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      publications: {
+        Row: {
+          created_at: string
+          creative_id: string
+          error_message: string | null
+          external_post_id: string | null
+          id: string
+          platform: string
+          published_at: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          creative_id: string
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          platform: string
+          published_at?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          creative_id?: string
+          error_message?: string | null
+          external_post_id?: string | null
+          id?: string
+          platform?: string
+          published_at?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publications_creative_id_fkey"
+            columns: ["creative_id"]
+            isOneToOne: false
+            referencedRelation: "creatives"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      render_templates: {
+        Row: {
+          canvas_height: number | null
+          canvas_width: number | null
+          component_ref: string
+          created_at: string
+          engine: string
+          frame_image_url: string | null
+          id: string
+          name: string
+          props_schema: Json
+          status: string
+          tenant_id: string | null
+          type: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          canvas_height?: number | null
+          canvas_width?: number | null
+          component_ref: string
+          created_at?: string
+          engine: string
+          frame_image_url?: string | null
+          id?: string
+          name: string
+          props_schema?: Json
+          status?: string
+          tenant_id?: string | null
+          type: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          canvas_height?: number | null
+          canvas_width?: number | null
+          component_ref?: string
+          created_at?: string
+          engine?: string
+          frame_image_url?: string | null
+          id?: string
+          name?: string
+          props_schema?: Json
+          status?: string
+          tenant_id?: string | null
+          type?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_templates_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          instagram_business_account_id: string | null
+          instagram_username: string | null
+          last_error: string | null
+          last_verified_at: string | null
+          page_id: string
+          page_name: string | null
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          instagram_business_account_id?: string | null
+          instagram_username?: string | null
+          last_error?: string | null
+          last_verified_at?: string | null
+          page_id: string
+          page_name?: string | null
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          instagram_business_account_id?: string | null
+          instagram_username?: string | null
+          last_error?: string | null
+          last_verified_at?: string | null
+          page_id?: string
+          page_name?: string | null
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          hitl_mode: string
+          id: string
+          name: string
+          rubro: string | null
+          slug: string
+          status: string
+          token_limit_daily: number | null
+          token_limit_per_job: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hitl_mode?: string
+          id?: string
+          name: string
+          rubro?: string | null
+          slug: string
+          status?: string
+          token_limit_daily?: number | null
+          token_limit_per_job?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hitl_mode?: string
+          id?: string
+          name?: string
+          rubro?: string | null
+          slug?: string
+          status?: string
+          token_limit_daily?: number | null
+          token_limit_per_job?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenants_rubro_fkey"
+            columns: ["rubro"]
+            isOneToOne: false
+            referencedRelation: "business_categories"
+            referencedColumns: ["slug"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
-      create_tenant_with_owner: {
-        Args: { tenant_name: string; tenant_slug: string; tenant_rubro: string };
-        Returns: Database["public"]["Tables"]["tenants"]["Row"];
-      };
       claim_pending_events: {
-        Args: { batch_size?: number };
-        Returns: Database["public"]["Tables"]["events"]["Row"][];
-      };
+        Args: { batch_size?: number }
+        Returns: {
+          attempts: number
+          correlation_id: string
+          created_at: string
+          dispatched_at: string | null
+          id: string
+          last_error: string | null
+          payload: Json
+          status: string
+          tenant_id: string
+          type: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      create_tenant_with_owner: {
+        Args: { tenant_name: string; tenant_rubro: string; tenant_slug: string }
+        Returns: {
+          created_at: string
+          hitl_mode: string
+          id: string
+          name: string
+          rubro: string | null
+          slug: string
+          status: string
+          token_limit_daily: number | null
+          token_limit_per_job: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tenants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       request_calendar_regeneration: {
-        Args: { target_tenant_id: string };
-        Returns: undefined;
-      };
-    };
-  };
+        Args: { target_tenant_id: string }
+        Returns: undefined
+      }
+      request_creative_generation: {
+        Args: { target_calendar_slot_id: string }
+        Returns: undefined
+      }
+      request_creative_publish: {
+        Args: { target_creative_id: string }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const

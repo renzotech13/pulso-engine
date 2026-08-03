@@ -1,12 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { Card } from "@/components/ui/card";
+import { inputClass } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
-type Status = "idle" | "sending" | "sent" | "error";
+type Status = "idle" | "sending" | "error";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -15,50 +20,54 @@ export default function LoginPage() {
     setStatus("sending");
 
     const supabase = createSupabaseBrowserClient();
-    // No emailRedirectTo: our custom magic_link.html template always points
-    // to /auth/confirm with a fixed `next`, ignoring RedirectTo entirely.
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
       setStatus("error");
       setErrorMessage(error.message);
       return;
     }
-    setStatus("sent");
+
+    // Full navigation (not router.push) so the server sees the freshly-set session cookie.
+    window.location.href = "/agents";
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded-lg border border-neutral-800 p-8"
-      >
-        <h1 className="text-xl font-semibold">Pulso Engine</h1>
-        <p className="text-sm text-neutral-400">
-          Ingresa con el enlace mágico que te enviaremos por correo.
-        </p>
-        <input
-          type="email"
-          required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="tu@negocio.com"
-          className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm"
-        />
-        <button
-          type="submit"
-          disabled={status === "sending"}
-          className="w-full rounded bg-indigo-600 px-3 py-2 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
-        >
-          {status === "sending" ? "Enviando..." : "Enviar enlace mágico"}
-        </button>
-        {status === "sent" && (
-          <p className="text-sm text-emerald-400">
-            Revisa tu correo para continuar (en local: http://127.0.0.1:54324 — Inbucket).
-          </p>
-        )}
-        {status === "error" && <p className="text-sm text-red-400">{errorMessage}</p>}
-      </form>
+    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+      <Card className="w-full max-w-sm p-8">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <h1 className="font-display text-xl text-neutral-100">Pulso Engine</h1>
+          <p className="text-sm text-neutral-400">Ingresa con tu correo y contraseña.</p>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="tu@negocio.com"
+            className={inputClass}
+          />
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="Contraseña"
+            className={inputClass}
+          />
+          <Button type="submit" disabled={status === "sending"} className="w-full disabled:opacity-50">
+            {status === "sending" ? "Ingresando..." : "Ingresar"}
+          </Button>
+          {status === "error" && <p className="text-sm text-status-pink">{errorMessage}</p>}
+          <div className="flex items-center justify-between text-xs text-neutral-500">
+            <Link href="/forgot-password" className="hover:text-pulso-accent hover:underline">
+              ¿Olvidaste tu contraseña?
+            </Link>
+            <Link href="/signup" className="hover:text-pulso-accent hover:underline">
+              Crear cuenta
+            </Link>
+          </div>
+        </form>
+      </Card>
     </main>
   );
 }

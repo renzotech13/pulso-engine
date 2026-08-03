@@ -22,8 +22,12 @@ export class LlmOutputError extends AppError {
 let client: OpenAI | undefined;
 
 // A hung local model must not hang the agent (and its BullMQ concurrency
-// slot) forever — fail after 2 minutes so the job can retry/error out.
-const REQUEST_TIMEOUT_MS = 120_000;
+// slot) forever — fail eventually so the job can retry/error out. Measured
+// against gemma-4-e4b on real prompts: a reasoning-heavy completion can take
+// ~180s (759 of 841 completion tokens were the "thinking" trace), so 120s
+// was cutting off completions that were about to succeed. 4 minutes leaves
+// headroom above that observed worst case.
+const REQUEST_TIMEOUT_MS = 240_000;
 
 function getClient(): OpenAI {
   if (!client) {

@@ -7,6 +7,9 @@ import { getQueue, getRedisConnection, closeAllQueues } from "./queues.js";
 import { runOrchestratorTick } from "./agents/orchestrator.js";
 import { runHelloAgent } from "./agents/hello.js";
 import { runPlannerForTenant, runPlannerTick } from "./agents/planner.js";
+import { runCreativeAgentForSlot } from "./agents/creative.js";
+import { runPublishAgentForCreative } from "./agents/publish.js";
+import { runPublishTick } from "./agents/publish-tick.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
 
@@ -21,6 +24,10 @@ async function processCoreJob(job: Job): Promise<void> {
   }
   if (job.name === "planner.tick") {
     await runPlannerTick();
+    return;
+  }
+  if (job.name === "publish.tick") {
+    await runPublishTick();
     return;
   }
 
@@ -50,6 +57,46 @@ async function processCoreJob(job: Job): Promise<void> {
   }
 }
 
+async function processRenderJob(job: Job): Promise<void> {
+  const event = job.data as EventRow;
+
+  switch (event.type) {
+    case "creative.requested": {
+      const payload = event.payload as { calendarSlotId: string };
+      await runCreativeAgentForSlot(event.tenant_id, payload.calendarSlotId, event.correlation_id, job.id);
+      return;
+    }
+    case "creative.generated":
+      logger.info(
+        { tenantId: event.tenant_id, correlationId: event.correlation_id },
+        "creative generated",
+      );
+      return;
+    default:
+      logger.warn({ eventType: event.type }, "render worker received unhandled event type");
+  }
+}
+
+async function processPublishJob(job: Job): Promise<void> {
+  const event = job.data as EventRow;
+
+  switch (event.type) {
+    case "publish.requested": {
+      const payload = event.payload as { creativeId: string };
+      await runPublishAgentForCreative(event.tenant_id, payload.creativeId, event.correlation_id);
+      return;
+    }
+    case "publish.completed":
+      logger.info(
+        { tenantId: event.tenant_id, correlationId: event.correlation_id },
+        "publish completed",
+      );
+      return;
+    default:
+      logger.warn({ eventType: event.type }, "publish worker received unhandled event type");
+  }
+}
+
 async function main(): Promise<void> {
   const stopDispatcher = startDispatcher();
 
@@ -59,6 +106,22 @@ async function main(): Promise<void> {
   });
   coreWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, err }, "core job failed");
+  });
+
+  const renderWorker = new Worker("render", processRenderJob, {
+    connection: getRedisConnection(),
+    concurrency: 2,
+  });
+  renderWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "render job failed");
+  });
+
+  const publishWorker = new Worker("publish", processPublishJob, {
+    connection: getRedisConnection(),
+    concurrency: 2,
+  });
+  publishWorker.on("failed", (job, err) => {
+    logger.error({ jobId: job?.id, err }, "publish job failed");
   });
 
   const coreQueue = getQueue("core");
@@ -75,8 +138,17 @@ async function main(): Promise<void> {
     {},
     { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: "planner-tick" },
   );
+  // Only fires publish.requested for full-auto tenants (see publish-tick.ts)
+  // — everyone else still needs a manual "Publicar" click, unaffected by this.
+  await coreQueue.add(
+    "publish.tick",
+    {},
+    { repeat: { every: 60 * 60 * 1000 }, jobId: "publish-tick" },
+  );
 
-  logger.info("workers bootstrapped: dispatcher + core worker + orchestrator/planner ticks running");
+  logger.info(
+    "workers bootstrapped: dispatcher + core/render/publish workers + orchestrator/planner/publish ticks running",
+  );
 
   let shuttingDown = false;
   const shutdown = async () => {
@@ -85,6 +157,8 @@ async function main(): Promise<void> {
     logger.info("shutting down workers");
     stopDispatcher();
     await coreWorker.close();
+    await renderWorker.close();
+    await publishWorker.close();
     await closeAllQueues();
     process.exit(0);
   };

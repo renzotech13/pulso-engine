@@ -22,6 +22,22 @@ export const eventCatalog = {
     payload: z.object({ count: z.number() }),
     queue: "core",
   },
+  "creative.requested": {
+    payload: z.object({ calendarSlotId: z.string().uuid() }),
+    queue: "render",
+  },
+  "creative.generated": {
+    payload: z.object({ creativeId: z.string().uuid() }),
+    queue: "render",
+  },
+  "publish.requested": {
+    payload: z.object({ creativeId: z.string().uuid() }),
+    queue: "publish",
+  },
+  "publish.completed": {
+    payload: z.object({ creativeId: z.string().uuid() }),
+    queue: "publish",
+  },
 } as const;
 
 export type EventType = keyof typeof eventCatalog;

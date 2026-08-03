@@ -60,7 +60,7 @@ export function AgentRunsTable({ tenantId }: { tenantId: string }) {
       </thead>
       <tbody>
         {runs.map((run) => (
-          <tr key={run.id} className="border-t border-neutral-800">
+          <tr key={run.id} className="border-t border-ink-700">
             <td className="py-2">{run.agent}</td>
             <td className="py-2">{run.trigger}</td>
             <td className={`py-2 ${STATUS_COLOR[run.status]}`}>{run.status}</td>

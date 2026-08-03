@@ -127,6 +127,11 @@ export async function runPlannerForTenant(
     const openDatesSet = new Set(openDates);
     let proposedCount = 0;
 
+    // approve-creatives and full-auto both skip manual slot approval — the
+    // difference between them is whether the *creative* also auto-approves
+    // (handled in creative.ts), not whether the slot does.
+    const autoApproveSlot = tenant.hitl_mode !== "approve-all";
+
     for (const slot of proposal.slots) {
       if (!openDatesSet.has(slot.date)) {
         ctx.logger.warn(
@@ -136,12 +141,22 @@ export async function runPlannerForTenant(
         continue;
       }
 
-      await ctx.db.upsertContentCalendarSlot({
+      const inserted = await ctx.db.upsertContentCalendarSlot({
         date: slot.date,
         slot_type: slot.slot_type,
         theme: slot.theme,
         source: { agent: "planner", rationale: slot.rationale },
+        ...(autoApproveSlot ? { status: "approved" as const } : {}),
       });
+
+      if (inserted && autoApproveSlot) {
+        await publishEvent(service, {
+          tenantId,
+          type: "creative.requested",
+          payload: { calendarSlotId: inserted.id },
+          correlationId,
+        });
+      }
 
       await ctx.db.insertDecisionLog({
         agent: "planner",

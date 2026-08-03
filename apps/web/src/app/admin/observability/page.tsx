@@ -1,5 +1,6 @@
-import { createServiceRoleClient } from "@pulso/db/worker";
+import { createServiceRoleClient } from "@/lib/supabase/service";
 import { TokenUsageChart } from "@/components/token-usage-chart";
+import { Card, CardHeader } from "@/components/ui/card";
 
 const CHART_DAYS = 14;
 const WINDOW_DAYS = 30;
@@ -83,54 +84,61 @@ export default async function AdminObservabilityPage() {
   });
 
   return (
-    <div>
-      <h1 className="mb-1 text-lg font-semibold">Observabilidad de agentes</h1>
-      <p className="mb-6 text-sm text-neutral-500">
-        Últimos {WINDOW_DAYS} días, todos los tenants. Costo siempre $0 con LM Studio (local).
-      </p>
-
-      <div className="mb-8 rounded border border-neutral-800 p-4">
-        <p className="mb-2 text-xs uppercase text-neutral-500">Tokens por día (últimos {CHART_DAYS})</p>
-        <TokenUsageChart data={chartData} />
+    <div className="space-y-6">
+      <div>
+        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
+          Panel interno
+        </p>
+        <h1 className="font-display text-2xl font-semibold">Observabilidad de agentes</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          Últimos {WINDOW_DAYS} días, todos los tenants. Costo siempre $0 con LM Studio (local).
+        </p>
       </div>
 
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-neutral-500">
-            <th className="pb-2">Tenant</th>
-            <th className="pb-2">Agente</th>
-            <th className="pb-2">Tokens hoy</th>
-            <th className="pb-2">Tokens ({WINDOW_DAYS}d)</th>
-            <th className="pb-2">Costo est. ({WINDOW_DAYS}d)</th>
-            <th className="pb-2">Bloqueadas</th>
-            <th className="pb-2">Latencia prom.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={7} className="py-4 text-neutral-500">
-                Sin llamadas registradas todavía.
-              </td>
+      <Card className="p-5">
+        <CardHeader title={`Tokens por día (últimos ${CHART_DAYS})`} />
+        <TokenUsageChart data={chartData} />
+      </Card>
+
+      <Card className="overflow-hidden p-5">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-neutral-500">
+              <th className="pb-2">Tenant</th>
+              <th className="pb-2">Agente</th>
+              <th className="pb-2">Tokens hoy</th>
+              <th className="pb-2">Tokens ({WINDOW_DAYS}d)</th>
+              <th className="pb-2">Costo est. ({WINDOW_DAYS}d)</th>
+              <th className="pb-2">Bloqueadas</th>
+              <th className="pb-2">Latencia prom.</th>
             </tr>
-          )}
-          {rows.map((row) => (
-            <tr key={`${row.tenantId}:${row.agentName}`} className="border-t border-neutral-800">
-              <td className="py-2">{row.tenantName}</td>
-              <td className="py-2">{row.agentName}</td>
-              <td className="py-2">{row.tokensToday.toLocaleString()}</td>
-              <td className="py-2">{row.tokensMonth.toLocaleString()}</td>
-              <td className="py-2">${row.costMonth.toFixed(4)}</td>
-              <td className={`py-2 ${row.blockedCount > 0 ? "text-red-400" : ""}`}>
-                {row.blockedCount}
-              </td>
-              <td className="py-2">
-                {row.latencyCount > 0 ? `${Math.round(row.latencySum / row.latencyCount)}ms` : "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="py-4 text-neutral-500">
+                  Sin llamadas registradas todavía.
+                </td>
+              </tr>
+            )}
+            {rows.map((row) => (
+              <tr key={`${row.tenantId}:${row.agentName}`} className="border-t border-ink-700">
+                <td className="py-2">{row.tenantName}</td>
+                <td className="py-2">{row.agentName}</td>
+                <td className="py-2">{row.tokensToday.toLocaleString()}</td>
+                <td className="py-2">{row.tokensMonth.toLocaleString()}</td>
+                <td className="py-2">${row.costMonth.toFixed(4)}</td>
+                <td className={`py-2 ${row.blockedCount > 0 ? "text-status-pink" : ""}`}>
+                  {row.blockedCount}
+                </td>
+                <td className="py-2">
+                  {row.latencyCount > 0 ? `${Math.round(row.latencySum / row.latencyCount)}ms` : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
     </div>
   );
 }

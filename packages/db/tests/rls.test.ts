@@ -111,9 +111,11 @@ describe("append-only audit tables", () => {
       correlation_id: correlationId,
     });
 
+    // Append-only is enforced by revoked UPDATE grants at the DB level (see
+    // migration 00000000000001), not by the generated TS types — the update
+    // call itself type-checks fine, it's the resulting `error` that proves it.
     const { error } = await service
       .from("agent_runs")
-      // @ts-expect-error -- Update is `never`: this table is append-only by design.
       .update({ status: "succeeded" })
       .eq("correlation_id", correlationId);
     expect(error).not.toBeNull();
