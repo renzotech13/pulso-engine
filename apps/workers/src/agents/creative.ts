@@ -149,12 +149,13 @@ export async function runCreativeAgentForSlot(
 
       const service = createServiceRoleClient();
       const config = loadConfig();
-      const [tenant, promotions, products, promptTemplate, ephemerides] = await Promise.all([
+      const [tenant, promotions, products, promptTemplate, ephemerides, mediaAssets] = await Promise.all([
         ctx.db.getTenant(),
         ctx.db.listActivePromotions(),
         ctx.db.listActiveProducts(),
         getActivePrompt(service, promptName),
         ctx.db.listEphemerides(),
+        ctx.db.listMediaAssets("image"),
       ]);
 
       // Exact-date match only — the Planner doesn't record which ephemeris (if
@@ -202,10 +203,23 @@ export async function runCreativeAgentForSlot(
 
       let photoUrl = pickProductPhoto(products, copy.productName);
 
-      // No catalog photo matched — try an AI-generated one instead of just
-      // falling back to the brand gradient. Inactive whenever GEMINI_API_KEY
-      // isn't configured (generateThemedImage itself no-ops), so tenants who
-      // never set one see exactly today's behavior.
+      // No specific catalog product matched — prefer the tenant's own
+      // uploaded photo library over an AI-generated image, since a real
+      // photo the tenant chose beats a synthetic one whenever one's
+      // available. listMediaAssets already orders oldest/never-used first,
+      // so this naturally cycles through every uploaded photo before any
+      // gets reused.
+      const pickedMediaAsset = !photoUrl ? mediaAssets[0] : undefined;
+      if (pickedMediaAsset) {
+        photoUrl = pickedMediaAsset.url;
+        await ctx.db.markMediaAssetUsed(pickedMediaAsset.id);
+      }
+
+      // Still no photo — try an AI-generated one instead of just falling
+      // back to the brand gradient. Inactive whenever GEMINI_API_KEY isn't
+      // configured (generateThemedImage itself no-ops), so tenants who
+      // never set one and never uploaded to their photo library see
+      // exactly today's behavior.
       if (!photoUrl && config.GEMINI_API_KEY) {
         const styleHint = accentEphemeris
           ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`

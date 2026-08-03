@@ -362,6 +362,71 @@ export async function upsertPhotoFrameAction(formData: FormData): Promise<void> 
 }
 
 /**
+ * Adds real photos to the tenant's media library — the Creative agent picks
+ * from this pool (oldest/never-used first) for regular posts that aren't
+ * about a specific catalog product, instead of falling straight to an
+ * AI-generated image. Plain authenticated insert (media_assets has its own
+ * owner/admin RLS policy), unlike the photo-frame creative action below.
+ */
+export async function uploadMediaAssetsAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  if (!tenantId) return;
+
+  const supabase = await createSupabaseServerClient();
+
+  const files = formData
+    .getAll("photos")
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  if (files.length === 0) return;
+
+  const rows: { tenant_id: string; kind: "image"; url: string }[] = [];
+  for (const file of files) {
+    const path = `${tenantId}/library-${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage.from("brand-assets").upload(path, file);
+    if (uploadError) throw new Error(`failed to upload photo: ${uploadError.message}`);
+    const { data } = supabase.storage.from("brand-assets").getPublicUrl(path);
+    rows.push({ tenant_id: tenantId, kind: "image", url: data.publicUrl });
+  }
+
+  const { error } = await supabase.from("media_assets").insert(rows);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/brand-kit");
+}
+
+export async function deleteMediaAssetAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const assetId = String(formData.get("assetId") ?? "");
+  if (!tenantId || !assetId) return;
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: asset } = await supabase
+    .from("media_assets")
+    .select("url")
+    .eq("id", assetId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  const { error } = await supabase
+    .from("media_assets")
+    .delete()
+    .eq("id", assetId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+
+  if (asset?.url) {
+    const marker = "/brand-assets/";
+    const idx = asset.url.indexOf(marker);
+    if (idx !== -1) {
+      await supabase.storage.from("brand-assets").remove([asset.url.slice(idx + marker.length)]);
+    }
+  }
+
+  revalidatePath("/brand-kit");
+}
+
+/**
  * Uploads one or more real photos, composites them under the tenant's own
  * "photo-frame" template (configured in Brand Kit), and creates the
  * calendar slot + creative directly — no Planner/LLM involved, this is a

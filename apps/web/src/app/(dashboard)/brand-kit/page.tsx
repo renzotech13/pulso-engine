@@ -1,7 +1,8 @@
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { upsertBrandKitAction, upsertPhotoFrameAction } from "@/lib/actions";
+import { deleteMediaAssetAction, upsertBrandKitAction, upsertPhotoFrameAction, uploadMediaAssetsAction } from "@/lib/actions";
 import { MediaDropzone } from "@/components/media-dropzone";
+import { SubmitButton } from "@/components/submit-button";
 import { TonePresets } from "@/components/tone-presets";
 import { inputClass, labelClass } from "@/components/ui/field";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -25,7 +26,7 @@ export default async function BrandKitPage() {
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: brandKit }, { data: photoFrame }] = await Promise.all([
+  const [{ data: brandKit }, { data: photoFrame }, { data: mediaAssets }] = await Promise.all([
     supabase.from("brand_kits").select("*").eq("tenant_id", ctx.tenantId).maybeSingle(),
     supabase
       .from("render_templates")
@@ -33,6 +34,12 @@ export default async function BrandKitPage() {
       .eq("tenant_id", ctx.tenantId)
       .eq("component_ref", "photo-frame")
       .maybeSingle(),
+    supabase
+      .from("media_assets")
+      .select("id, url")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("kind", "image")
+      .order("created_at", { ascending: false }),
   ]);
 
   const colorPrimary = brandKit?.color_primary ?? DEFAULT_COLOR_PRIMARY;
@@ -183,6 +190,57 @@ export default async function BrandKitPage() {
             </button>
           </div>
         </form>
+      </Card>
+
+      <Card className="p-5">
+        <CardHeader title="Banco de fotos" />
+        <p className="mb-4 text-sm text-neutral-500">
+          Sube fotos reales de tu negocio — el Creative las usa como protagonista de tus posts (con
+          título, subtítulo y colores de marca encima, igual que ahora) en vez de generar una imagen
+          con IA. Van rotando: cada post usa la que lleva más tiempo sin salir, así que todas se
+          terminan usando.
+        </p>
+        <form action={uploadMediaAssetsAction} className="mb-5 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="tenantId" value={ctx.tenantId} />
+          <div className="min-w-[220px] flex-1">
+            <MediaDropzone
+              name="photos"
+              accept="image/*"
+              label="Fotos"
+              hint="Arrastra fotos acá o haz click para elegir"
+            />
+          </div>
+          <SubmitButton
+            pendingText="Subiendo…"
+            className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            Agregar al banco
+          </SubmitButton>
+        </form>
+
+        {mediaAssets && mediaAssets.length > 0 && (
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {mediaAssets.map((asset) => (
+              <div
+                key={asset.id}
+                className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700"
+              >
+                <img src={asset.url} alt="" className="h-full w-full object-cover" />
+                <form action={deleteMediaAssetAction} className="absolute right-1 top-1">
+                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                  <input type="hidden" name="assetId" value={asset.id} />
+                  <button
+                    type="submit"
+                    title="Eliminar esta foto"
+                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink group-hover:opacity-100"
+                  >
+                    ×
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <section>

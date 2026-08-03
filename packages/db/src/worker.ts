@@ -40,6 +40,7 @@ type SocialConnectionRow = Database["public"]["Tables"]["social_connections"]["R
 type PublicationRow = Database["public"]["Tables"]["publications"]["Row"];
 type PublicationInsert = Database["public"]["Tables"]["publications"]["Insert"];
 type PublicationUpdate = Database["public"]["Tables"]["publications"]["Update"];
+type MediaAssetRow = Database["public"]["Tables"]["media_assets"]["Row"];
 
 /**
  * Tenant-scoped handle for agent code. Since service_role bypasses RLS,
@@ -97,6 +98,9 @@ export interface TenantScopedClient {
   sumTokensToday(): Promise<number>;
   sumTokensForJob(jobId: string): Promise<number>;
   insertAgentCall(row: Omit<AgentCallInsert, "tenant_id">): Promise<void>;
+  /** Ordered oldest-first (nulls — never used — first), so the caller just needs the head of the list. */
+  listMediaAssets(kind: "image" | "video"): Promise<MediaAssetRow[]>;
+  markMediaAssetUsed(id: string): Promise<void>;
 }
 
 export function createTenantScopedClient(
@@ -450,6 +454,32 @@ export function createTenantScopedClient(
       const { error } = await client.from("agent_calls").insert({ ...row, tenant_id: tenantId });
       if (error) {
         throw new TenantIsolationError(`failed to insert agent_call for tenant ${tenantId}`, error);
+      }
+    },
+
+    async listMediaAssets(kind) {
+      const { data, error } = await client
+        .from("media_assets")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("kind", kind)
+        .order("last_used_at", { ascending: true, nullsFirst: true });
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list media_assets for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async markMediaAssetUsed(id) {
+      const { error } = await client
+        .from("media_assets")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to mark media_asset ${id} used for tenant ${tenantId}`, error);
       }
     },
   };
