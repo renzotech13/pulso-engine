@@ -14,6 +14,17 @@ export interface TenantContext extends TenantSummary {
   memberships: TenantSummary[];
 }
 
+const MEMBERSHIP_ROLES = ["owner", "admin", "viewer"] as const;
+
+// memberships.role is `text` at the DB level (Supabase's generator doesn't
+// see the CHECK constraint that actually restricts it to these three
+// values), so the query result comes back typed as plain `string` — this
+// narrows it back, falling back to the least-privileged role for any value
+// that somehow doesn't match instead of letting a bad row break the page.
+function toMembershipRole(role: string): TenantSummary["role"] {
+  return (MEMBERSHIP_ROLES as readonly string[]).includes(role) ? (role as TenantSummary["role"]) : "viewer";
+}
+
 /**
  * Resolves the signed-in user's active tenant for this request. RLS already
  * guarantees `memberships`/`tenants` only return rows the user belongs to —
@@ -51,7 +62,7 @@ export async function getTenantContext(): Promise<TenantContext> {
 
   const summaries: TenantSummary[] = memberships.map((m) => ({
     tenantId: m.tenant_id,
-    role: m.role,
+    role: toMembershipRole(m.role),
     tenantName: tenants?.find((t) => t.id === m.tenant_id)?.name ?? "Untitled",
   }));
 
