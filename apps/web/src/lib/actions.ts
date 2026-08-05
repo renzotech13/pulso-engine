@@ -886,3 +886,94 @@ export async function retestSocialConnectionAction(formData: FormData): Promise<
   if (error) throw new Error(error.message);
   revalidatePath("/connections");
 }
+
+/**
+ * Converts a pending news suggestion into a real content_calendar slot for
+ * the chosen date — the News agent itself never touches content_calendar
+ * (see apps/workers/src/agents/news.ts), this action is the one
+ * human-triggered bridge between "a news item worth using" and actual
+ * scheduled content. Same reasoning as createPhotoFrameCreativeAction:
+ * content_calendar has no insert policy for authenticated, so this does its
+ * own owner/admin check and writes with the service role.
+ */
+export async function useNewsSuggestionAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const suggestionId = String(formData.get("suggestionId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  if (!tenantId || !suggestionId || !date) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const service = createServiceRoleClient();
+
+  const { data: suggestion } = await service
+    .from("news_suggestions")
+    .select("headline, angle, status")
+    .eq("id", suggestionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (!suggestion || suggestion.status !== "pending") return;
+
+  const { data: tenant } = await service.from("tenants").select("hitl_mode").eq("id", tenantId).single();
+  const autoApproveSlot = tenant?.hitl_mode !== "approve-all";
+
+  const { data: slot, error: slotError } = await service
+    .from("content_calendar")
+    .upsert(
+      {
+        tenant_id: tenantId,
+        date,
+        slot_type: "post",
+        theme: suggestion.angle,
+        status: autoApproveSlot ? "approved" : "draft",
+        source: { agent: "news", rationale: suggestion.headline },
+      },
+      { onConflict: "tenant_id,date", ignoreDuplicates: true },
+    )
+    .select("id")
+    .maybeSingle();
+  if (slotError) throw new Error(slotError.message);
+
+  // Unique tenant_id+date means a day that's already planned silently loses
+  // this insert (see upsertContentCalendarSlot's own doc comment) — surfaced
+  // here instead of failing silently, since the user explicitly picked this
+  // date and would otherwise have no idea why nothing happened.
+  if (!slot) {
+    throw new Error(`Ya hay contenido planificado para el ${date}. Elige otro día.`);
+  }
+
+  if (autoApproveSlot) {
+    const { error: rpcError } = await supabase.rpc("request_creative_generation", {
+      target_calendar_slot_id: slot.id,
+    });
+    if (rpcError) throw new Error(rpcError.message);
+  }
+
+  const { error: updateError } = await service
+    .from("news_suggestions")
+    .update({ status: "used" })
+    .eq("id", suggestionId)
+    .eq("tenant_id", tenantId);
+  if (updateError) throw new Error(updateError.message);
+
+  revalidatePath("/news");
+  revalidatePath("/calendar");
+}
+
+export async function dismissNewsSuggestionAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const suggestionId = String(formData.get("suggestionId") ?? "");
+  if (!tenantId || !suggestionId) return;
+
+  const supabase = await createSupabaseServerClient();
+
+  const { error } = await supabase
+    .from("news_suggestions")
+    .update({ status: "dismissed" })
+    .eq("id", suggestionId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/news");
+}

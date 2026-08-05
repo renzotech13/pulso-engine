@@ -615,6 +615,53 @@ export type Database = {
           },
         ]
       }
+      news_suggestions: {
+        Row: {
+          angle: string
+          created_at: string
+          headline: string
+          id: string
+          published_at: string | null
+          source_name: string | null
+          source_url: string
+          status: string
+          summary: string | null
+          tenant_id: string
+        }
+        Insert: {
+          angle: string
+          created_at?: string
+          headline: string
+          id?: string
+          published_at?: string | null
+          source_name?: string | null
+          source_url: string
+          status?: string
+          summary?: string | null
+          tenant_id: string
+        }
+        Update: {
+          angle?: string
+          created_at?: string
+          headline?: string
+          id?: string
+          published_at?: string | null
+          source_name?: string | null
+          source_url?: string
+          status?: string
+          summary?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "news_suggestions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products_services: {
         Row: {
           active: boolean

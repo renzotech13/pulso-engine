@@ -10,6 +10,7 @@ import { runPlannerForTenant, runPlannerTick } from "./agents/planner.js";
 import { runCreativeAgentForSlot } from "./agents/creative.js";
 import { runPublishAgentForCreative } from "./agents/publish.js";
 import { runPublishTick } from "./agents/publish-tick.js";
+import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
 
@@ -28,6 +29,10 @@ async function processCoreJob(job: Job): Promise<void> {
   }
   if (job.name === "publish.tick") {
     await runPublishTick();
+    return;
+  }
+  if (job.name === "news.tick") {
+    await runNewsTick();
     return;
   }
 
@@ -50,6 +55,15 @@ async function processCoreJob(job: Job): Promise<void> {
       logger.info(
         { tenantId: event.tenant_id, correlationId: event.correlation_id },
         "calendar slots proposed",
+      );
+      return;
+    case "news.digest.requested":
+      await runNewsAgentForTenant(event.tenant_id, event.correlation_id, job.id);
+      return;
+    case "news.suggestions.generated":
+      logger.info(
+        { tenantId: event.tenant_id, correlationId: event.correlation_id },
+        "news suggestions generated",
       );
       return;
     default:
@@ -145,9 +159,17 @@ async function main(): Promise<void> {
     {},
     { repeat: { every: 60 * 60 * 1000 }, jobId: "publish-tick" },
   );
+  // Always lands as 'pending' news_suggestions regardless of hitl_mode — see
+  // news.ts. To see it run without waiting 24h, call runNewsAgentForTenant
+  // directly for one tenant, same as the Planner's own dev-loop note above.
+  await coreQueue.add(
+    "news.tick",
+    {},
+    { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: "news-tick" },
+  );
 
   logger.info(
-    "workers bootstrapped: dispatcher + core/render/publish workers + orchestrator/planner/publish ticks running",
+    "workers bootstrapped: dispatcher + core/render/publish workers + orchestrator/planner/publish/news ticks running",
   );
 
   let shuttingDown = false;

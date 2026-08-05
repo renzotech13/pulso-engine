@@ -101,6 +101,7 @@ const AGENTS_REGISTRY = [
   { name: "orchestrator", allowed_tools: [], prompt_name: null, model: null },
   { name: "planner", allowed_tools: [], prompt_name: "planner.calendar", model: null },
   { name: "creative", allowed_tools: [], prompt_name: "creative.brief", model: null },
+  { name: "news", allowed_tools: [], prompt_name: "news.relevance", model: null },
 ] as const;
 
 const PLANNER_PROMPT_V1 = `Eres el planificador de contenido de marketing para un negocio local peruano.
@@ -161,6 +162,20 @@ Escribe entre 5 y 7 slides (frases cortas, una idea por slide) con esta estructu
 Si hay una instrucción adicional del cliente arriba, respétala por encima de tu propio criterio de estilo.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
 {"slides": ["string corto", "string corto", "..."]}`;
+
+const NEWS_PROMPT_V1 = `Eres el agente de noticias de Pulso Engine. Tu trabajo es revisar los titulares del día y decidir cuáles le sirven a este negocio para crear contenido en redes sociales.
+
+Rubro del negocio: {{RUBRO}}
+
+Titulares de hoy:
+{{HEADLINES}}
+
+Para cada titular que sea genuinamente relevante y aprovechable para este negocio, indica su número y un ángulo de contenido concreto: una idea específica de cómo este negocio podría usar esa noticia en una publicación (no una relación forzada ni genérica). Es mejor devolver pocos titulares o ninguno que inventar relevancia donde no la hay.
+
+Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
+{"relevant": [{"index": 1, "angle": "string breve y concreto"}]}
+
+Si ningún titular es relevante, responde {"relevant": []}.`;
 
 async function upsertUser(
   client: ReturnType<typeof createServiceRoleClient>,
@@ -488,6 +503,30 @@ async function upsertCarouselPrompt(client: ReturnType<typeof createServiceRoleC
   if (error) throw new Error(`failed to seed carousel prompt: ${error.message}`);
 }
 
+/** Same update-in-place pattern as upsertCreativePrompt — still being iterated on. */
+async function upsertNewsPrompt(client: ReturnType<typeof createServiceRoleClient>) {
+  const { data: existing } = await client
+    .from("prompts")
+    .select("id")
+    .eq("name", "news.relevance")
+    .eq("version", 1)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await client.from("prompts").update({ template: NEWS_PROMPT_V1 }).eq("id", existing.id);
+    if (error) throw new Error(`failed to update news prompt: ${error.message}`);
+    return;
+  }
+
+  const { error } = await client.from("prompts").insert({
+    name: "news.relevance",
+    version: 1,
+    template: NEWS_PROMPT_V1,
+    is_active: true,
+  });
+  if (error) throw new Error(`failed to seed news prompt: ${error.message}`);
+}
+
 async function upsertAgentsRegistry(client: ReturnType<typeof createServiceRoleClient>) {
   for (const agent of AGENTS_REGISTRY) {
     const { data: existing } = await client
@@ -519,6 +558,7 @@ async function main() {
   await upsertPlannerPrompt(client);
   await upsertCreativePrompt(client);
   await upsertCarouselPrompt(client);
+  await upsertNewsPrompt(client);
   await upsertAgentsRegistry(client);
 
   const userA = await upsertUser(client, SEED_USERS.tenantA.email, SEED_USERS.tenantA.password);

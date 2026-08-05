@@ -22,6 +22,14 @@ export const eventCatalog = {
     payload: z.object({ count: z.number() }),
     queue: "core",
   },
+  "news.digest.requested": {
+    payload: z.object({}),
+    queue: "core",
+  },
+  "news.suggestions.generated": {
+    payload: z.object({ count: z.number() }),
+    queue: "core",
+  },
   "creative.requested": {
     payload: z.object({ calendarSlotId: z.string().uuid() }),
     queue: "render",
