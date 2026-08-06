@@ -151,14 +151,27 @@ export async function runCreativeAgentForSlot(
 
       const service = createServiceRoleClient();
       const config = loadConfig();
-      const [tenant, promotions, products, promptTemplate, ephemerides, mediaAssets] = await Promise.all([
+      const [tenant, brandKit, promotions, products, promptTemplate, ephemerides, mediaAssets] = await Promise.all([
         ctx.db.getTenant(),
+        ctx.db.getBrandKit(),
         ctx.db.listActivePromotions(),
         ctx.db.listActiveProducts(),
         getActivePrompt(service, promptName),
         ctx.db.listEphemerides(),
         ctx.db.listMediaAssets("image"),
       ]);
+
+      // Tenant-authored guidance (tone preset + free-text "entrenamiento" from
+      // Brand Kit) that every copy AND image prompt below folds in — the only
+      // place a tenant can steer the agents' voice beyond the theme/catalog.
+      const brandVoiceParts = [brandKit?.tone_description, brandKit?.voice_training].filter(
+        (part): part is string => Boolean(part?.trim()),
+      );
+      const brandTraining = brandVoiceParts.length > 0 ? brandVoiceParts.join("\n") : undefined;
+      const brandTrainingForCopy = brandTraining
+        ? `Indicaciones de la marca (tenlas en cuenta siempre): ${brandTraining}`
+        : "";
+      const brandTrainingForImage = brandTraining ? ` Indicaciones de la marca: ${brandTraining}.` : "";
 
       // Exact-date match only — the Planner doesn't record which ephemeris (if
       // any) actually inspired a given day's theme, so this is the one
@@ -185,7 +198,7 @@ export async function runCreativeAgentForSlot(
       const newsHeadline = newsSource?.agent === "news" ? newsSource.rationale : undefined;
 
       const newsContext = newsHeadline
-        ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}".\nAdemás del headline/subheadline para la imagen, escribe un campo "caption" separado — el texto que acompaña la publicación en Facebook/Instagram (no va impreso en la imagen). Debe explicar en 2-3 párrafos breves por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cerrar conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y terminar con 3 a 5 hashtags relevantes en español. No inventes datos que no estén en el tema de arriba.`
+        ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}". Además del headline/subheadline para la imagen, escribe un campo "caption" separado: el texto que acompaña la publicación en Facebook/Instagram (no va impreso en la imagen). Debe explicar en 2-3 párrafos breves por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cerrar conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y terminar con 3 a 5 hashtags relevantes en español. No inventes datos que no estén en el tema de arriba. No uses la raya "—" (em dash) en el caption.`
         : "";
 
       const prompt = renderPrompt(promptTemplate, {
@@ -195,6 +208,7 @@ export async function runCreativeAgentForSlot(
         PRODUCTS: formatProducts(products),
         INSTRUCTION: instruction,
         NEWS_CONTEXT: newsContext,
+        BRAND_TRAINING: brandTrainingForCopy,
       });
 
       const copy: CreativeCopy = isCarousel
@@ -244,7 +258,7 @@ export async function runCreativeAgentForSlot(
               `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema general del carrusel: ${slot.theme}.`,
               `Este slide en particular dice: "${slideText}".`,
-              "La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde — sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.",
+              `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.${brandTrainingForImage}`,
             ].join(" ");
 
             const imageBuffer = await generateThemedImage(prompt);
@@ -299,13 +313,13 @@ export async function runCreativeAgentForSlot(
           ? [
               `Fotografía profesional y editorial para una publicación de noticias sobre: "${newsHeadline}".`,
               `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
-              "Estilo fotoperiodístico, realista, sin texto superpuesto, sin logos.",
+              `Estilo fotoperiodístico, realista, sin texto superpuesto, sin logos.${brandTrainingForImage}`,
             ].join(" ")
           : [
               `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema: ${slot.theme}.`,
               styleHint,
-              "Sin texto superpuesto, estilo limpio y corporativo.",
+              `Sin texto superpuesto, estilo limpio y corporativo.${brandTrainingForImage}`,
             ]
               .filter(Boolean)
               .join(" ");

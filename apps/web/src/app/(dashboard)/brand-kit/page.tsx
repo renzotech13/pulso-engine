@@ -101,6 +101,22 @@ export default async function BrandKitPage() {
         </div>
 
         <div className="sm:col-span-2">
+          <label className={labelClass}>Entrenamiento</label>
+          <textarea
+            name="voiceTraining"
+            rows={5}
+            placeholder="Ej: nunca menciones a la competencia. Somos expertos en trámites de importación, no solo logística. Evita la palabra 'sinergia'. El Puerto de Chancay ya no es novedad para nuestros clientes desde julio 2026..."
+            defaultValue={brandKit?.voice_training ?? ""}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-neutral-600">
+            Indicaciones libres que todo agente tiene en cuenta al escribir copy o generar imágenes:
+            detalles del negocio, temas puntuales, cosas que evitar. Se suma al tono de voz de arriba,
+            no lo reemplaza.
+          </p>
+        </div>
+
+        <div className="sm:col-span-2">
           <label className={labelClass}>Sitio web</label>
           <input
             name="websiteUrl"

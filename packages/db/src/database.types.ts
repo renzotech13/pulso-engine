@@ -225,6 +225,7 @@ export type Database = {
           tenant_id: string
           tone_description: string | null
           updated_at: string
+          voice_training: string | null
           website_url: string | null
         }
         Insert: {
@@ -239,6 +240,7 @@ export type Database = {
           tenant_id: string
           tone_description?: string | null
           updated_at?: string
+          voice_training?: string | null
           website_url?: string | null
         }
         Update: {
@@ -253,6 +255,7 @@ export type Database = {
           tenant_id?: string
           tone_description?: string | null
           updated_at?: string
+          voice_training?: string | null
           website_url?: string | null
         }
         Relationships: [

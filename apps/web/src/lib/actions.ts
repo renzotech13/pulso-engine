@@ -305,6 +305,7 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
   const colorPrimary = String(formData.get("colorPrimary") ?? "").trim() || null;
   const colorSecondary = String(formData.get("colorSecondary") ?? "").trim() || null;
   const toneDescription = String(formData.get("toneDescription") ?? "").trim() || null;
+  const voiceTraining = String(formData.get("voiceTraining") ?? "").trim() || null;
   const websiteUrl = String(formData.get("websiteUrl") ?? "").trim() || null;
 
   const supabase = await createSupabaseServerClient();
@@ -320,6 +321,7 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
     color_primary: string | null;
     color_secondary: string | null;
     tone_description: string | null;
+    voice_training: string | null;
     website_url: string | null;
     logo_url?: string;
     brief_document_url?: string;
@@ -329,6 +331,7 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
     color_primary: colorPrimary,
     color_secondary: colorSecondary,
     tone_description: toneDescription,
+    voice_training: voiceTraining,
     website_url: websiteUrl,
   };
 
@@ -749,16 +752,26 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
   const slideText = slides[slideIndex];
   if (slideText === undefined) throw new Error("ese slide no existe");
 
-  const [{ data: slot }, { data: tenant }] = await Promise.all([
+  const [{ data: slot }, { data: tenant }, { data: brandKit }] = await Promise.all([
     supabase.from("content_calendar").select("theme").eq("tenant_id", tenantId).eq("date", date).maybeSingle(),
     supabase.from("tenants").select("rubro").eq("id", tenantId).single(),
+    supabase.from("brand_kits").select("tone_description, voice_training").eq("tenant_id", tenantId).maybeSingle(),
   ]);
+
+  // Same tenant-authored guidance creative.ts folds into every image prompt
+  // (see apps/workers/src/agents/creative.ts) — kept in sync by hand since
+  // this action builds its own prompt rather than reusing that one.
+  const brandVoiceParts = [brandKit?.tone_description, brandKit?.voice_training].filter(
+    (part): part is string => Boolean(part?.trim()),
+  );
+  const brandTrainingForImage =
+    brandVoiceParts.length > 0 ? ` Indicaciones de la marca: ${brandVoiceParts.join("\n")}.` : "";
 
   const prompt = [
     `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant?.rubro ?? "general"}".`,
     `Tema general del carrusel: ${slot?.theme ?? ""}.`,
     `Este slide en particular dice: "${slideText}".`,
-    "La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde — sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.",
+    `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.${brandTrainingForImage}`,
   ].join(" ");
 
   const imageBuffer = await generateThemedImage(prompt);

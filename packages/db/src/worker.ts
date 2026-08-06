@@ -65,6 +65,7 @@ type PublicationRow = Database["public"]["Tables"]["publications"]["Row"];
 type PublicationInsert = Database["public"]["Tables"]["publications"]["Insert"];
 type PublicationUpdate = Database["public"]["Tables"]["publications"]["Update"];
 type MediaAssetRow = Database["public"]["Tables"]["media_assets"]["Row"];
+type BrandKitRow = Database["public"]["Tables"]["brand_kits"]["Row"];
 
 /**
  * Tenant-scoped handle for agent code. Since service_role bypasses RLS,
@@ -75,6 +76,8 @@ type MediaAssetRow = Database["public"]["Tables"]["media_assets"]["Row"];
 export interface TenantScopedClient {
   readonly tenantId: string;
   getTenant(): Promise<TenantRow>;
+  /** null when the tenant never set one up — every field is optional there. */
+  getBrandKit(): Promise<BrandKitRow | null>;
   insertAgentRun(row: Omit<AgentRunInsert, "tenant_id">): Promise<void>;
   insertDecisionLog(row: Omit<DecisionLogInsert, "tenant_id">): Promise<void>;
   /** Global ephemerides (tenant_id null) plus this tenant's custom ones. */
@@ -145,6 +148,11 @@ export function createTenantScopedClient(
         throw new TenantIsolationError(`tenant ${tenantId} not found`, error);
       }
       return data;
+    },
+
+    async getBrandKit() {
+      const { data } = await client.from("brand_kits").select("*").eq("tenant_id", tenantId).maybeSingle();
+      return data ?? null;
     },
 
     async insertAgentRun(row) {
