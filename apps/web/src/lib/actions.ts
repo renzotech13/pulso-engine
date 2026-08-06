@@ -801,41 +801,37 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
 }
 
 /**
- * Edits the actual text of every slide at once — the copy itself was never
- * visible anywhere in the review UI before this (the generic brief dump on
- * the day page only ever showed string fields, silently skipping `slides`
- * since it's an array), so there was no way to tweak a headline that ran
- * long or fix a wording issue without a full "Guardar y regenerar" (which
- * also re-rolls the photos and can drift from what was approved).
+ * Edits the real post caption — the text that accompanies the publication on
+ * Facebook/Instagram, below the image(s) (never printed on the image itself).
+ * Applies to every creative type (post, carousel, story, reel): the caption
+ * lives at brief.caption regardless of type, and editing it never touches
+ * any rendered asset, so there's no re-render to trigger.
  */
-export async function updateCarouselCopyAction(formData: FormData): Promise<void> {
+export async function updateCreativeCaptionAction(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
+  const caption = String(formData.get("caption") ?? "").trim();
   if (!tenantId || !date || !creativeId) return;
 
   const supabase = await createSupabaseServerClient();
   await requireTenantEditor(supabase, tenantId);
 
   const service = createServiceRoleClient();
-  const { brief, slides, photoUrls } = await getOwnedCarouselCreative(service, tenantId, creativeId);
+  const { data: creative } = await service
+    .from("creatives")
+    .select("tenant_id, brief")
+    .eq("id", creativeId)
+    .maybeSingle();
+  if (!creative || creative.tenant_id !== tenantId) throw new Error("creative not found");
 
-  const nextSlides = formData
-    .getAll("slides")
-    .map((v) => String(v).trim())
-    .filter(Boolean);
-  if (nextSlides.length !== slides.length) {
-    throw new Error("Número de slides inesperado — recarga la página e inténtalo de nuevo.");
-  }
-
+  const brief = creative.brief as Record<string, unknown>;
   const { error: updateError } = await service
     .from("creatives")
-    .update({ status: "pending", brief: { ...brief, slides: nextSlides, photoUrls } })
+    .update({ brief: { ...brief, caption } })
     .eq("id", creativeId);
   if (updateError) throw new Error(updateError.message);
 
-  await clearCarouselRender(service, tenantId, creativeId, 0);
-  triggerPhotoFrameRender(creativeId);
   revalidatePath(`/calendar/${date}`);
 }
 

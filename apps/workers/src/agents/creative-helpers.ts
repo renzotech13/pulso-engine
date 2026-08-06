@@ -67,6 +67,7 @@ export function buildBriefForComponentRef(
     // today's fallback.
     if (carouselPhotoUrls?.some(Boolean)) brief.photoUrls = carouselPhotoUrls;
     if (colorOverride) Object.assign(brief, colorOverride);
+    if (copy.caption) brief.caption = copy.caption;
     return brief;
   }
 

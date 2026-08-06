@@ -18,7 +18,7 @@ import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { AutoSubmitFileInput } from "@/components/auto-submit-file-input";
 import { MoveDateForm } from "./move-date-form";
-import { CarouselCopyForm } from "./carousel-copy-form";
+import { CaptionForm } from "./caption-form";
 
 const RENDER_TEMPLATES_URL = process.env.NEXT_PUBLIC_RENDER_TEMPLATES_URL ?? "http://localhost:3001";
 
@@ -245,32 +245,19 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
               <p className="mb-2 text-xs text-neutral-500">
                 {creative.asset_urls.length}{" "}
                 {creative.type === "carousel"
-                  ? "slides — pasa el mouse sobre uno para regenerarlo con IA (↻) o reemplazarlo con tu propia foto (⤴). El texto de cada slide se edita más abajo."
+                  ? "slides — pasa el mouse sobre uno para regenerarlo con IA (↻) o reemplazarlo con tu propia foto (⤴)."
                   : "fotos listas — click para descargar cada una"}
                 {photoFrame && creative.template_id === photoFrame.id && isAppendable(creative)
                   ? ", pasa el mouse y click en × para eliminar una"
                   : ""}
               </p>
               {creative.type === "carousel" ? (
-                <>
-                  <CarouselSlideGrid
-                    urls={creative.asset_urls}
-                    creativeId={creative.id}
-                    tenantId={ctx.tenantId}
-                    date={date}
-                  />
-                  {(() => {
-                    const briefSlides = (creative.brief as { slides?: unknown } | null)?.slides;
-                    return Array.isArray(briefSlides) && briefSlides.length > 0 ? (
-                      <CarouselCopyForm
-                        tenantId={ctx.tenantId}
-                        creativeId={creative.id}
-                        date={date}
-                        slides={briefSlides as string[]}
-                      />
-                    ) : null;
-                  })()}
-                </>
+                <CarouselSlideGrid
+                  urls={creative.asset_urls}
+                  creativeId={creative.id}
+                  tenantId={ctx.tenantId}
+                  date={date}
+                />
               ) : (
                 <ThumbnailGrid
                   urls={creative.asset_urls}
@@ -330,7 +317,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 {typeof creative.brief === "object" &&
                   creative.brief !== null &&
                   Object.entries(creative.brief as Record<string, unknown>).map(([key, value]) =>
-                    typeof value === "string" && value ? (
+                    key !== "caption" && typeof value === "string" && value ? (
                       <p key={key}>
                         <span className="text-neutral-600">{key}:</span> {value}
                       </p>
@@ -338,6 +325,19 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                   )}
               </div>
             ) : null}
+
+            {creative && (
+              <CaptionForm
+                tenantId={ctx.tenantId}
+                creativeId={creative.id}
+                date={date}
+                caption={
+                  typeof (creative.brief as { caption?: unknown } | null)?.caption === "string"
+                    ? ((creative.brief as { caption: string }).caption)
+                    : ""
+                }
+              />
+            )}
 
             {creative?.publications && creative.publications.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2 border-t border-ink-700 pt-3 text-xs">

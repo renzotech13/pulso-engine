@@ -113,6 +113,19 @@ describe("buildBriefForComponentRef", () => {
     ]);
     expect(brief).toEqual({ slides });
   });
+
+  it("includes the real post caption for carousel when the LLM wrote one", () => {
+    const slides = ["a", "b", "c", "d", "e"];
+    const caption = "Un texto real para la publicación, con fuente y hashtags. #tips";
+    const brief = buildBriefForComponentRef("carousel", { slides, caption });
+    expect(brief).toEqual({ slides, caption });
+  });
+
+  it("omits caption entirely when the LLM didn't write one", () => {
+    const slides = ["a", "b", "c", "d", "e"];
+    const brief = buildBriefForComponentRef("carousel", { slides });
+    expect(brief).toEqual({ slides });
+  });
 });
 
 describe("pickProductPhoto", () => {

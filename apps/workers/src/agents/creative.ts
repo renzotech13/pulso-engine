@@ -45,8 +45,9 @@ const creativeCopySchema = z
 const carouselCopySchema = z
   .object({
     slides: z.array(z.string().min(1)).min(5).max(7),
+    caption: z.string().nullable().optional(),
   })
-  .transform((data) => ({ slides: data.slides }));
+  .transform((data) => ({ slides: data.slides, caption: data.caption ?? undefined }));
 
 function renderPrompt(template: string, vars: Record<string, string>): string {
   let rendered = template;
@@ -198,7 +199,7 @@ export async function runCreativeAgentForSlot(
       const newsHeadline = newsSource?.agent === "news" ? newsSource.rationale : undefined;
 
       const newsContext = newsHeadline
-        ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}". Además del headline/subheadline para la imagen, escribe un campo "caption" separado: el texto que acompaña la publicación en Facebook/Instagram (no va impreso en la imagen). Debe explicar en 2-3 párrafos breves por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cerrar conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y terminar con 3 a 5 hashtags relevantes en español. No inventes datos que no estén en el tema de arriba. No uses la raya "—" (em dash) en el caption.`
+        ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}". En el campo "caption" (el texto de la publicación, no el de la imagen), explica por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cierra conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y menciona que la fuente es una noticia reciente. No inventes datos que no estén en el tema de arriba.`
         : "";
 
       const prompt = renderPrompt(promptTemplate, {
