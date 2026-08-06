@@ -1,6 +1,8 @@
-import { createLogger } from "./logger.js";
-
-const logger = createLogger({ agent: "image-gen" });
+// Deliberately not @pulso/shared's own createLogger (pulls in pino) — this
+// module is imported directly into apps/web's webpack bundle (not just
+// apps/workers'), and Next's bundler doesn't resolve this package's other
+// relative "./x.js" imports (pointing at unbuilt .ts source) the way tsc
+// does. console.warn avoids that cross-file import entirely.
 
 const GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
@@ -43,19 +45,19 @@ export async function generateThemedImage(prompt: string): Promise<Buffer | null
 
     const data = (await response.json()) as GeminiResponse;
     if (!response.ok || data.error) {
-      logger.warn({ err: data.error?.message ?? response.statusText }, "gemini image generation failed");
+      console.warn("gemini image generation failed:", data.error?.message ?? response.statusText);
       return null;
     }
 
     const imagePart = data.candidates?.[0]?.content?.parts?.find((part) => part.inlineData);
     if (!imagePart?.inlineData) {
-      logger.warn({ prompt }, "gemini response had no inline image data");
+      console.warn("gemini response had no inline image data for prompt:", prompt);
       return null;
     }
 
     return Buffer.from(imagePart.inlineData.data, "base64");
   } catch (err) {
-    logger.warn({ err }, "gemini image generation request failed");
+    console.warn("gemini image generation request failed:", err);
     return null;
   }
 }
