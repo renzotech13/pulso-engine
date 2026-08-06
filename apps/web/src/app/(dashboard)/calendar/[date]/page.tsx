@@ -18,6 +18,7 @@ import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { AutoSubmitFileInput } from "@/components/auto-submit-file-input";
 import { MoveDateForm } from "./move-date-form";
+import { CarouselCopyForm } from "./carousel-copy-form";
 
 const RENDER_TEMPLATES_URL = process.env.NEXT_PUBLIC_RENDER_TEMPLATES_URL ?? "http://localhost:3001";
 
@@ -244,19 +245,32 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
               <p className="mb-2 text-xs text-neutral-500">
                 {creative.asset_urls.length}{" "}
                 {creative.type === "carousel"
-                  ? "slides — pasa el mouse sobre uno para regenerarlo con IA (↻) o reemplazarlo con tu propia foto (⤴)"
+                  ? "slides — pasa el mouse sobre uno para regenerarlo con IA (↻) o reemplazarlo con tu propia foto (⤴). El texto de cada slide se edita más abajo."
                   : "fotos listas — click para descargar cada una"}
                 {photoFrame && creative.template_id === photoFrame.id && isAppendable(creative)
                   ? ", pasa el mouse y click en × para eliminar una"
                   : ""}
               </p>
               {creative.type === "carousel" ? (
-                <CarouselSlideGrid
-                  urls={creative.asset_urls}
-                  creativeId={creative.id}
-                  tenantId={ctx.tenantId}
-                  date={date}
-                />
+                <>
+                  <CarouselSlideGrid
+                    urls={creative.asset_urls}
+                    creativeId={creative.id}
+                    tenantId={ctx.tenantId}
+                    date={date}
+                  />
+                  {(() => {
+                    const briefSlides = (creative.brief as { slides?: unknown } | null)?.slides;
+                    return Array.isArray(briefSlides) && briefSlides.length > 0 ? (
+                      <CarouselCopyForm
+                        tenantId={ctx.tenantId}
+                        creativeId={creative.id}
+                        date={date}
+                        slides={briefSlides as string[]}
+                      />
+                    ) : null;
+                  })()}
+                </>
               ) : (
                 <ThumbnailGrid
                   urls={creative.asset_urls}

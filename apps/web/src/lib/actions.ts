@@ -801,6 +801,45 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
 }
 
 /**
+ * Edits the actual text of every slide at once — the copy itself was never
+ * visible anywhere in the review UI before this (the generic brief dump on
+ * the day page only ever showed string fields, silently skipping `slides`
+ * since it's an array), so there was no way to tweak a headline that ran
+ * long or fix a wording issue without a full "Guardar y regenerar" (which
+ * also re-rolls the photos and can drift from what was approved).
+ */
+export async function updateCarouselCopyAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const creativeId = String(formData.get("creativeId") ?? "");
+  if (!tenantId || !date || !creativeId) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const service = createServiceRoleClient();
+  const { brief, slides, photoUrls } = await getOwnedCarouselCreative(service, tenantId, creativeId);
+
+  const nextSlides = formData
+    .getAll("slides")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+  if (nextSlides.length !== slides.length) {
+    throw new Error("Número de slides inesperado — recarga la página e inténtalo de nuevo.");
+  }
+
+  const { error: updateError } = await service
+    .from("creatives")
+    .update({ status: "pending", brief: { ...brief, slides: nextSlides, photoUrls } })
+    .eq("id", creativeId);
+  if (updateError) throw new Error(updateError.message);
+
+  await clearCarouselRender(service, tenantId, creativeId, 0);
+  triggerPhotoFrameRender(creativeId);
+  revalidatePath(`/calendar/${date}`);
+}
+
+/**
  * Replaces a single carousel slide's photo with a manually uploaded file —
  * for when the tenant has their own photo they'd rather use than anything
  * AI-generated or from the media library.
