@@ -215,7 +215,8 @@ export async function runCreativeAgentForSlot(
             schema: creativeCopySchema,
           });
 
-      let photoUrl = pickProductPhoto(products, copy.productName);
+      let photoUrl = isCarousel ? undefined : pickProductPhoto(products, copy.productName);
+      let carouselPhotoUrls: Array<string | undefined> | undefined;
 
       // A news-sourced piece is about a specific real-world story — the
       // tenant's generic photo library (built for their own products/brand)
@@ -224,11 +225,54 @@ export async function runCreativeAgentForSlot(
       // the library below only if Gemini isn't configured or fails.
       const isNewsSourced = Boolean(newsHeadline);
 
-      // A carousel's cover is meant to be a theme-specific "hook" that gets
-      // someone to swipe — a random library photo (the tenant's own
-      // products/office/team) rarely matches the slide's actual topic, so
-      // this skips straight to an on-theme AI image the same way news does.
-      const skipsMediaLibrary = isNewsSourced || isCarousel;
+      if (isCarousel) {
+        // Every slide gets its own photo, themed to that slide's own text
+        // (not just the carousel's overall theme) — a shared cover photo
+        // reused across all slides isn't what was asked for; each one
+        // should visually match what it says. Sequential, not parallel: the
+        // Gemini image endpoint has hit real per-minute rate limits before
+        // (see image-gen.ts), and a carousel is generated once in the
+        // background, not on a user-facing request path, so the extra time
+        // is a non-issue.
+        const remainingMediaAssets = [...mediaAssets];
+        carouselPhotoUrls = [];
+        for (const [i, slideText] of (copy.slides ?? []).entries()) {
+          let slidePhotoUrl: string | undefined;
+
+          if (config.GEMINI_API_KEY) {
+            const prompt = [
+              `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
+              `Tema general del carrusel: ${slot.theme}.`,
+              `Este slide en particular dice: "${slideText}".`,
+              "La imagen debe ilustrar visualmente esta idea puntual del slide — composición limpia, con espacio libre para overlay de texto. Sin texto superpuesto, sin logos.",
+            ].join(" ");
+
+            const imageBuffer = await generateThemedImage(prompt);
+            if (imageBuffer) {
+              const assetPath = `${tenantId}/generated-${calendarSlotId}-slide${i}-${Date.now()}.png`;
+              const { error: uploadError } = await service.storage
+                .from("creative-assets")
+                .upload(assetPath, imageBuffer, { contentType: "image/png" });
+              if (!uploadError) {
+                const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
+                slidePhotoUrl = publicUrlData.publicUrl;
+              }
+            }
+          }
+
+          // Gemini unavailable/failed for this slide — an unused library
+          // photo still beats a text-only gradient for that one slide.
+          if (!slidePhotoUrl) {
+            const fallbackMediaAsset = remainingMediaAssets.shift();
+            if (fallbackMediaAsset) {
+              slidePhotoUrl = fallbackMediaAsset.url;
+              await ctx.db.markMediaAssetUsed(fallbackMediaAsset.id);
+            }
+          }
+
+          carouselPhotoUrls.push(slidePhotoUrl);
+        }
+      }
 
       // No specific catalog product matched — prefer the tenant's own
       // uploaded photo library over an AI-generated image, since a real
@@ -236,7 +280,7 @@ export async function runCreativeAgentForSlot(
       // available. listMediaAssets already orders oldest/never-used first,
       // so this naturally cycles through every uploaded photo before any
       // gets reused.
-      const pickedMediaAsset = !photoUrl && !skipsMediaLibrary ? mediaAssets[0] : undefined;
+      const pickedMediaAsset = !photoUrl && !isNewsSourced && !isCarousel ? mediaAssets[0] : undefined;
       if (pickedMediaAsset) {
         photoUrl = pickedMediaAsset.url;
         await ctx.db.markMediaAssetUsed(pickedMediaAsset.id);
@@ -247,7 +291,7 @@ export async function runCreativeAgentForSlot(
       // configured (generateThemedImage itself no-ops), so tenants who
       // never set one and never uploaded to their photo library see
       // exactly today's behavior.
-      if (!photoUrl && config.GEMINI_API_KEY) {
+      if (!photoUrl && !isCarousel && config.GEMINI_API_KEY) {
         const styleHint = accentEphemeris
           ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
           : "";
@@ -257,20 +301,14 @@ export async function runCreativeAgentForSlot(
               `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
               "Estilo fotoperiodístico, realista, sin texto superpuesto, sin logos.",
             ].join(" ")
-          : isCarousel
-            ? [
-                `Fotografía "gancho" para la portada de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
-                `Tema del carrusel: ${slot.theme}.`,
-                "Debe ser una imagen llamativa y editorial que invite a deslizar y ver más — composición limpia, con espacio libre en la parte inferior para overlay de texto. Sin texto superpuesto, sin logos.",
-              ].join(" ")
-            : [
-                `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
-                `Tema: ${slot.theme}.`,
-                styleHint,
-                "Sin texto superpuesto, estilo limpio y corporativo.",
-              ]
-                .filter(Boolean)
-                .join(" ");
+          : [
+              `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
+              `Tema: ${slot.theme}.`,
+              styleHint,
+              "Sin texto superpuesto, estilo limpio y corporativo.",
+            ]
+              .filter(Boolean)
+              .join(" ");
 
         const imageBuffer = await generateThemedImage(prompt);
         if (imageBuffer) {
@@ -288,7 +326,7 @@ export async function runCreativeAgentForSlot(
 
       // Gemini wasn't configured or failed — a library photo (even if
       // generic) still beats the plain gradient fallback.
-      if (!photoUrl && skipsMediaLibrary) {
+      if (!photoUrl && !isCarousel && isNewsSourced) {
         const fallbackMediaAsset = mediaAssets[0];
         if (fallbackMediaAsset) {
           photoUrl = fallbackMediaAsset.url;
@@ -296,7 +334,13 @@ export async function runCreativeAgentForSlot(
         }
       }
 
-      const brief = buildBriefForComponentRef(template.component_ref, copy, photoUrl, colorOverride);
+      const brief = buildBriefForComponentRef(
+        template.component_ref,
+        copy,
+        photoUrl,
+        colorOverride,
+        carouselPhotoUrls,
+      );
 
       // template.type only distinguishes static/video (creativeTypeForTemplateType)
       // — carousel is its own creatives.type even though render_templates.type

@@ -18,7 +18,9 @@ const socialPostBriefSchema = z.object({
 
 const carouselBriefSchema = z.object({
   slides: z.array(z.string().min(1)).min(5).max(7),
-  photoUrl: z.string().url().optional(),
+  // JSONB round-trips a JS `undefined` array slot as `null`, so this needs
+  // to accept both — not just .optional().
+  photoUrls: z.array(z.string().url().nullable()).optional(),
   colorPrimary: z.string().optional(),
   colorSecondary: z.string().optional(),
 });
@@ -70,7 +72,7 @@ export default async function TemplatePage({
       notFound();
     }
 
-    const { colorPrimary, colorSecondary, slides, photoUrl } = brief.data;
+    const { colorPrimary, colorSecondary, slides, photoUrls } = brief.data;
     const brand = {
       ...resolveBrand(brandKit, tenantName),
       ...(colorPrimary && colorSecondary ? { colorPrimary, colorSecondary } : {}),
@@ -82,7 +84,7 @@ export default async function TemplatePage({
         brand={brand}
         slides={slides}
         slideIndex={slideIndex}
-        {...omitUndefined({ photoUrl })}
+        {...omitUndefined({ photoUrls: photoUrls?.map((url) => url ?? undefined) })}
       />
     );
   }

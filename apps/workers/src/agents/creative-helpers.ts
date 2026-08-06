@@ -48,6 +48,7 @@ export function buildBriefForComponentRef(
   copy: CreativeCopy,
   photoUrl?: string,
   colorOverride?: ColorOverride,
+  carouselPhotoUrls?: Array<string | undefined>,
 ): Record<string, unknown> {
   if (componentRef === "story-promo") {
     const message = copy.subheadline ? `${copy.headline} — ${copy.subheadline}` : copy.headline;
@@ -60,7 +61,11 @@ export function buildBriefForComponentRef(
 
   if (componentRef === "carousel") {
     const brief: Record<string, unknown> = { slides: copy.slides ?? [] };
-    if (photoUrl) brief.photoUrl = photoUrl;
+    // One photo per slide (each themed to that slide's own text) rather than
+    // a single shared photoUrl — a slide with no photo of its own (Gemini
+    // failed, no library photo left) just renders text-on-gradient, same as
+    // today's fallback.
+    if (carouselPhotoUrls?.some(Boolean)) brief.photoUrls = carouselPhotoUrls;
     if (colorOverride) Object.assign(brief, colorOverride);
     return brief;
   }

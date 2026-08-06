@@ -4,7 +4,7 @@ export interface CarouselProps {
   brand: BrandKitProps;
   slides: string[];
   slideIndex: number;
-  photoUrl?: string;
+  photoUrls?: Array<string | undefined>;
 }
 
 export const CAROUSEL_SIZE = { width: 1080, height: 1080 };
@@ -12,16 +12,18 @@ export const CAROUSEL_SIZE = { width: 1080, height: 1080 };
 /**
  * Renders exactly ONE slide per page load (slideIndex picks which) — the
  * render route calls this once per slide and stitches the resulting images
- * into `creatives.asset_urls`. Slide 0 (the hook) can use a catalog photo as
- * background, same treatment as SocialPostTemplate; the last slide is always
- * the comment-CTA and gets a visually distinct treatment so it stands out
- * when someone swipes to the end.
+ * into `creatives.asset_urls`. Each slide can carry its own photo (themed to
+ * that slide's own text, resolved by the Creative agent) — same photo+overlay
+ * treatment as SocialPostTemplate for whichever slides have one; the last
+ * slide is always the comment-CTA and gets a visually distinct fallback
+ * gradient so it stands out when someone swipes to the end and has no photo.
  */
-export function CarouselTemplate({ brand, slides, slideIndex, photoUrl }: CarouselProps) {
+export function CarouselTemplate({ brand, slides, slideIndex, photoUrls }: CarouselProps) {
   const isFirst = slideIndex === 0;
   const isLast = slideIndex === slides.length - 1;
   const text = slides[slideIndex] ?? "";
-  const usePhoto = isFirst && Boolean(photoUrl);
+  const photoUrl = photoUrls?.[slideIndex];
+  const usePhoto = Boolean(photoUrl);
 
   return (
     <div

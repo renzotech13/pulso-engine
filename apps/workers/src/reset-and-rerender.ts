@@ -2,6 +2,10 @@ import { createServiceRoleClient } from "@pulso/db/worker";
 
 const creativeId = process.argv[2];
 const ext = process.argv[3] ?? "png";
+if (!creativeId) {
+  console.error("usage: tsx src/reset-and-rerender.ts <creativeId> [ext]");
+  process.exit(1);
+}
 const service = createServiceRoleClient();
 
 const { data: creative } = await service.from("creatives").select("tenant_id").eq("id", creativeId).single();

@@ -84,18 +84,34 @@ describe("buildBriefForComponentRef", () => {
     expect(brief).toEqual({ slides: [] });
   });
 
-  it("includes photoUrl and color override for carousel when provided", () => {
+  it("includes photoUrls and color override for carousel when provided", () => {
     const slides = ["a", "b", "c", "d", "e"];
-    const brief = buildBriefForComponentRef("carousel", { slides }, "https://x/photo.jpg", {
-      colorPrimary: "#D91023",
-      colorSecondary: "#FFFFFF",
-    });
+    const photoUrls = ["https://x/0.jpg", undefined, "https://x/2.jpg", undefined, undefined];
+    const brief = buildBriefForComponentRef(
+      "carousel",
+      { slides },
+      undefined,
+      { colorPrimary: "#D91023", colorSecondary: "#FFFFFF" },
+      photoUrls,
+    );
     expect(brief).toEqual({
       slides,
-      photoUrl: "https://x/photo.jpg",
+      photoUrls,
       colorPrimary: "#D91023",
       colorSecondary: "#FFFFFF",
     });
+  });
+
+  it("omits photoUrls entirely when every slide came back with none", () => {
+    const slides = ["a", "b", "c", "d", "e"];
+    const brief = buildBriefForComponentRef("carousel", { slides }, undefined, undefined, [
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(brief).toEqual({ slides });
   });
 });
 
