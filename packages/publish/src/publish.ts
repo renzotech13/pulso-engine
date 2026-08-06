@@ -266,7 +266,7 @@ export async function runPublishAgentForCreative(
       const slot = creative.calendar_slot_id
         ? await ctx.db.getContentCalendarSlotById(creative.calendar_slot_id)
         : null;
-      if (slot?.published_at) {
+      if (slot?.published_at && slot.creative_id !== creativeId) {
         await skip("Este día del calendario ya se publicó antes (con un creative distinto).", {
           creative_id: creativeId,
           calendar_slot_id: creative.calendar_slot_id,
