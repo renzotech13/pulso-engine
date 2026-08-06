@@ -4,7 +4,7 @@ import type { Database, Json } from "@pulso/db/types";
 import { publishEvent } from "@pulso/events/publish";
 import { loadConfig } from "@pulso/shared/config";
 import { callAgentLlm } from "../agent-llm.js";
-import { executeAgentRun } from "./base-agent.js";
+import { executeAgentRun } from "@pulso/publish/base-agent";
 import {
   buildBriefForComponentRef,
   creativeTypeForTemplateType,

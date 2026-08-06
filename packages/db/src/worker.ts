@@ -1,7 +1,20 @@
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { loadConfig } from "@pulso/shared/config";
+import { config as loadDotenv } from "dotenv";
 import { ConfigError, TenantIsolationError } from "@pulso/shared/errors";
 import type { Database } from "./database.types.js";
+
+// This file always lives at <repo-root>/packages/db/src/worker.ts in the
+// workspace, so this resolves to the repo root regardless of which app
+// imports it or what its own cwd is — same approach @pulso/shared/config
+// used to provide as a side effect of being imported, lost when this file
+// stopped importing loadConfig() (see createServiceRoleClient below). Only
+// matters for standalone tsx scripts; Next.js and apps/workers' main.ts both
+// already populate process.env before this runs, and dotenv never overwrites
+// an existing key.
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+loadDotenv({ path: path.join(repoRoot, ".env") });
 
 export type ServiceRoleClient = SupabaseClient<Database>;
 
@@ -12,12 +25,23 @@ let serviceClient: ServiceRoleClient | undefined;
  * to service_role) — reserved for infrastructure code that must legitimately
  * operate across tenants, like the outbox dispatcher. Agent code should use
  * `createTenantScopedClient` instead.
+ *
+ * Reads SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY directly instead of going
+ * through @pulso/shared's loadConfig() — that validates the FULL
+ * worker-oriented schema (REDIS_URL, LMSTUDIO_MODEL, ...), which apps/web
+ * (the other real caller, for the manual "Publicar" button) has no reason to
+ * set. Same reasoning as apps/web's own now-redundant local service client.
  */
 export function createServiceRoleClient(): ServiceRoleClient {
   if (serviceClient) return serviceClient;
 
-  const config = loadConfig();
-  serviceClient = createClient<Database>(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceRoleKey) {
+    throw new ConfigError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set");
+  }
+
+  serviceClient = createClient<Database>(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return serviceClient;

@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { generateThemedImage } from "@pulso/shared/image-gen";
+import { runPublishAgentForCreative } from "@pulso/publish/agent";
+import { newCorrelationId } from "@pulso/shared/ids";
 import { createServiceRoleClient } from "./supabase/service";
 import { createSupabaseServerClient } from "./supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "./tenant-context";
@@ -99,6 +101,50 @@ export async function updateCalendarSlotAction(formData: FormData): Promise<void
   revalidatePath("/calendar");
 }
 
+export interface MoveCalendarSlotDateState {
+  error: string | null;
+}
+
+/**
+ * Moves a slot to a different date (e.g. "publish this today instead of the
+ * 13th") — content_calendar's one-slot-per-tenant-per-day unique constraint
+ * means the target day might already be taken, which is an expected outcome
+ * here (the user free-picks any date), not an exceptional one, so it's
+ * returned for inline display (useActionState, see move-date-form.tsx)
+ * instead of thrown — same reasoning as useNewsSuggestionAction.
+ */
+export async function moveCalendarSlotDateAction(
+  _prevState: MoveCalendarSlotDateState,
+  formData: FormData,
+): Promise<MoveCalendarSlotDateState> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const slotId = String(formData.get("slotId") ?? "");
+  const newDate = String(formData.get("newDate") ?? "");
+  if (!tenantId || !slotId || !newDate) return { error: "Falta la fecha." };
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const { data: slot } = await supabase
+    .from("content_calendar")
+    .select("date, tenant_id")
+    .eq("id", slotId)
+    .maybeSingle();
+  if (!slot || slot.tenant_id !== tenantId) return { error: "Este día ya no existe." };
+  if (slot.date === newDate) return { error: null };
+
+  const { error } = await supabase.from("content_calendar").update({ date: newDate }).eq("id", slotId);
+  if (error) {
+    if (error.code === "23505") {
+      return { error: `Ya hay contenido planificado para el ${newDate}. Elige otro día.` };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath("/calendar");
+  redirect(`/calendar/${newDate}`);
+}
+
 export async function approveCreativeAction(formData: FormData): Promise<void> {
   const creativeId = String(formData.get("creativeId") ?? "");
   if (!creativeId) return;
@@ -109,7 +155,17 @@ export async function approveCreativeAction(formData: FormData): Promise<void> {
   revalidatePath("/calendar");
 }
 
-/** Fires publish.requested — actually posting to the connected platforms happens in the Publish agent, not here. */
+/**
+ * Publishes right now — real Facebook/Instagram calls, not just a queued
+ * event. request_creative_publish still runs first purely for its
+ * permission check (owner/admin on the creative's tenant) and audit-trail
+ * event row; apps/workers isn't running as a persistent process, so without
+ * actually invoking the agent here too, that event would sit in the outbox
+ * forever and the button would silently do nothing. Safe to also have a
+ * real worker consume that same event later (e.g. once one is deployed):
+ * runPublishAgentForCreative's own per-platform idempotency check means a
+ * platform already published here just gets skipped, never double-posted.
+ */
 export async function requestPublishAction(formData: FormData): Promise<void> {
   const creativeId = String(formData.get("creativeId") ?? "");
   if (!creativeId) return;
@@ -117,6 +173,12 @@ export async function requestPublishAction(formData: FormData): Promise<void> {
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("request_creative_publish", { target_creative_id: creativeId });
   if (error) throw new Error(error.message);
+
+  const { data: creative } = await supabase.from("creatives").select("tenant_id").eq("id", creativeId).single();
+  if (!creative) throw new Error("creative not found");
+
+  await runPublishAgentForCreative(creative.tenant_id, creativeId, newCorrelationId());
+
   revalidatePath("/calendar");
 }
 

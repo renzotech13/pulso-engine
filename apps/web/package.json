@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@pulso/db": "workspace:*",
+    "@pulso/events": "workspace:*",
+    "@pulso/publish": "workspace:*",
     "@pulso/shared": "workspace:*",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.47.10",

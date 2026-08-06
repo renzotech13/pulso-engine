@@ -17,6 +17,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { AutoSubmitFileInput } from "@/components/auto-submit-file-input";
+import { MoveDateForm } from "./move-date-form";
 
 const RENDER_TEMPLATES_URL = process.env.NEXT_PUBLIC_RENDER_TEMPLATES_URL ?? "http://localhost:3001";
 
@@ -305,6 +306,10 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 </>
               )}
             </p>
+
+            <div className="mt-3 border-t border-ink-700 pt-3">
+              <MoveDateForm tenantId={ctx.tenantId} slotId={slot.id} date={date} />
+            </div>
 
             {creative?.brief ? (
               <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-neutral-400">

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCaption } from "../src/agents/publish-helpers.js";
+import { buildCaption } from "../src/publish-helpers.js";
 
 describe("buildCaption", () => {
   it("joins headline/subheadline/priceLabel with blank lines", () => {

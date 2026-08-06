@@ -1,12 +1,12 @@
 {
-  "name": "@pulso/db",
+  "name": "@pulso/publish",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "exports": {
-    "./server": "./src/server.ts",
-    "./worker": "./src/worker.ts",
-    "./types": "./src/database.types.ts"
+    "./agent": "./src/publish.ts",
+    "./caption": "./src/publish-helpers.ts",
+    "./base-agent": "./src/base-agent.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -14,14 +14,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@pulso/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.47.10",
-    "dotenv": "^16.4.7"
+    "@pulso/db": "workspace:*",
+    "@pulso/events": "workspace:*",
+    "@pulso/shared": "workspace:*"
   },
   "devDependencies": {
     "@pulso/tsconfig": "workspace:*",
     "@pulso/eslint-config": "workspace:*",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.0",
     "vitest": "^2.1.8"
   }

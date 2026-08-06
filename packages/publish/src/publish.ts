@@ -1,8 +1,14 @@
 import { publishEvent } from "@pulso/events/publish";
 import { createServiceRoleClient } from "@pulso/db/worker";
 import type { Json } from "@pulso/db/types";
-import { executeAgentRun } from "./base-agent.js";
-import { buildCaption } from "./publish-helpers.js";
+// Self-referencing package-subpath imports (not relative "./x.js" paths) —
+// those go through the same package.json `exports` resolution any external
+// consumer uses, which Next's webpack (with transpilePackages set) handles
+// correctly. A plain relative import pointing a NodeNext-style ".js"
+// extension at an unbuilt ".ts" file does not (confirmed the hard way on
+// @pulso/shared/image-gen — see apps/web/next.config.ts).
+import { executeAgentRun } from "@pulso/publish/base-agent";
+import { buildCaption } from "@pulso/publish/caption";
 
 const META_GRAPH_API_VERSION = "v21.0";
 const IG_CONTAINER_POLL_ATTEMPTS = 10;

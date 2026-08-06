@@ -5,7 +5,7 @@ import { publishEvent } from "@pulso/events/publish";
 import { newCorrelationId } from "@pulso/shared/ids";
 import { createLogger } from "@pulso/shared/logger";
 import { callAgentLlm } from "../agent-llm.js";
-import { executeAgentRun } from "./base-agent.js";
+import { executeAgentRun } from "@pulso/publish/base-agent";
 import { computeOpenDates, formatDate, resolveEphemeridesInWindow } from "./planner-helpers.js";
 
 const logger = createLogger({ agent: "planner-tick" });

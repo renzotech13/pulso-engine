@@ -1,5 +1,5 @@
 import { newCorrelationId } from "@pulso/shared/ids";
-import { runPublishAgentForCreative } from "./agents/publish.js";
+import { runPublishAgentForCreative } from "@pulso/publish/agent";
 
 const tenantId = process.argv[2];
 const creativeId = process.argv[3];

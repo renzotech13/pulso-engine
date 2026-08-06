@@ -152,6 +152,12 @@ importers:
       '@pulso/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@pulso/events':
+        specifier: workspace:*
+        version: link:../../packages/events
+      '@pulso/publish':
+        specifier: workspace:*
+        version: link:../../packages/publish
       '@pulso/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -216,6 +222,9 @@ importers:
       '@pulso/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@pulso/publish':
+        specifier: workspace:*
+        version: link:../../packages/publish
       '@pulso/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -256,6 +265,9 @@ importers:
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.110.0
+      dotenv:
+        specifier: ^16.4.7
+        version: 16.6.1
     devDependencies:
       '@pulso/eslint-config':
         specifier: workspace:*
@@ -287,6 +299,31 @@ importers:
       zod:
         specifier: ^3.24.1
         version: 3.25.76
+    devDependencies:
+      '@pulso/eslint-config':
+        specifier: workspace:*
+        version: link:../../tooling/eslint-config
+      '@pulso/tsconfig':
+        specifier: workspace:*
+        version: link:../../tooling/tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.0)(terser@5.49.0)
+
+  packages/publish:
+    dependencies:
+      '@pulso/db':
+        specifier: workspace:*
+        version: link:../db
+      '@pulso/events':
+        specifier: workspace:*
+        version: link:../events
+      '@pulso/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@pulso/eslint-config':
         specifier: workspace:*

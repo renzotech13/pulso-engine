@@ -8,7 +8,7 @@ import { runOrchestratorTick } from "./agents/orchestrator.js";
 import { runHelloAgent } from "./agents/hello.js";
 import { runPlannerForTenant, runPlannerTick } from "./agents/planner.js";
 import { runCreativeAgentForSlot } from "./agents/creative.js";
-import { runPublishAgentForCreative } from "./agents/publish.js";
+import { runPublishAgentForCreative } from "@pulso/publish/agent";
 import { runPublishTick } from "./agents/publish-tick.js";
 import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
 

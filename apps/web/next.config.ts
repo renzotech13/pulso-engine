@@ -6,13 +6,14 @@ const nextConfig: NextConfig = {
   // Without this, Next.js infers the workspace root from the nearest
   // lockfile and picks up the unrelated one in the user's home directory.
   outputFileTracingRoot: path.resolve(import.meta.dirname, "../.."),
-  // @pulso/shared ships raw .ts source (no build step) with relative
-  // imports like "./logger.js" pointing at "./logger.ts" — tsc resolves
-  // that fine, but Next's own bundler only does when the package is listed
-  // here. First surfaced when actions.ts started importing
-  // @pulso/shared/image-gen (nothing in apps/web touched @pulso/shared
-  // before that): "Module not found: Can't resolve './logger.js'".
-  transpilePackages: ["@pulso/shared"],
+  // These ship raw .ts source (no build step) — Next's bundler only picks
+  // them up for transpilation when listed here. (Their own internal cross-
+  // file imports were separately rewritten from relative "./x.js" paths to
+  // self-referencing package-subpath imports, e.g. "@pulso/events/catalog"
+  // — transpilePackages alone doesn't make webpack resolve a ".js"
+  // extension pointing at an unbuilt ".ts" file. See @pulso/shared/image-gen
+  // and @pulso/publish/agent for where this first bit.)
+  transpilePackages: ["@pulso/shared", "@pulso/db", "@pulso/events", "@pulso/publish"],
   experimental: {
     // Default is 1MB — "Publicar con marco" submits a whole batch of real
     // photos (e.g. 18 match photos at ~1-2MB each) as one multipart Server

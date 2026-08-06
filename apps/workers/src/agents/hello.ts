@@ -1,7 +1,7 @@
 import { createServiceRoleClient } from "@pulso/db/worker";
 import { publishEvent } from "@pulso/events/publish";
 import type { EventPayload } from "@pulso/events/catalog";
-import { executeAgentRun } from "./base-agent.js";
+import { executeAgentRun } from "@pulso/publish/base-agent";
 
 /**
  * Fase 0 proof-of-loop agent: acknowledges a heartbeat, records why it

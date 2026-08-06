@@ -1,7 +1,11 @@
 import type { ServiceRoleClient } from "@pulso/db/worker";
 import { AppError } from "@pulso/shared/errors";
 import { newCorrelationId } from "@pulso/shared/ids";
-import { type EventType, type EventPayload, parseEventPayload } from "./catalog.js";
+// Self-referencing package-subpath import, not a relative "./x.js" path —
+// see packages/publish/src/publish.ts for why (Next's webpack can't resolve
+// a NodeNext-style ".js" extension pointing at an unbuilt ".ts" file, even
+// with transpilePackages set, for anything beyond type-only imports).
+import { type EventType, type EventPayload, parseEventPayload } from "@pulso/events/catalog";
 
 export interface PublishEventInput<T extends EventType> {
   tenantId: string;
