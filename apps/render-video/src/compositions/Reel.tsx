@@ -30,10 +30,28 @@ export function Reel({ brand, headline, subheadline, priceLabel, photoUrl }: Ree
         justifyContent: "flex-end",
         fontFamily: "system-ui, -apple-system, sans-serif",
         background: photoUrl
-          ? `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%), url(${photoUrl}) center/cover no-repeat`
+          ? undefined
           : `radial-gradient(circle at 30% 20%, ${brand.colorSecondary} 0%, ${brand.colorPrimary} 65%)`,
       }}
     >
+      {/* Plain CSS background: url() doesn't participate in Remotion's
+          asset-loading barrier (unlike <Img>), so frames could get captured
+          before the photo finished downloading — rendering as just the
+          gradient with no photo. <Img> here fixes that the same way
+          StoryPromo.tsx already does it. */}
+      {photoUrl && (
+        <AbsoluteFill>
+          <Img src={photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </AbsoluteFill>
+      )}
+      {photoUrl && (
+        <AbsoluteFill
+          style={{
+            background: `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%)`,
+          }}
+        />
+      )}
+
       {brand.logoUrl && (
         <Img
           src={brand.logoUrl}
