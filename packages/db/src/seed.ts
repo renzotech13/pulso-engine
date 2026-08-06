@@ -136,12 +136,13 @@ Catálogo de productos/servicios:
 {{PRODUCTS}}
 
 {{INSTRUCTION}}
+{{NEWS_CONTEXT}}
 
 Escribe el copy para esta pieza. Sé concreto y usa precios/promociones reales del catálogo cuando calce con el tema.
 Si hay una instrucción adicional del cliente arriba, respétala por encima de tu propio criterio de estilo.
 Si el tema se refiere claramente a un producto específico del catálogo de arriba, incluye su nombre EXACTO tal como aparece ahí en el campo "productName" (así se puede usar su foto real en la pieza). Si no aplica a ningún producto puntual, omite ese campo.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
-{"headline": "string corto y llamativo", "subheadline": "string breve opcional", "priceLabel": "string tipo 'Desde S/ 96', opcional", "productName": "nombre exacto del producto del catálogo, opcional"}`;
+{"headline": "string corto y llamativo", "subheadline": "string breve opcional", "priceLabel": "string tipo 'Desde S/ 96', opcional", "productName": "nombre exacto del producto del catálogo, opcional", "caption": "string, SOLO si arriba se te pidió un campo caption separado, si no omítelo"}`;
 
 const CREATIVE_CAROUSEL_PROMPT_V1 = `Eres el redactor de un carrusel de Instagram/Facebook para un negocio local peruano. Los carruseles con este formato convierten mejor que los reels en el algoritmo actual, especialmente cuando invitan a comentar.
 

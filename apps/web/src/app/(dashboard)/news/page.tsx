@@ -1,13 +1,23 @@
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { dismissNewsSuggestionAction, useNewsSuggestionAction } from "@/lib/actions";
-import { inputClass, labelClass } from "@/components/ui/field";
+import { dismissNewsSuggestionAction } from "@/lib/actions";
 import { Card } from "@/components/ui/card";
-import { SubmitButton } from "@/components/submit-button";
+import { UseIdeaForm } from "./use-idea-form";
 
-function tomorrow(): string {
+/**
+ * Starting tomorrow, the first date with no content_calendar row yet —
+ * content_calendar has one slot per day, so proposing an already-taken date
+ * as the default would just make the common case hit the "day already
+ * planned" error the form now has to handle anyway.
+ */
+function nextFreeDate(takenDates: ReadonlySet<string>): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() + 1);
+  for (let i = 0; i < 90; i++) {
+    const iso = d.toISOString().slice(0, 10);
+    if (!takenDates.has(iso)) return iso;
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
   return d.toISOString().slice(0, 10);
 }
 
@@ -15,14 +25,17 @@ export default async function NewsPage() {
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const { data: suggestions } = await supabase
-    .from("news_suggestions")
-    .select("*")
-    .eq("tenant_id", ctx.tenantId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+  const [{ data: suggestions }, { data: plannedSlots }] = await Promise.all([
+    supabase
+      .from("news_suggestions")
+      .select("*")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false }),
+    supabase.from("content_calendar").select("date").eq("tenant_id", ctx.tenantId),
+  ]);
 
-  const defaultDate = tomorrow();
+  const defaultDate = nextFreeDate(new Set((plannedSlots ?? []).map((s) => s.date)));
 
   return (
     <div className="space-y-6">
@@ -60,20 +73,7 @@ export default async function NewsPage() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-end gap-3">
-              <form action={useNewsSuggestionAction} className="flex flex-wrap items-end gap-3">
-                <input type="hidden" name="tenantId" value={ctx.tenantId} />
-                <input type="hidden" name="suggestionId" value={s.id} />
-                <div>
-                  <label className={labelClass}>Fecha para el post</label>
-                  <input type="date" name="date" defaultValue={defaultDate} className={inputClass} />
-                </div>
-                <SubmitButton
-                  pendingText="Creando…"
-                  className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Usar esta idea
-                </SubmitButton>
-              </form>
+              <UseIdeaForm tenantId={ctx.tenantId} suggestionId={s.id} defaultDate={defaultDate} />
 
               <form action={dismissNewsSuggestionAction}>
                 <input type="hidden" name="tenantId" value={ctx.tenantId} />

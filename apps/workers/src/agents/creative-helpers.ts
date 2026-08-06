@@ -26,6 +26,7 @@ export interface CreativeCopy {
   priceLabel?: string | undefined;
   productName?: string | undefined;
   slides?: string[] | undefined;
+  caption?: string | undefined;
 }
 
 /**
@@ -52,6 +53,7 @@ export function buildBriefForComponentRef(
     const message = copy.subheadline ? `${copy.headline} — ${copy.subheadline}` : copy.headline;
     const brief: Record<string, unknown> = { message };
     if (photoUrl) brief.photoUrl = photoUrl;
+    if (copy.caption) brief.caption = copy.caption;
     if (colorOverride) Object.assign(brief, colorOverride);
     return brief;
   }
@@ -67,6 +69,7 @@ export function buildBriefForComponentRef(
   if (copy.subheadline) brief.subheadline = copy.subheadline;
   if (copy.priceLabel) brief.priceLabel = copy.priceLabel;
   if (photoUrl) brief.photoUrl = photoUrl;
+  if (copy.caption) brief.caption = copy.caption;
   if (colorOverride) Object.assign(brief, colorOverride);
   return brief;
 }

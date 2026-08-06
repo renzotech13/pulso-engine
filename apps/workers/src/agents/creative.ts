@@ -29,12 +29,14 @@ const creativeCopySchema = z
     subheadline: z.string().nullable().optional(),
     priceLabel: z.string().nullable().optional(),
     productName: z.string().nullable().optional(),
+    caption: z.string().nullable().optional(),
   })
   .transform((data) => ({
     headline: data.headline,
     subheadline: data.subheadline ?? undefined,
     priceLabel: data.priceLabel ?? undefined,
     productName: data.productName ?? undefined,
+    caption: data.caption ?? undefined,
   }));
 
 // Carousel copy is a flat list, not a single headline — first slide is the
@@ -175,12 +177,24 @@ export async function runCreativeAgentForSlot(
         ? `Instrucción adicional del cliente para esta pieza: ${slot.notes.trim()}`
         : "";
 
+      // The News agent stores the original headline as source.rationale when
+      // it creates the slot (see useNewsSuggestionAction) — this is the only
+      // signal creative.ts has that this piece is grounded in a real news
+      // story instead of a Planner-invented theme.
+      const newsSource = slot.source as { agent?: string; rationale?: string } | null;
+      const newsHeadline = newsSource?.agent === "news" ? newsSource.rationale : undefined;
+
+      const newsContext = newsHeadline
+        ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}".\nAdemás del headline/subheadline para la imagen, escribe un campo "caption" separado — el texto que acompaña la publicación en Facebook/Instagram (no va impreso en la imagen). Debe explicar en 2-3 párrafos breves por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cerrar conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y terminar con 3 a 5 hashtags relevantes en español. No inventes datos que no estén en el tema de arriba.`
+        : "";
+
       const prompt = renderPrompt(promptTemplate, {
         THEME: slot.theme,
         SLOT_TYPE: slot.slot_type,
         PROMOTIONS: formatPromotions(promotions),
         PRODUCTS: formatProducts(products),
         INSTRUCTION: instruction,
+        NEWS_CONTEXT: newsContext,
       });
 
       const copy: CreativeCopy = isCarousel
@@ -203,13 +217,20 @@ export async function runCreativeAgentForSlot(
 
       let photoUrl = pickProductPhoto(products, copy.productName);
 
+      // A news-sourced piece is about a specific real-world story — the
+      // tenant's generic photo library (built for their own products/brand)
+      // has nothing relevant to show, so it's skipped in favor of an
+      // AI-generated image themed to the actual headline. Falls through to
+      // the library below only if Gemini isn't configured or fails.
+      const isNewsSourced = Boolean(newsHeadline);
+
       // No specific catalog product matched — prefer the tenant's own
       // uploaded photo library over an AI-generated image, since a real
       // photo the tenant chose beats a synthetic one whenever one's
       // available. listMediaAssets already orders oldest/never-used first,
       // so this naturally cycles through every uploaded photo before any
       // gets reused.
-      const pickedMediaAsset = !photoUrl ? mediaAssets[0] : undefined;
+      const pickedMediaAsset = !photoUrl && !isNewsSourced ? mediaAssets[0] : undefined;
       if (pickedMediaAsset) {
         photoUrl = pickedMediaAsset.url;
         await ctx.db.markMediaAssetUsed(pickedMediaAsset.id);
@@ -224,14 +245,20 @@ export async function runCreativeAgentForSlot(
         const styleHint = accentEphemeris
           ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
           : "";
-        const prompt = [
-          `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
-          `Tema: ${slot.theme}.`,
-          styleHint,
-          "Sin texto superpuesto, estilo limpio y corporativo.",
-        ]
-          .filter(Boolean)
-          .join(" ");
+        const prompt = isNewsSourced
+          ? [
+              `Fotografía profesional y editorial para una publicación de noticias sobre: "${newsHeadline}".`,
+              `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
+              "Estilo fotoperiodístico, realista, sin texto superpuesto, sin logos.",
+            ].join(" ")
+          : [
+              `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
+              `Tema: ${slot.theme}.`,
+              styleHint,
+              "Sin texto superpuesto, estilo limpio y corporativo.",
+            ]
+              .filter(Boolean)
+              .join(" ");
 
         const imageBuffer = await generateThemedImage(prompt);
         if (imageBuffer) {
@@ -244,6 +271,16 @@ export async function runCreativeAgentForSlot(
             const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
             photoUrl = publicUrlData.publicUrl;
           }
+        }
+      }
+
+      // Gemini wasn't configured or failed — a library photo (even if
+      // generic) still beats the plain gradient fallback for a news piece.
+      if (!photoUrl && isNewsSourced) {
+        const fallbackMediaAsset = mediaAssets[0];
+        if (fallbackMediaAsset) {
+          photoUrl = fallbackMediaAsset.url;
+          await ctx.db.markMediaAssetUsed(fallbackMediaAsset.id);
         }
       }
 

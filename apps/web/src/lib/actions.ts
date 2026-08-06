@@ -896,11 +896,28 @@ export async function retestSocialConnectionAction(formData: FormData): Promise<
  * content_calendar has no insert policy for authenticated, so this does its
  * own owner/admin check and writes with the service role.
  */
-export async function useNewsSuggestionAction(formData: FormData): Promise<void> {
+export interface UseNewsSuggestionState {
+  error: string | null;
+}
+
+/**
+ * Bound to a `useActionState` form (see news/use-idea-form.tsx), not a plain
+ * `<form action={...}>` — an expected failure like "day already taken" is a
+ * normal outcome here (the user free-picks any date), not an exceptional one,
+ * so it's returned for inline display instead of thrown. An uncaught throw
+ * from a server action renders as a blank "Application error" crash page in
+ * production (Next redacts the real message from the client for security),
+ * which is unusable for a message the user is specifically meant to read and
+ * act on.
+ */
+export async function useNewsSuggestionAction(
+  _prevState: UseNewsSuggestionState,
+  formData: FormData,
+): Promise<UseNewsSuggestionState> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const suggestionId = String(formData.get("suggestionId") ?? "");
   const date = String(formData.get("date") ?? "");
-  if (!tenantId || !suggestionId || !date) return;
+  if (!tenantId || !suggestionId || !date) return { error: "Falta la fecha." };
 
   const supabase = await createSupabaseServerClient();
   await requireTenantEditor(supabase, tenantId);
@@ -913,7 +930,7 @@ export async function useNewsSuggestionAction(formData: FormData): Promise<void>
     .eq("id", suggestionId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  if (!suggestion || suggestion.status !== "pending") return;
+  if (!suggestion || suggestion.status !== "pending") return { error: null };
 
   const { data: tenant } = await service.from("tenants").select("hitl_mode").eq("id", tenantId).single();
   const autoApproveSlot = tenant?.hitl_mode !== "approve-all";
@@ -933,21 +950,21 @@ export async function useNewsSuggestionAction(formData: FormData): Promise<void>
     )
     .select("id")
     .maybeSingle();
-  if (slotError) throw new Error(slotError.message);
+  if (slotError) return { error: slotError.message };
 
   // Unique tenant_id+date means a day that's already planned silently loses
   // this insert (see upsertContentCalendarSlot's own doc comment) — surfaced
   // here instead of failing silently, since the user explicitly picked this
   // date and would otherwise have no idea why nothing happened.
   if (!slot) {
-    throw new Error(`Ya hay contenido planificado para el ${date}. Elige otro día.`);
+    return { error: `Ya hay contenido planificado para el ${date}. Elige otro día.` };
   }
 
   if (autoApproveSlot) {
     const { error: rpcError } = await supabase.rpc("request_creative_generation", {
       target_calendar_slot_id: slot.id,
     });
-    if (rpcError) throw new Error(rpcError.message);
+    if (rpcError) return { error: rpcError.message };
   }
 
   const { error: updateError } = await service
@@ -955,10 +972,11 @@ export async function useNewsSuggestionAction(formData: FormData): Promise<void>
     .update({ status: "used" })
     .eq("id", suggestionId)
     .eq("tenant_id", tenantId);
-  if (updateError) throw new Error(updateError.message);
+  if (updateError) return { error: updateError.message };
 
   revalidatePath("/news");
   revalidatePath("/calendar");
+  return { error: null };
 }
 
 export async function dismissNewsSuggestionAction(formData: FormData): Promise<void> {
