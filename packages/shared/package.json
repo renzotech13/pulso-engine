@@ -8,7 +8,8 @@
     "./logger": "./src/logger.ts",
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
-    "./llm": "./src/llm.ts"
+    "./llm": "./src/llm.ts",
+    "./image-gen": "./src/image-gen.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

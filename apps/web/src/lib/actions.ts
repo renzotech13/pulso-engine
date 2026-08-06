@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { generateThemedImage } from "@pulso/shared/image-gen";
 import { createServiceRoleClient } from "./supabase/service";
 import { createSupabaseServerClient } from "./supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "./tenant-context";
@@ -621,6 +622,146 @@ export async function removePhotoFromCreativeAction(formData: FormData): Promise
     triggerPhotoFrameRender(creativeId);
   }
 
+  revalidatePath(`/calendar/${date}`);
+}
+
+/**
+ * Shared by regenerate/replace below: both need the creative's own tenant_id
+ * (ownership check) and its carousel brief (slides + current photoUrls) to
+ * know what they're editing.
+ */
+async function getOwnedCarouselCreative(
+  service: ReturnType<typeof createServiceRoleClient>,
+  tenantId: string,
+  creativeId: string,
+): Promise<{ brief: Record<string, unknown>; slides: string[]; photoUrls: Array<string | null> }> {
+  const { data: creative } = await service
+    .from("creatives")
+    .select("tenant_id, brief")
+    .eq("id", creativeId)
+    .maybeSingle();
+  if (!creative || creative.tenant_id !== tenantId) throw new Error("creative not found");
+
+  const brief = creative.brief as Record<string, unknown> & { slides?: unknown; photoUrls?: unknown };
+  const slides = Array.isArray(brief.slides) ? (brief.slides as string[]) : [];
+  const photoUrls: Array<string | null> = Array.isArray(brief.photoUrls)
+    ? (brief.photoUrls as Array<string | null>)
+    : new Array(slides.length).fill(null);
+
+  return { brief, slides, photoUrls };
+}
+
+/**
+ * Clears just this slide's stale rendered file — handleCarouselRender's
+ * "already rendered" check only compares file COUNT to slide count, so
+ * dropping any one file below that count is enough to make it re-render
+ * every slide fresh (cheap: it's a handful of Puppeteer screenshots, and the
+ * unrelated slides just re-composite the same photo they already had).
+ */
+async function clearCarouselRender(
+  service: ReturnType<typeof createServiceRoleClient>,
+  tenantId: string,
+  creativeId: string,
+  slideIndex: number,
+): Promise<void> {
+  await service.storage.from("creative-assets").remove([`${tenantId}/${creativeId}-${slideIndex}.png`]);
+}
+
+/**
+ * Regenerates a single carousel slide's photo with Gemini, themed to that
+ * slide's own text — for fixing one bad slide (cropped, mistimed, Gemini
+ * baked in garbled text, ...) without touching the other slides or the copy.
+ */
+export async function regenerateCarouselSlideAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const creativeId = String(formData.get("creativeId") ?? "");
+  const slideIndex = Number(formData.get("slideIndex"));
+  if (!tenantId || !date || !creativeId || !Number.isInteger(slideIndex)) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const service = createServiceRoleClient();
+  const { brief, slides, photoUrls } = await getOwnedCarouselCreative(service, tenantId, creativeId);
+  const slideText = slides[slideIndex];
+  if (slideText === undefined) throw new Error("ese slide no existe");
+
+  const [{ data: slot }, { data: tenant }] = await Promise.all([
+    supabase.from("content_calendar").select("theme").eq("tenant_id", tenantId).eq("date", date).maybeSingle(),
+    supabase.from("tenants").select("rubro").eq("id", tenantId).single(),
+  ]);
+
+  const prompt = [
+    `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant?.rubro ?? "general"}".`,
+    `Tema general del carrusel: ${slot?.theme ?? ""}.`,
+    `Este slide en particular dice: "${slideText}".`,
+    "La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde — sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.",
+  ].join(" ");
+
+  const imageBuffer = await generateThemedImage(prompt);
+  if (!imageBuffer) {
+    throw new Error("Gemini no devolvió una imagen — revisa GEMINI_API_KEY o el límite de uso.");
+  }
+
+  const assetPath = `${tenantId}/generated-manual-${creativeId}-slide${slideIndex}-${Date.now()}.png`;
+  const { error: uploadError } = await service.storage
+    .from("creative-assets")
+    .upload(assetPath, imageBuffer, { contentType: "image/png" });
+  if (uploadError) throw new Error(`upload failed: ${uploadError.message}`);
+
+  const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
+  const nextPhotoUrls = [...photoUrls];
+  nextPhotoUrls[slideIndex] = publicUrlData.publicUrl;
+
+  const { error: updateError } = await service
+    .from("creatives")
+    .update({ status: "pending", brief: { ...brief, slides, photoUrls: nextPhotoUrls } })
+    .eq("id", creativeId);
+  if (updateError) throw new Error(updateError.message);
+
+  await clearCarouselRender(service, tenantId, creativeId, slideIndex);
+  triggerPhotoFrameRender(creativeId);
+  revalidatePath(`/calendar/${date}`);
+}
+
+/**
+ * Replaces a single carousel slide's photo with a manually uploaded file —
+ * for when the tenant has their own photo they'd rather use than anything
+ * AI-generated or from the media library.
+ */
+export async function replaceCarouselSlidePhotoAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const creativeId = String(formData.get("creativeId") ?? "");
+  const slideIndex = Number(formData.get("slideIndex"));
+  const photo = formData.get("photo");
+  if (!tenantId || !date || !creativeId || !Number.isInteger(slideIndex)) return;
+  if (!(photo instanceof File) || photo.size === 0) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const service = createServiceRoleClient();
+  const { brief, slides, photoUrls } = await getOwnedCarouselCreative(service, tenantId, creativeId);
+  if (slideIndex < 0 || slideIndex >= slides.length) throw new Error("ese slide no existe");
+
+  const assetPath = `${tenantId}/uploaded-${creativeId}-slide${slideIndex}-${crypto.randomUUID()}-${photo.name}`;
+  const { error: uploadError } = await service.storage.from("creative-assets").upload(assetPath, photo);
+  if (uploadError) throw new Error(`upload failed: ${uploadError.message}`);
+
+  const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
+  const nextPhotoUrls = [...photoUrls];
+  nextPhotoUrls[slideIndex] = publicUrlData.publicUrl;
+
+  const { error: updateError } = await service
+    .from("creatives")
+    .update({ status: "pending", brief: { ...brief, slides, photoUrls: nextPhotoUrls } })
+    .eq("id", creativeId);
+  if (updateError) throw new Error(updateError.message);
+
+  await clearCarouselRender(service, tenantId, creativeId, slideIndex);
+  triggerPhotoFrameRender(creativeId);
   revalidatePath(`/calendar/${date}`);
 }
 

@@ -12,7 +12,7 @@ import {
   templateNameForSlotType,
   type CreativeCopy,
 } from "./creative-helpers.js";
-import { generateThemedImage } from "./image-gen.js";
+import { generateThemedImage } from "@pulso/shared/image-gen";
 
 type PromotionRow = Database["public"]["Tables"]["promotions"]["Row"];
 type ProductRow = Database["public"]["Tables"]["products_services"]["Row"];
@@ -244,7 +244,7 @@ export async function runCreativeAgentForSlot(
               `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema general del carrusel: ${slot.theme}.`,
               `Este slide en particular dice: "${slideText}".`,
-              "La imagen debe ilustrar visualmente esta idea puntual del slide — composición limpia, con espacio libre para overlay de texto. Sin texto superpuesto, sin logos.",
+              "La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde — sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.",
             ].join(" ");
 
             const imageBuffer = await generateThemedImage(prompt);

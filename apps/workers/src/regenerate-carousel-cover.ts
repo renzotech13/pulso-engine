@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@pulso/db/worker";
-import { generateThemedImage } from "./agents/image-gen.js";
+import { generateThemedImage } from "@pulso/shared/image-gen";
 
 const creativeId = process.argv[2];
 const prompt = process.argv[3];

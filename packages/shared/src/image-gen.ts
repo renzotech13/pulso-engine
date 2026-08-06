@@ -1,5 +1,4 @@
-import { loadConfig } from "@pulso/shared/config";
-import { createLogger } from "@pulso/shared/logger";
+import { createLogger } from "./logger.js";
 
 const logger = createLogger({ agent: "image-gen" });
 
@@ -17,22 +16,24 @@ interface GeminiResponse {
 }
 
 /**
- * Generates an image from a text prompt via the Gemini API — the fallback
- * for when there's no catalog photo to composite (pickProductPhoto in
- * creative-helpers.ts came up empty). Never throws: no configured key, a
- * network error, or a response shape that doesn't match what's expected all
- * just return null, and the caller falls back to the plain gradient
- * background exactly like it did before this existed. Not yet verified
- * against a real API key — if Gemini's actual response shape differs, this
- * is the one place that needs adjusting.
+ * Generates an image from a text prompt via the Gemini API. Reads
+ * process.env.GEMINI_API_KEY directly instead of @pulso/shared's own
+ * loadConfig() — that function requires REDIS_URL/LMSTUDIO_MODEL (worker-only
+ * env vars), which would make this unusable from apps/web, the other real
+ * caller (per-slide carousel regeneration from the dashboard).
+ *
+ * Never throws: no configured key, a network error, or a response shape that
+ * doesn't match what's expected all just return null, and the caller falls
+ * back to the plain gradient background (or, from the dashboard, shows an
+ * error toast) exactly like before this existed.
  */
 export async function generateThemedImage(prompt: string): Promise<Buffer | null> {
-  const config = loadConfig();
-  if (!config.GEMINI_API_KEY) return null;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
 
   try {
     const response = await fetch(
-      `${GEMINI_API_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${config.GEMINI_API_KEY}`,
+      `${GEMINI_API_BASE}/models/${GEMINI_IMAGE_MODEL}:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
