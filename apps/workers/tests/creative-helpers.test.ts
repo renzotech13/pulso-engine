@@ -114,6 +114,30 @@ describe("buildBriefForComponentRef", () => {
     expect(brief).toEqual({ slides });
   });
 
+  it("includes videoEffects on the brief for reel when the LLM returned some", () => {
+    const brief = buildBriefForComponentRef("reel", {
+      headline: "20% en masajes",
+      videoEffects: { hideLogo: true, zoomOutBackground: true },
+    });
+    expect(brief).toEqual({
+      headline: "20% en masajes",
+      videoEffects: { hideLogo: true, zoomOutBackground: true },
+    });
+  });
+
+  it("omits videoEffects entirely for reel when the LLM didn't return any", () => {
+    const brief = buildBriefForComponentRef("reel", { headline: "20% en masajes" });
+    expect(brief).toEqual({ headline: "20% en masajes" });
+  });
+
+  it("never puts videoEffects on a social-post brief even if present in copy", () => {
+    const brief = buildBriefForComponentRef("social-post", {
+      headline: "20% en masajes",
+      videoEffects: { hideLogo: true },
+    });
+    expect(brief).toEqual({ headline: "20% en masajes" });
+  });
+
   it("includes the real post caption for carousel when the LLM wrote one", () => {
     const slides = ["a", "b", "c", "d", "e"];
     const caption = "Un texto real para la publicación, con fuente y hashtags. #tips";

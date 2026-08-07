@@ -8,9 +8,9 @@ export { reelSchema, REEL_SIZE, REEL_FPS, REEL_DURATION_FRAMES, type ReelProps }
  * slides/fades in, price badge pops in ~20 frames later, subheadline
  * trails last. Fixed 1080x1920 — matches the composition's registered size.
  */
-export function Reel({ brand, headline, subheadline, priceLabel, photoUrl }: ReelProps) {
+export function Reel({ brand, headline, subheadline, priceLabel, photoUrl, videoEffects }: ReelProps) {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, durationInFrames } = useVideoConfig();
 
   const headlineSpring = spring({ frame, fps, config: { damping: 200 } });
   const headlineTranslateY = interpolate(headlineSpring, [0, 1], [60, 0]);
@@ -23,6 +23,16 @@ export function Reel({ brand, headline, subheadline, priceLabel, photoUrl }: Ree
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
+  // Both opt-in via brief.videoEffects (see creative.ts's VIDEO_EFFECTS_INSTRUCTION) —
+  // default behavior (no zoom, overlay visible from frame 0) is unchanged
+  // when a piece doesn't ask for either.
+  const backgroundScale = videoEffects?.zoomOutBackground
+    ? interpolate(frame, [0, durationInFrames], [1.15, 1], { extrapolateRight: "clamp" })
+    : 1;
+  const overlayOpacity = videoEffects?.fadeInOverlay
+    ? interpolate(frame, [0, 25], [0, 1], { extrapolateRight: "clamp" })
+    : 1;
 
   return (
     <AbsoluteFill
@@ -41,18 +51,27 @@ export function Reel({ brand, headline, subheadline, priceLabel, photoUrl }: Ree
           StoryPromo.tsx already does it. */}
       {photoUrl && (
         <AbsoluteFill>
-          <Img src={photoUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <Img
+            src={photoUrl}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              transform: `scale(${backgroundScale})`,
+            }}
+          />
         </AbsoluteFill>
       )}
       {photoUrl && (
         <AbsoluteFill
           style={{
             background: `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%)`,
+            opacity: overlayOpacity,
           }}
         />
       )}
 
-      {brand.logoUrl && (
+      {brand.logoUrl && !videoEffects?.hideLogo && (
         <Img
           src={brand.logoUrl}
           style={{

@@ -20,6 +20,12 @@ export function creativeTypeForTemplateType(templateType: "static" | "video"): "
   return templateType === "video" ? "video" : "image";
 }
 
+export interface VideoEffects {
+  hideLogo?: boolean | undefined;
+  zoomOutBackground?: boolean | undefined;
+  fadeInOverlay?: boolean | undefined;
+}
+
 export interface CreativeCopy {
   headline?: string | undefined;
   subheadline?: string | undefined;
@@ -27,6 +33,7 @@ export interface CreativeCopy {
   productName?: string | undefined;
   slides?: string[] | undefined;
   caption?: string | undefined;
+  videoEffects?: VideoEffects | undefined;
 }
 
 /**
@@ -77,6 +84,10 @@ export function buildBriefForComponentRef(
   if (photoUrl) brief.photoUrl = photoUrl;
   if (copy.caption) brief.caption = copy.caption;
   if (colorOverride) Object.assign(brief, colorOverride);
+  // Only the reel composition (Remotion) actually reads these — social-post's
+  // HTML template has no notion of "effects", so they're scoped to avoid
+  // dead data on every other creative type.
+  if (componentRef === "reel" && copy.videoEffects) brief.videoEffects = copy.videoEffects;
   return brief;
 }
 

@@ -12,6 +12,13 @@ export const reelSchema = z.object({
   subheadline: z.string().optional(),
   priceLabel: z.string().optional(),
   photoUrl: z.string().optional(),
+  videoEffects: z
+    .object({
+      hideLogo: z.boolean().optional(),
+      zoomOutBackground: z.boolean().optional(),
+      fadeInOverlay: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type ReelProps = z.infer<typeof reelSchema>;

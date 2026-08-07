@@ -23,6 +23,15 @@ type ProductRow = Database["public"]["Tables"]["products_services"]["Row"];
 // rejected otherwise-valid output until the retry also came back null and
 // the whole generation failed. .nullable() plus the transform below let
 // both "omitted" and "explicitly null" mean the same thing downstream.
+const videoEffectsSchema = z
+  .object({
+    hideLogo: z.boolean().nullable().optional(),
+    zoomOutBackground: z.boolean().nullable().optional(),
+    fadeInOverlay: z.boolean().nullable().optional(),
+  })
+  .nullable()
+  .optional();
+
 const creativeCopySchema = z
   .object({
     headline: z.string().min(1),
@@ -30,6 +39,7 @@ const creativeCopySchema = z
     priceLabel: z.string().nullable().optional(),
     productName: z.string().nullable().optional(),
     caption: z.string().nullable().optional(),
+    videoEffects: videoEffectsSchema,
   })
   .transform((data) => ({
     headline: data.headline,
@@ -37,6 +47,13 @@ const creativeCopySchema = z
     priceLabel: data.priceLabel ?? undefined,
     productName: data.productName ?? undefined,
     caption: data.caption ?? undefined,
+    videoEffects: data.videoEffects
+      ? {
+          hideLogo: data.videoEffects.hideLogo ?? undefined,
+          zoomOutBackground: data.videoEffects.zoomOutBackground ?? undefined,
+          fadeInOverlay: data.videoEffects.fadeInOverlay ?? undefined,
+        }
+      : undefined,
   }));
 
 // Carousel copy is a flat list, not a single headline — first slide is the
@@ -202,6 +219,15 @@ export async function runCreativeAgentForSlot(
         ? `\nEsta pieza está inspirada en una noticia real: "${newsHeadline}". En el campo "caption" (el texto de la publicación, no el de la imagen), explica por qué esta noticia le importa a un negocio de tipo "${tenant.rubro ?? "general"}" llamado "${tenant.name}", cierra conectándola con el negocio (usa el nombre "${tenant.name}" tal cual, nunca un placeholder como "[Nombre del Negocio]"), y menciona que la fuente es una noticia reciente. No inventes datos que no estén en el tema de arriba.`
         : "";
 
+      // Only reels have real visual effects a template can act on today
+      // (hide the logo, zoom out the background, fade in the color overlay)
+      // — asking for this on a static post/story would just add a dead JSON
+      // key no template reads.
+      const videoEffectsInstruction =
+        slot.slot_type === "reel"
+          ? `\nEste reel soporta estos efectos visuales opcionales, agrégalos al campo "videoEffects" SOLO si la instrucción del cliente arriba los pide explícitamente (si no dice nada de esto, omite el campo por completo): "hideLogo" (quita el logo de la marca), "zoomOutBackground" (la foto de fondo empieza más cerca y se aleja durante el video), "fadeInOverlay" (la sombra de color entra con un fundido en vez de aparecer de golpe).`
+          : "";
+
       const prompt = renderPrompt(promptTemplate, {
         THEME: slot.theme,
         SLOT_TYPE: slot.slot_type,
@@ -209,6 +235,7 @@ export async function runCreativeAgentForSlot(
         PRODUCTS: formatProducts(products),
         INSTRUCTION: instruction,
         NEWS_CONTEXT: newsContext,
+        VIDEO_EFFECTS_INSTRUCTION: videoEffectsInstruction,
         BRAND_TRAINING: brandTrainingForCopy,
       });
 
