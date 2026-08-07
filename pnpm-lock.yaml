@@ -106,6 +106,9 @@ importers:
 
   apps/render-video:
     dependencies:
+      '@pulso/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@remotion/bundler':
         specifier: ^4.0.496
         version: 4.0.496(@swc/helpers@0.5.15)(postcss@8.5.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)

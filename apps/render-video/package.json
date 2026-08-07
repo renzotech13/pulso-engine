@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./render": "./src/render.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
   "dependencies": {
+    "@pulso/db": "workspace:*",
     "@remotion/bundler": "^4.0.496",
     "@remotion/renderer": "^4.0.496",
     "react": "^19.0.0",

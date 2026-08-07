@@ -19,7 +19,7 @@ let bundlePromise: Promise<string> | undefined;
 // same reasoning as the shared Puppeteer browser in render-templates.
 function getBundleLocation(): Promise<string> {
   if (!bundlePromise) {
-    bundlePromise = bundle({ entryPoint: path.join(import.meta.dirname, "entry.ts") });
+    bundlePromise = bundle({ entryPoint: path.join(import.meta.dirname!, "entry.ts") });
   }
   return bundlePromise;
 }
