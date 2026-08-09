@@ -1,10 +1,28 @@
+import { headers } from "next/headers";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { retestSocialConnectionAction, upsertSocialConnectionAction } from "@/lib/actions";
 import { inputClass as fieldClass, labelClass } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 
-export default async function ConnectionsPage() {
+const META_GRAPH_API_VERSION = "v21.0";
+const META_APP_ID = process.env.META_APP_ID ?? "1550590863219497";
+const META_SCOPES = [
+  "pages_show_list",
+  "pages_read_engagement",
+  "pages_manage_posts",
+  "pages_manage_metadata",
+  "instagram_basic",
+  "instagram_content_publish",
+  "business_management",
+].join(",");
+
+interface ConnectionsPageProps {
+  searchParams: Promise<{ meta_connected?: string; meta_error?: string; meta_other_pages?: string }>;
+}
+
+export default async function ConnectionsPage({ searchParams }: ConnectionsPageProps) {
+  const sp = await searchParams;
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
@@ -14,6 +32,12 @@ export default async function ConnectionsPage() {
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
 
+  const headersList = await headers();
+  const host = headersList.get("host");
+  const protocol = host?.startsWith("localhost") ? "http" : "https";
+  const redirectUri = `${protocol}://${host}/api/meta/callback`;
+  const connectUrl = `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${ctx.tenantId}&scope=${META_SCOPES}&response_type=code`;
+
   return (
     <div className="space-y-8">
       <div>
@@ -22,11 +46,36 @@ export default async function ConnectionsPage() {
         </p>
         <h1 className="font-display text-2xl font-semibold">{ctx.tenantName}</h1>
         <p className="mt-1 max-w-2xl text-sm text-neutral-500">
-          Fase A: sin OAuth todavía — necesitas agregar la app de Pulso Engine como tester/admin de
-          esta página en Meta for Developers, generar un Page Access Token vía Graph API Explorer,
-          y pegarlo acá. El botón de conectar con un click llega en Fase B.
+          Conecta tu página de Facebook con un click — el token que genera este flujo es de larga
+          duración y no depende de tu sesión del navegador, a diferencia de uno pegado a mano.
         </p>
+        <a
+          href={connectUrl}
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
+        >
+          Conectar con Facebook
+        </a>
+        {sp.meta_connected && (
+          <p className="mt-3 text-sm text-status-green">
+            Página conectada correctamente.
+            {sp.meta_other_pages && (
+              <> También administras: {sp.meta_other_pages} — para usar otra, pégala abajo manualmente.</>
+            )}
+          </p>
+        )}
+        {sp.meta_error && <p className="mt-3 text-sm text-status-pink">Error de Meta: {sp.meta_error}</p>}
       </div>
+
+      <details className="rounded-xl border border-ink-700 bg-ink-900 p-4 text-sm text-neutral-400">
+        <summary className="cursor-pointer font-medium text-neutral-300">
+          Conectar a mano con un token (avanzado)
+        </summary>
+        <p className="mt-3">
+          Solo si el botón de arriba no funciona: agrega la app de Pulso Engine como tester/admin
+          de la página en Meta for Developers, genera un Page Access Token vía Graph API Explorer,
+          y pégalo abajo.
+        </p>
+      </details>
 
       {connection && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-ink-700 bg-ink-900 p-4">
