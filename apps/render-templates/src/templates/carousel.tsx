@@ -90,7 +90,7 @@ export function CarouselTemplate({ brand, slides, slideIndex, photoUrls }: Carou
           justifyContent: "center",
           alignItems: isLast ? "center" : "flex-start",
           textAlign: isLast ? "center" : "left",
-          padding: 80,
+          padding: 120,
         }}
       >
         {isLast && (
