@@ -1,9 +1,9 @@
-import { headers } from "next/headers";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { retestSocialConnectionAction, upsertSocialConnectionAction } from "@/lib/actions";
 import { inputClass as fieldClass, labelClass } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { META_OAUTH_REDIRECT_URI } from "@/lib/meta-oauth";
 
 const META_GRAPH_API_VERSION = "v21.0";
 const META_APP_ID = process.env.META_APP_ID ?? "1550590863219497";
@@ -32,11 +32,7 @@ export default async function ConnectionsPage({ searchParams }: ConnectionsPageP
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
 
-  const headersList = await headers();
-  const host = headersList.get("host");
-  const protocol = host?.startsWith("localhost") ? "http" : "https";
-  const redirectUri = `${protocol}://${host}/api/meta/callback`;
-  const connectUrl = `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${ctx.tenantId}&scope=${META_SCOPES}&response_type=code`;
+  const connectUrl = `https://www.facebook.com/${META_GRAPH_API_VERSION}/dialog/oauth?client_id=${META_APP_ID}&redirect_uri=${encodeURIComponent(META_OAUTH_REDIRECT_URI)}&state=${ctx.tenantId}&scope=${META_SCOPES}&response_type=code`;
 
   return (
     <div className="space-y-8">

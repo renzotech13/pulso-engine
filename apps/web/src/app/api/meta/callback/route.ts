@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { META_OAUTH_REDIRECT_URI } from "@/lib/meta-oauth";
 
 const META_GRAPH_API_VERSION = "v21.0";
 const META_APP_ID = process.env.META_APP_ID ?? "1550590863219497";
@@ -12,15 +13,11 @@ type MetaPage = {
   instagram_business_account?: { id: string };
 };
 
-function redirectUri(origin: string): string {
-  return `${origin}/api/meta/callback`;
-}
-
-async function exchangeCodeForUserToken(code: string, origin: string): Promise<string> {
+async function exchangeCodeForUserToken(code: string): Promise<string> {
   const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token`);
   url.searchParams.set("client_id", META_APP_ID);
   url.searchParams.set("client_secret", META_APP_SECRET);
-  url.searchParams.set("redirect_uri", redirectUri(origin));
+  url.searchParams.set("redirect_uri", META_OAUTH_REDIRECT_URI);
   url.searchParams.set("code", code);
 
   const response = await fetch(url);
@@ -94,7 +91,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!tenantId) return back("meta_error=falta%20el%20tenant");
 
   try {
-    const shortLivedToken = await exchangeCodeForUserToken(code, url.origin);
+    const shortLivedToken = await exchangeCodeForUserToken(code);
     const longLivedUserToken = await extendUserToken(shortLivedToken);
     const pages = await fetchManagedPages(longLivedUserToken);
 
