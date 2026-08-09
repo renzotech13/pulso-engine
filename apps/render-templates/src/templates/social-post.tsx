@@ -38,42 +38,27 @@ export function SocialPostTemplate({ brand, headline, subheadline, priceLabel, p
       }}
     >
       {brand.logoUrl && (
-        <>
-          {/* Accent circle peeking out from behind the badge — softens the
-              hard-edged photo/gradient rectangle behind it. */}
-          <div
-            style={{
-              position: "absolute",
-              top: 66,
-              left: 118,
-              width: 84,
-              height: 84,
-              borderRadius: "50%",
-              background: brand.colorSecondary,
-            }}
+        <div
+          style={{
+            position: "absolute",
+            top: 40,
+            left: 40,
+            width: 148,
+            height: 148,
+            borderRadius: "50%",
+            background: "white",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <img
+            src={brand.logoUrl}
+            alt={brand.tenantName}
+            style={{ maxWidth: 96, maxHeight: 80, objectFit: "contain" }}
           />
-          <div
-            style={{
-              position: "absolute",
-              top: 40,
-              left: 40,
-              width: 148,
-              height: 148,
-              borderRadius: "50%",
-              background: "white",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.28)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={brand.logoUrl}
-              alt={brand.tenantName}
-              style={{ maxWidth: 96, maxHeight: 80, objectFit: "contain" }}
-            />
-          </div>
-        </>
+        </div>
       )}
 
       {priceLabel && (
