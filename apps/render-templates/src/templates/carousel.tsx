@@ -112,7 +112,7 @@ export function CarouselTemplate({ brand, slides, slideIndex, photoUrls }: Carou
         <h1
           style={{
             margin: 0,
-            fontSize: isFirst || isLast ? 68 : 56,
+            fontSize: isFirst || isLast ? 58 : 48,
             lineHeight: 1.15,
             fontWeight: 800,
             color: "white",

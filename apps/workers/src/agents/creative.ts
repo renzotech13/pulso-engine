@@ -337,17 +337,19 @@ export async function runCreativeAgentForSlot(
         const styleHint = accentEphemeris
           ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
           : "";
+        const noTextInstruction =
+          "Sin texto, letras, palabras, titulares ni tipografía de ningún tipo dentro de la imagen — nada de portadas de revista, artículos simulados ni gráficos con texto. Solo la fotografía, sin ningún elemento tipográfico compuesto en la escena.";
         const prompt = isNewsSourced
           ? [
               `Fotografía profesional y editorial para una publicación de noticias sobre: "${newsHeadline}".`,
               `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
-              `Estilo fotoperiodístico, realista, sin texto superpuesto, sin logos.${brandTrainingForImage}`,
+              `Estilo fotoperiodístico, realista, sin logos. ${noTextInstruction}${brandTrainingForImage}`,
             ].join(" ")
           : [
               `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema: ${slot.theme}.`,
               styleHint,
-              `Sin texto superpuesto, estilo limpio y corporativo.${brandTrainingForImage}`,
+              `Estilo limpio y corporativo. ${noTextInstruction}${brandTrainingForImage}`,
             ]
               .filter(Boolean)
               .join(" ");
