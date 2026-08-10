@@ -10,6 +10,7 @@ import { runPlannerForTenant, runPlannerTick } from "./agents/planner.js";
 import { runCreativeAgentForSlot } from "./agents/creative.js";
 import { runPublishAgentForCreative } from "@pulso/publish/agent";
 import { runPublishTick } from "./agents/publish-tick.js";
+import { runRenderTick } from "./agents/render-tick.js";
 import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
@@ -29,6 +30,10 @@ async function processCoreJob(job: Job): Promise<void> {
   }
   if (job.name === "publish.tick") {
     await runPublishTick();
+    return;
+  }
+  if (job.name === "render.tick") {
+    await runRenderTick();
     return;
   }
   if (job.name === "news.tick") {
@@ -159,6 +164,14 @@ async function main(): Promise<void> {
     {},
     { repeat: { every: 60 * 60 * 1000 }, jobId: "publish-tick" },
   );
+  // Retries creatives whose render never completed (see render-tick.ts) —
+  // this is what keeps a piece from sitting at "generando…" forever after a
+  // transient render failure, without anyone having to click "Regenerar".
+  await coreQueue.add(
+    "render.tick",
+    {},
+    { repeat: { every: 5 * 60 * 1000 }, jobId: "render-tick" },
+  );
   // Always lands as 'pending' news_suggestions regardless of hitl_mode — see
   // news.ts. To see it run without waiting 24h, call runNewsAgentForTenant
   // directly for one tenant, same as the Planner's own dev-loop note above.
@@ -169,7 +182,7 @@ async function main(): Promise<void> {
   );
 
   logger.info(
-    "workers bootstrapped: dispatcher + core/render/publish workers + orchestrator/planner/publish/news ticks running",
+    "workers bootstrapped: dispatcher + core/render/publish workers + orchestrator/planner/publish/render/news ticks running",
   );
 
   let shuttingDown = false;

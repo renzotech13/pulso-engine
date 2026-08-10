@@ -14,6 +14,19 @@ import {
 } from "./creative-helpers.js";
 import { generateThemedImage } from "@pulso/shared/image-gen";
 
+/**
+ * Two separate failure modes seen on real Mohrroce posts, both from the image
+ * model trying to *illustrate the concept* instead of just photographing a
+ * scene: a fake magazine cover with garbled Spanish body copy, and — when the
+ * theme mentioned "los 4 sectores" — a labelled infographic with misspelled
+ * English captions under each icon. Banning text alone wasn't enough, since
+ * the model still reached for the diagram layout and then labelled it, so the
+ * composition itself has to be ruled out too. Shared by every prompt that
+ * generates a photo meant to sit *behind* our own text overlay.
+ */
+const NO_TEXT_IN_IMAGE =
+  "Una sola escena fotográfica real, capturada con cámara. Prohibido: texto, letras, palabras, titulares o tipografía de cualquier idioma dentro de la imagen; portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados. Nada de composiciones que expliquen o enumeren conceptos: solo una fotografía única y natural.";
+
 type PromotionRow = Database["public"]["Tables"]["promotions"]["Row"];
 type ProductRow = Database["public"]["Tables"]["products_services"]["Row"];
 
@@ -286,7 +299,7 @@ export async function runCreativeAgentForSlot(
               `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema general del carrusel: ${slot.theme}.`,
               `Este slide en particular dice: "${slideText}".`,
-              `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.${brandTrainingForImage}`,
+              `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
             ].join(" ");
 
             const imageBuffer = await generateThemedImage(prompt);
@@ -337,19 +350,17 @@ export async function runCreativeAgentForSlot(
         const styleHint = accentEphemeris
           ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
           : "";
-        const noTextInstruction =
-          "Sin texto, letras, palabras, titulares ni tipografía de ningún tipo dentro de la imagen — nada de portadas de revista, artículos simulados ni gráficos con texto. Solo la fotografía, sin ningún elemento tipográfico compuesto en la escena.";
         const prompt = isNewsSourced
           ? [
               `Fotografía profesional y editorial para una publicación de noticias sobre: "${newsHeadline}".`,
               `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
-              `Estilo fotoperiodístico, realista, sin logos. ${noTextInstruction}${brandTrainingForImage}`,
+              `Estilo fotoperiodístico, realista, sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
             ].join(" ")
           : [
               `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema: ${slot.theme}.`,
               styleHint,
-              `Estilo limpio y corporativo. ${noTextInstruction}${brandTrainingForImage}`,
+              `Estilo limpio y corporativo. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
             ]
               .filter(Boolean)
               .join(" ");
