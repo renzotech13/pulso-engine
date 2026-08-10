@@ -79,7 +79,7 @@ export function SocialPostTemplate({ brand, headline, subheadline, priceLabel, p
         </div>
       )}
 
-      <div style={{ padding: 56, paddingTop: 120 }}>
+      <div style={{ padding: 120, paddingTop: 120 }}>
         <p
           style={{
             margin: 0,
@@ -96,8 +96,8 @@ export function SocialPostTemplate({ brand, headline, subheadline, priceLabel, p
         <h1
           style={{
             margin: 0,
-            fontSize: 72,
-            lineHeight: 1.05,
+            fontSize: 58,
+            lineHeight: 1.1,
             fontWeight: 800,
             color: "white",
             textShadow: "0 4px 24px rgba(0,0,0,0.35)",
@@ -110,7 +110,7 @@ export function SocialPostTemplate({ brand, headline, subheadline, priceLabel, p
             style={{
               marginTop: 20,
               marginBottom: 0,
-              fontSize: 32,
+              fontSize: 28,
               color: "rgba(255,255,255,0.92)",
               fontWeight: 500,
             }}
