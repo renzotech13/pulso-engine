@@ -16,6 +16,11 @@ const { data: creative, error: creativeError } = await service
 if (creativeError) throw new Error(creativeError.message);
 console.log("creative:", JSON.stringify(creative, null, 2));
 
+if (!creative.calendar_slot_id) {
+  console.log("slot: (creative has no calendar_slot_id)");
+  process.exit(0);
+}
+
 const { data: slot } = await service
   .from("content_calendar")
   .select("id, date, status, published_at, creative_id")
