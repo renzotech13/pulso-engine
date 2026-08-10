@@ -298,8 +298,13 @@ export async function runCreativeAgentForSlot(
             const prompt = [
               `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
               `Tema general del carrusel: ${slot.theme}.`,
-              `Este slide en particular dice: "${slideText}".`,
-              `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
+              // Deliberately NOT quoted as «este slide dice "..."» — con esa
+              // formulación el modelo entendía que la frase debía aparecer
+              // escrita y la dibujaba dentro de la foto, mal escrita (se vio
+              // en un carrusel real: "La burocracia no tiene ur pé frenarte").
+              // Acá la frase es solo contexto de qué ilustrar.
+              `Concepto a ilustrar visualmente, sin escribirlo: ${slideText}`,
+              `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
             ].join(" ");
 
             const imageBuffer = await generateThemedImage(prompt);

@@ -5,10 +5,8 @@ import {
   addPhotosToCreativeAction,
   approveCreativeAction,
   createPhotoFrameCreativeAction,
-  regenerateCarouselSlideAction,
   regenerateCreativeAction,
   removePhotoFromCreativeAction,
-  replaceCarouselSlidePhotoAction,
   requestPublishAction,
   updateCalendarSlotAction,
 } from "@/lib/actions";
@@ -16,7 +14,7 @@ import { inputClass as fieldClass, labelClass } from "@/components/ui/field";
 import { Card, CardHeader } from "@/components/ui/card";
 import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
-import { AutoSubmitFileInput } from "@/components/auto-submit-file-input";
+import { CarouselSlideGrid } from "@/components/carousel-slide-grid";
 import { MoveDateForm } from "./move-date-form";
 import { CaptionForm } from "./caption-form";
 
@@ -74,67 +72,6 @@ function ThumbnailGrid({ urls, creativeId, tenantId, date, canDelete }: Thumbnai
               </button>
             </form>
           )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-interface CarouselSlideGridProps {
-  urls: string[];
-  creativeId: string;
-  tenantId: string;
-  date: string;
-}
-
-/**
- * Per-slide fix controls for an AI-generated carousel — separate from
- * ThumbnailGrid (which only ever deletes) because a carousel slide can't
- * just be removed without leaving a gap in the copy; it needs a replacement
- * photo, either AI-regenerated or uploaded by hand.
- */
-function CarouselSlideGrid({ urls, creativeId, tenantId, date }: CarouselSlideGridProps) {
-  return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-      {urls.map((url, i) => (
-        <div
-          key={url}
-          className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700 transition-colors duration-200 hover:border-pulso-accent/60"
-        >
-          <a href={url} target="_blank" rel="noreferrer" title={`Slide ${i + 1}`} className="block h-full w-full">
-            <img src={url} alt={`Slide ${i + 1}`} className="h-full w-full object-cover" />
-          </a>
-          <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
-            {i + 1}
-          </span>
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/75 py-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
-            <form action={regenerateCarouselSlideAction}>
-              <input type="hidden" name="tenantId" value={tenantId} />
-              <input type="hidden" name="date" value={date} />
-              <input type="hidden" name="creativeId" value={creativeId} />
-              <input type="hidden" name="slideIndex" value={i} />
-              <SubmitButton
-                pendingText="⏳"
-                title="Regenerar esta imagen con IA"
-                className="rounded px-1 text-sm text-white hover:text-pulso-accent disabled:opacity-50"
-              >
-                ↻
-              </SubmitButton>
-            </form>
-            <form action={replaceCarouselSlidePhotoAction}>
-              <input type="hidden" name="tenantId" value={tenantId} />
-              <input type="hidden" name="date" value={date} />
-              <input type="hidden" name="creativeId" value={creativeId} />
-              <input type="hidden" name="slideIndex" value={i} />
-              <label
-                title="Reemplazar con una foto propia"
-                className="cursor-pointer rounded px-1 text-sm text-white hover:text-pulso-accent"
-              >
-                ⤴
-                <AutoSubmitFileInput name="photo" accept="image/*" className="hidden" />
-              </label>
-            </form>
-          </div>
         </div>
       ))}
     </div>

@@ -770,8 +770,10 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
   const prompt = [
     `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant?.rubro ?? "general"}".`,
     `Tema general del carrusel: ${slot?.theme ?? ""}.`,
-    `Este slide en particular dice: "${slideText}".`,
-    `La imagen debe ilustrar visualmente esta idea puntual del slide, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin texto ni letras dentro de la imagen, sin logos.${brandTrainingForImage}`,
+    // Ver el comentario equivalente en creative.ts: citar la frase como «este
+    // slide dice "..."» hacía que el modelo la dibujara dentro de la foto.
+    `Concepto a ilustrar visualmente, sin escribirlo: ${slideText}`,
+    `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. Una sola escena fotográfica real, capturada con cámara. Prohibido: texto, letras, palabras, titulares o tipografía de cualquier idioma dentro de la imagen; portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados.${brandTrainingForImage}`,
   ].join(" ");
 
   const imageBuffer = await generateThemedImage(prompt);
