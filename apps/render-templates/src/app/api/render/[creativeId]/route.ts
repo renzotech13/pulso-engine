@@ -42,6 +42,7 @@ export async function GET(
   const isVideo = templateInfo.engine === "remotion";
   const isCarousel = !isVideo && templateInfo.componentRef === "carousel";
   const isPhotoFrame = !isVideo && templateInfo.componentRef === "photo-frame";
+  const isStudentShowcase = !isVideo && templateInfo.componentRef === "student-showcase";
 
   if (isCarousel) {
     return handleCarouselRender(request, service, creativeId, creative.tenant_id, creative.brief);
@@ -52,6 +53,10 @@ export async function GET(
       canvasWidth: templateInfo.canvasWidth,
       canvasHeight: templateInfo.canvasHeight,
     });
+  }
+
+  if (isStudentShowcase) {
+    return handleStudentShowcaseRender(request, service, creativeId, creative.tenant_id, creative.brief);
   }
 
   const extension = isVideo ? "mp4" : "png";
@@ -272,6 +277,73 @@ async function handlePhotoFrameRender(
         .upload(assetPath, output, { contentType: "image/png", upsert: true });
 
       if (uploadError) throw new Error(`upload failed (photo ${i}): ${uploadError.message}`);
+      assetUrls.push(publicUrlFor(i));
+    }
+
+    await service.from("creatives").update({ status: "ready", asset_urls: assetUrls }).eq("id", creativeId);
+
+    return NextResponse.redirect(assetUrls[0]!, {
+      headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+    });
+  } catch (err) {
+    await service.from("creatives").update({ status: "failed" }).eq("id", creativeId);
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(`render failed: ${message}`, { status: 500 });
+  }
+}
+
+/**
+ * Same one-page-load-per-slide shape as handleCarouselRender, but the slide
+ * data itself is real photos + a fixed slide `type` chosen by hand on the
+ * dashboard (photos/certificate/portrait), not LLM-written text — brief also
+ * carries the shared fields (eventName, eventYear, studentName, countryCode)
+ * every slide of the same creative needs, resolved once in t/[templateId].
+ */
+async function handleStudentShowcaseRender(
+  request: Request,
+  service: ReturnType<typeof createServiceRoleClient>,
+  creativeId: string,
+  tenantId: string,
+  brief: unknown,
+): Promise<Response> {
+  const slides = (brief as { slides?: unknown })?.slides;
+  if (!Array.isArray(slides) || slides.length === 0) {
+    await service.from("creatives").update({ status: "failed" }).eq("id", creativeId);
+    return new Response("invalid brief: missing slides array", { status: 422 });
+  }
+
+  const slideCount = slides.length;
+  const prefix = `${creativeId}-`;
+  const publicUrlFor = (i: number) =>
+    service.storage.from("creative-assets").getPublicUrl(`${tenantId}/${prefix}${i}.png`).data.publicUrl;
+
+  const { data: existingFiles } = await service.storage
+    .from("creative-assets")
+    .list(tenantId, { search: prefix });
+
+  const alreadyRendered =
+    (existingFiles?.filter((f) => f.name.startsWith(prefix)).length ?? 0) >= slideCount;
+
+  if (alreadyRendered) {
+    return NextResponse.redirect(publicUrlFor(0), {
+      headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+    });
+  }
+
+  try {
+    const origin = new URL(request.url).origin;
+    const assetUrls: string[] = [];
+
+    for (let i = 0; i < slideCount; i++) {
+      const templateUrl = `${origin}/t/student-showcase?creative=${creativeId}&slide=${i}`;
+      const output = await screenshotPage(templateUrl, TEMPLATE_SIZES["student-showcase"]);
+
+      const assetPath = `${tenantId}/${prefix}${i}.png`;
+      const { error: uploadError } = await service.storage
+        .from("creative-assets")
+        .upload(assetPath, output, { contentType: "image/png", upsert: true });
+
+      if (uploadError) throw new Error(`upload failed (slide ${i}): ${uploadError.message}`);
       assetUrls.push(publicUrlFor(i));
     }
 

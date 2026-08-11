@@ -1,6 +1,11 @@
 import { SocialPostTemplate, SOCIAL_POST_SIZE, type SocialPostProps } from "./social-post";
 import { CarouselTemplate, CAROUSEL_SIZE, type CarouselProps } from "./carousel";
 import { PhotoFrameTemplate, type PhotoFrameProps } from "./photo-frame";
+import {
+  StudentShowcaseTemplate,
+  STUDENT_SHOWCASE_SIZE,
+  type StudentShowcaseProps,
+} from "./student-showcase";
 
 /**
  * Maps render_templates.component_ref (a plain string in the DB) to the
@@ -12,6 +17,7 @@ export const TEMPLATE_REGISTRY = {
   "social-post": SocialPostTemplate,
   carousel: CarouselTemplate,
   "photo-frame": PhotoFrameTemplate,
+  "student-showcase": StudentShowcaseTemplate,
 } satisfies Record<string, (props: never) => React.JSX.Element>;
 
 // Puppeteer's viewport has to match each template's fixed pixel size exactly.
@@ -23,6 +29,7 @@ export const TEMPLATE_SIZES = {
   "social-post": SOCIAL_POST_SIZE,
   carousel: CAROUSEL_SIZE,
   "photo-frame": { width: 1080, height: 1080 },
+  "student-showcase": STUDENT_SHOWCASE_SIZE,
 } satisfies Record<keyof typeof TEMPLATE_REGISTRY, { width: number; height: number }>;
 
 export type TemplateRef = keyof typeof TEMPLATE_REGISTRY;
@@ -31,4 +38,4 @@ export function isKnownTemplateRef(ref: string): ref is TemplateRef {
   return ref in TEMPLATE_REGISTRY;
 }
 
-export type { SocialPostProps, CarouselProps, PhotoFrameProps };
+export type { SocialPostProps, CarouselProps, PhotoFrameProps, StudentShowcaseProps };

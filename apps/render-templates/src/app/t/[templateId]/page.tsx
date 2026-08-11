@@ -25,6 +25,21 @@ const carouselBriefSchema = z.object({
   colorSecondary: z.string().optional(),
 });
 
+const studentShowcaseBriefSchema = z.object({
+  eventName: z.string().min(1),
+  eventYear: z.string().min(1),
+  studentName: z.string().min(1),
+  countryCode: z.string().length(2).optional(),
+  slides: z
+    .array(
+      z.object({
+        type: z.enum(["photos", "certificate", "portrait"]),
+        photoUrls: z.array(z.string().url()).min(1).max(2),
+      }),
+    )
+    .min(1),
+});
+
 // exactOptionalPropertyTypes rejects spreading Zod's `optional()` output
 // (which types absent fields as `| undefined`) into props typed as plain
 // `field?: string` — strip the undefined-valued keys instead of just omitting them.
@@ -85,6 +100,31 @@ export default async function TemplatePage({
         slides={slides}
         slideIndex={slideIndex}
         {...omitUndefined({ photoUrls: photoUrls?.map((url) => url ?? undefined) })}
+      />
+    );
+  }
+
+  if (templateId === "student-showcase") {
+    const brief = studentShowcaseBriefSchema.safeParse(creative.brief);
+    if (!brief.success) notFound();
+
+    const slideIndex = Number(slide ?? "0");
+    if (!Number.isInteger(slideIndex) || slideIndex < 0 || slideIndex >= brief.data.slides.length) {
+      notFound();
+    }
+
+    const { eventName, eventYear, studentName, countryCode, slides } = brief.data;
+    const brand = resolveBrand(brandKit, tenantName);
+
+    const Component = TEMPLATE_REGISTRY["student-showcase"];
+    return (
+      <Component
+        brand={{ logoUrl: brand.logoUrl, tenantName: brand.tenantName }}
+        eventName={eventName}
+        eventYear={eventYear}
+        studentName={studentName}
+        slide={slides[slideIndex]!}
+        {...omitUndefined({ countryCode })}
       />
     );
   }

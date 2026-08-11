@@ -5,6 +5,7 @@ import {
   addPhotosToCreativeAction,
   approveCreativeAction,
   createPhotoFrameCreativeAction,
+  createStudentShowcaseCreativeAction,
   regenerateCreativeAction,
   removePhotoFromCreativeAction,
   requestPublishAction,
@@ -19,6 +20,21 @@ import { MoveDateForm } from "./move-date-form";
 import { CaptionForm } from "./caption-form";
 
 const RENDER_TEMPLATES_URL = process.env.NEXT_PUBLIC_RENDER_TEMPLATES_URL ?? "http://localhost:3001";
+
+// Shortlist of countries actually seen among students so far — "Otro" skips
+// the flag entirely rather than trying to cover every country up front.
+const STUDENT_COUNTRIES = [
+  { code: "PE", name: "Perú" },
+  { code: "CO", name: "Colombia" },
+  { code: "MX", name: "México" },
+  { code: "AR", name: "Argentina" },
+  { code: "CL", name: "Chile" },
+  { code: "EC", name: "Ecuador" },
+  { code: "BO", name: "Bolivia" },
+  { code: "VE", name: "Venezuela" },
+  { code: "ES", name: "España" },
+  { code: "US", name: "Estados Unidos" },
+] as const;
 
 interface CreativePublication {
   platform: string;
@@ -109,13 +125,19 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: slot }, { data: photoFrame }] = await Promise.all([
+  const [{ data: slot }, { data: photoFrame }, { data: studentShowcase }] = await Promise.all([
     supabase.from("content_calendar").select("*").eq("tenant_id", ctx.tenantId).eq("date", date).maybeSingle(),
     supabase
       .from("render_templates")
       .select("id")
       .eq("tenant_id", ctx.tenantId)
       .eq("component_ref", "photo-frame")
+      .maybeSingle(),
+    supabase
+      .from("render_templates")
+      .select("id")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("component_ref", "student-showcase")
       .maybeSingle(),
   ]);
 
@@ -489,6 +511,101 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 name="caption"
                 rows={3}
                 placeholder="Ej: Nuestra categoría Sub-13 se enfrentó a Academia Los Leones…"
+                className={fieldClass}
+              />
+            </div>
+
+            <SubmitButton
+              pendingText="Creando…"
+              className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Crear publicación
+            </SubmitButton>
+          </form>
+        </Card>
+      )}
+
+      {studentShowcase && (
+        <Card className="p-5">
+          <CardHeader title="Alumna destacada" />
+          <p className="mb-4 text-sm text-neutral-500">
+            Arma el carrusel de una alumna: sube lo que tengas de cada tipo — fotos de sus trabajos,
+            certificado, retrato — cada una es opcional, y el carrusel sale solo con las que llenes,
+            siempre en ese orden.
+          </p>
+          <form action={createStudentShowcaseCreativeAction} className="space-y-4">
+            <input type="hidden" name="tenantId" value={ctx.tenantId} />
+            <input type="hidden" name="date" value={date} />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClass}>Nombre del evento</label>
+                <input
+                  name="eventName"
+                  required
+                  placeholder="Expo Desfile Joyería Punto Peruano"
+                  className={fieldClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Año</label>
+                <input name="eventYear" required placeholder="2026" className={fieldClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Nombre de la alumna</label>
+                <input name="studentName" required placeholder="Diana Gonzales" className={fieldClass} />
+              </div>
+              <div>
+                <label className={labelClass}>País (opcional, agrega la bandera)</label>
+                <select name="countryCode" defaultValue="" className={fieldClass}>
+                  <option value="">Sin bandera</option>
+                  {STUDENT_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className={labelClass}>Trabajos de la alumna (1 o 2 fotos)</label>
+              <MediaDropzone
+                name="photosWork"
+                accept="image/*"
+                label="Fotos de trabajos"
+                hint="Arrastra hasta 2 fotos, o deja vacío para omitir este slide"
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Certificado (1 foto)</label>
+              <MediaDropzone
+                name="photoCertificate"
+                accept="image/*"
+                label="Certificado"
+                hint="Una foto, o deja vacío para omitir este slide"
+                multiple={false}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Retrato (1 foto)</label>
+              <MediaDropzone
+                name="photoPortrait"
+                accept="image/*"
+                label="Retrato"
+                hint="Una foto, o deja vacío para omitir este slide"
+                multiple={false}
+              />
+            </div>
+
+            <div>
+              <label className={labelClass}>Texto de la publicación</label>
+              <textarea
+                name="caption"
+                rows={3}
+                placeholder="Ej: Felicitamos a Diana por su certificación como especialista…"
                 className={fieldClass}
               />
             </div>

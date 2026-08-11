@@ -952,6 +952,131 @@ export async function createPhotoFrameCreativeAction(formData: FormData): Promis
   revalidatePath(`/calendar/${date}`);
 }
 
+/** Same upload shape as uploadPhotoFrameSources, generalized to a named field with its own max count. */
+async function uploadStudentShowcasePhotos(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  tenantId: string,
+  formData: FormData,
+  fieldName: string,
+  maxCount: number,
+): Promise<string[]> {
+  const files = formData
+    .getAll(fieldName)
+    .filter((entry): entry is File => entry instanceof File && entry.size > 0);
+  if (files.length === 0) return [];
+  if (files.length > maxCount) {
+    throw new Error(`Sube máximo ${maxCount} foto${maxCount > 1 ? "s" : ""} en ese campo.`);
+  }
+
+  const urls: string[] = [];
+  for (const file of files) {
+    const path = `${tenantId}/student-showcase-src-${crypto.randomUUID()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage.from("creative-assets").upload(path, file);
+    if (uploadError) throw new Error(`failed to upload photo: ${uploadError.message}`);
+    const { data } = supabase.storage.from("creative-assets").getPublicUrl(path);
+    urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
+/**
+ * Builds a "student-showcase" carousel — one slide per group of photos that
+ * was actually filled in (work photos, certificate, portrait), in that fixed
+ * order, skipping whichever ones are empty. No reordering yet: the design's
+ * natural order (work first, certificate, then portrait) covers the real
+ * cases so far — revisit if a piece genuinely needs a different order.
+ */
+export async function createStudentShowcaseCreativeAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const eventName = String(formData.get("eventName") ?? "").trim();
+  const eventYear = String(formData.get("eventYear") ?? "").trim();
+  const studentName = String(formData.get("studentName") ?? "").trim();
+  const countryCode = String(formData.get("countryCode") ?? "").trim();
+  const caption = String(formData.get("caption") ?? "").trim();
+  if (!tenantId || !date || !eventName || !eventYear || !studentName) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const { data: template } = await supabase
+    .from("render_templates")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("component_ref", "student-showcase")
+    .maybeSingle();
+  if (!template) throw new Error("Esta plantilla no está configurada para tu negocio.");
+
+  const [workPhotos, certificatePhotos, portraitPhotos] = await Promise.all([
+    uploadStudentShowcasePhotos(supabase, tenantId, formData, "photosWork", 2),
+    uploadStudentShowcasePhotos(supabase, tenantId, formData, "photoCertificate", 1),
+    uploadStudentShowcasePhotos(supabase, tenantId, formData, "photoPortrait", 1),
+  ]);
+
+  const slides: Array<{ type: "photos" | "certificate" | "portrait"; photoUrls: string[] }> = [];
+  if (workPhotos.length > 0) slides.push({ type: "photos", photoUrls: workPhotos });
+  if (certificatePhotos.length > 0) slides.push({ type: "certificate", photoUrls: certificatePhotos });
+  if (portraitPhotos.length > 0) slides.push({ type: "portrait", photoUrls: portraitPhotos });
+  if (slides.length === 0) {
+    throw new Error("Sube al menos una foto (trabajos, certificado o retrato).");
+  }
+
+  const service = createServiceRoleClient();
+
+  const { data: existingSlot } = await service
+    .from("content_calendar")
+    .select("id, creative_id")
+    .eq("tenant_id", tenantId)
+    .eq("date", date)
+    .maybeSingle();
+
+  let slotId = existingSlot?.id;
+  if (!slotId) {
+    const { data: newSlot, error: slotError } = await service
+      .from("content_calendar")
+      .insert({
+        tenant_id: tenantId,
+        date,
+        slot_type: "carousel",
+        theme: `Alumna destacada: ${studentName}`,
+        status: "approved",
+        source: { agent: "manual", rationale: "Creado a mano con la plantilla Alumna destacada" },
+      })
+      .select("id")
+      .single();
+    if (slotError || !newSlot) throw new Error(slotError?.message ?? "failed to create calendar slot");
+    slotId = newSlot.id;
+  }
+
+  const { data: creative, error: creativeError } = await service
+    .from("creatives")
+    .insert({
+      tenant_id: tenantId,
+      calendar_slot_id: slotId,
+      template_id: template.id,
+      type: "carousel",
+      status: "pending",
+      brief: {
+        eventName,
+        eventYear,
+        studentName,
+        caption,
+        slides,
+        ...(countryCode ? { countryCode } : {}),
+      },
+    })
+    .select("id")
+    .single();
+  if (creativeError || !creative) throw new Error(creativeError?.message ?? "failed to create creative");
+
+  if (!existingSlot?.creative_id) {
+    await service.from("content_calendar").update({ creative_id: creative.id }).eq("id", slotId);
+  }
+
+  triggerPhotoFrameRender(creative.id);
+  revalidatePath(`/calendar/${date}`);
+}
+
 /**
  * Server Actions are their own reachable endpoint, not gated just because
  * this page's layout calls requireAdmin() — a non-admin could otherwise
