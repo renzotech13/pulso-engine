@@ -12,6 +12,11 @@ export const SEED_USERS = {
   tenantB: { email: "owner-b@pulso.test", password: "pulso-dev-password-b" },
 } as const;
 
+// El slug se inyecta literalmente en los prompts («un negocio de tipo
+// "salon_belleza"»), así que tiene que leerse razonablemente en español, no
+// solo servir de clave. Los tres últimos nacieron de clientes reales y
+// vivían solo en la base — quedan acá para que un reseed no los pierda de
+// vista, aunque upsert nunca los borre.
 const BUSINESS_CATEGORIES = [
   { slug: "spa", name: "Spa" },
   { slug: "restaurante", name: "Restaurante" },
@@ -19,6 +24,9 @@ const BUSINESS_CATEGORIES = [
   { slug: "salon_belleza", name: "Salón de belleza" },
   { slug: "barberia", name: "Barbería" },
   { slug: "ecommerce", name: "Ecommerce" },
+  { slug: "academia_deportiva", name: "Academia deportiva" },
+  { slug: "consultoria", name: "Consultoría y servicios empresariales" },
+  { slug: "escuela_artesania", name: "Escuela de artesanía y manualidades" },
 ] as const;
 
 const EPHEMERIDES = [
