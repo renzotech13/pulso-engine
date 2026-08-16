@@ -120,7 +120,8 @@ export interface TenantScopedClient {
   getSocialConnection(): Promise<SocialConnectionRow | null>;
   /** 'published' means it genuinely went out; 'scheduled' (Facebook-only) means Meta already knows about it and will fire it itself — both mean "don't post this platform again". */
   getHandledPublication(creativeId: string, platform: "facebook" | "instagram"): Promise<PublicationRow | null>;
-  insertPublication(row: Omit<PublicationInsert, "tenant_id">): Promise<PublicationRow>;
+  /** null means a concurrent run already has an active row for this creative+platform (the unique index in migration 22 rejected the insert) — the caller should treat that exactly like getHandledPublication finding one. */
+  insertPublication(row: Omit<PublicationInsert, "tenant_id">): Promise<PublicationRow | null>;
   updatePublication(id: string, patch: Omit<PublicationUpdate, "tenant_id">): Promise<void>;
   sumTokensToday(): Promise<number>;
   sumTokensForJob(jobId: string): Promise<number>;
@@ -410,12 +411,22 @@ export function createTenantScopedClient(
     },
 
     async getHandledPublication(creativeId, platform) {
+      // Includes 'pending' — not just the terminal 'published'/'scheduled'
+      // states — because a second concurrent run for the same creative
+      // (the publish worker runs at concurrency: 2, and more than one code
+      // path can fire publish.requested for the same full-auto creative)
+      // needs to see a first run's row *before* that first run has actually
+      // finished calling Meta's API, or both proceed to publish for real.
+      // Confirmed in production: the same creative posted twice to both
+      // Facebook and Instagram within under a second. This narrows the race
+      // window a lot but isn't airtight on its own — see the partial unique
+      // index in migration 00000000000022, which is the actual atomic guard.
       const { data, error } = await client
         .from("publications")
         .select("*")
         .eq("creative_id", creativeId)
         .eq("platform", platform)
-        .in("status", ["published", "scheduled"])
+        .in("status", ["pending", "published", "scheduled"])
         .eq("tenant_id", tenantId)
         .maybeSingle();
 
@@ -435,6 +446,7 @@ export function createTenantScopedClient(
         .select("*")
         .single();
 
+      if (error?.code === "23505") return null;
       if (error || !data) {
         throw new TenantIsolationError(`failed to insert publication for tenant ${tenantId}`, error);
       }

@@ -317,6 +317,13 @@ export async function runPublishAgentForCreative(
           platform,
           status: "pending",
         });
+        if (!publication) {
+          // A concurrent run for this same creative+platform beat this one
+          // to the insert (the unique index in migration 22 rejected it) —
+          // that other run is the one calling Meta's API, not this one.
+          results[platform] = "already being handled by another run";
+          continue;
+        }
 
         try {
           const externalPostId = isCarousel
