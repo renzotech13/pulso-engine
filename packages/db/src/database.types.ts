@@ -291,6 +291,7 @@ export type Database = {
           created_at: string
           creative_id: string | null
           date: string
+          hold_publish: boolean
           id: string
           notes: string | null
           published_at: string | null
@@ -305,6 +306,7 @@ export type Database = {
           created_at?: string
           creative_id?: string | null
           date: string
+          hold_publish?: boolean
           id?: string
           notes?: string | null
           published_at?: string | null
@@ -319,6 +321,7 @@ export type Database = {
           created_at?: string
           creative_id?: string | null
           date?: string
+          hold_publish?: boolean
           id?: string
           notes?: string | null
           published_at?: string | null

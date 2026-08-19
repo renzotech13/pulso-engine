@@ -237,6 +237,13 @@ export async function runPublishAgentForCreative(
   tenantId: string,
   creativeId: string,
   correlationId: string,
+  /**
+   * false only when a human explicitly clicked "Publicar" — that's a
+   * deliberate override of the day's "No publicar" hold, not something an
+   * automated trigger (the eager fire in creative.ts, publish.tick,
+   * render.tick's self-heal) should ever get to do on its own.
+   */
+  respectHold = true,
 ): Promise<void> {
   await executeAgentRun(
     { agent: "publish", tenantId, trigger: "publish.requested", correlationId },
@@ -271,6 +278,14 @@ export async function runPublishAgentForCreative(
           creative_id: creativeId,
           calendar_slot_id: creative.calendar_slot_id,
           published_at: slot.published_at,
+        });
+        return;
+      }
+
+      if (respectHold && slot?.hold_publish) {
+        await skip("Este día tiene activado \"No publicar\" — la publicación automática está en pausa.", {
+          creative_id: creativeId,
+          calendar_slot_id: creative.calendar_slot_id,
         });
         return;
       }

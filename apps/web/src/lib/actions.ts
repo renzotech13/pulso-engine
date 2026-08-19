@@ -177,8 +177,39 @@ export async function requestPublishAction(formData: FormData): Promise<void> {
   const { data: creative } = await supabase.from("creatives").select("tenant_id").eq("id", creativeId).single();
   if (!creative) throw new Error("creative not found");
 
-  await runPublishAgentForCreative(creative.tenant_id, creativeId, newCorrelationId());
+  // respectHold=false: clicking "Publicar" is a deliberate human override of
+  // that day's "No publicar" hold, unlike the automated triggers that also
+  // call this same function.
+  await runPublishAgentForCreative(creative.tenant_id, creativeId, newCorrelationId(), false);
 
+  revalidatePath("/calendar");
+}
+
+/**
+ * "No publicar": blocks only the automated publish triggers (see
+ * runPublishAgentForCreative's respectHold param) — generation keeps
+ * running normally, and a human can still click "Publicar" explicitly.
+ * Toggles per calendar day, not per creative, since the point is to hold a
+ * whole day regardless of which creative ends up attached to it.
+ */
+export async function toggleHoldPublishAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const slotId = String(formData.get("slotId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const holdPublish = formData.get("holdPublish") === "true";
+  if (!tenantId || !slotId) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const { error } = await supabase
+    .from("content_calendar")
+    .update({ hold_publish: holdPublish })
+    .eq("id", slotId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/calendar/${date}`);
   revalidatePath("/calendar");
 }
 

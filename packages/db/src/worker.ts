@@ -249,6 +249,7 @@ export function createTenantScopedClient(
         .select("id, creative_id, published_at, creatives!content_calendar_creative_id_fkey(id, status)")
         .eq("tenant_id", tenantId)
         .eq("status", "approved")
+        .eq("hold_publish", false)
         .is("published_at", null)
         .not("creative_id", "is", null)
         .lte("date", today);

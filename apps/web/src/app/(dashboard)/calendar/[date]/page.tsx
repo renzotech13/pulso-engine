@@ -9,6 +9,7 @@ import {
   regenerateCreativeAction,
   removePhotoFromCreativeAction,
   requestPublishAction,
+  toggleHoldPublishAction,
   updateCalendarSlotAction,
 } from "@/lib/actions";
 import { inputClass as fieldClass, labelClass } from "@/components/ui/field";
@@ -266,6 +267,12 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 </>
               )}
             </p>
+            {slot.hold_publish && (
+              <p className="mt-2 rounded-lg bg-status-pink/15 px-3 py-1.5 text-xs font-medium text-status-pink">
+                ⏸ No publicar activado — la publicación automática de este día está en pausa. La generación
+                sigue normal.
+              </p>
+            )}
 
             <div className="mt-3 border-t border-ink-700 pt-3">
               <MoveDateForm tenantId={ctx.tenantId} slotId={slot.id} date={date} />
@@ -335,6 +342,27 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                   </button>
                 </form>
               )}
+              <form action={toggleHoldPublishAction}>
+                <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                <input type="hidden" name="slotId" value={slot.id} />
+                <input type="hidden" name="date" value={date} />
+                <input type="hidden" name="holdPublish" value={String(!slot.hold_publish)} />
+                <button
+                  type="submit"
+                  title={
+                    slot.hold_publish
+                      ? "Vuelve a permitir que este día se publique solo"
+                      : "El contenido se sigue generando normal — solo bloquea que se publique automáticamente"
+                  }
+                  className={
+                    slot.hold_publish
+                      ? "rounded-lg bg-status-pink px-3 py-1.5 text-sm font-medium text-white hover:bg-status-pink/80"
+                      : "rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-status-pink/60 hover:text-status-pink"
+                  }
+                >
+                  {slot.hold_publish ? "Reactivar publicación automática" : "No publicar"}
+                </button>
+              </form>
             </div>
           </div>
 
