@@ -11,8 +11,15 @@ import { executeAgentRun } from "@pulso/publish/base-agent";
 import { buildCaption } from "@pulso/publish/caption";
 
 const META_GRAPH_API_VERSION = "v21.0";
-const IG_CONTAINER_POLL_ATTEMPTS = 10;
-const IG_CONTAINER_POLL_DELAY_MS = 2000;
+// Real reels take noticeably longer than photo containers to finish
+// processing on Instagram's side — confirmed in production: a real Mohrroce
+// reel still hadn't reached FINISHED after the old 10×2s (20s) budget, and
+// pollContainerUntilFinished used to just fall through silently when that
+// ran out, letting media_publish fail downstream with the confusing
+// "Media ID is not available" instead of a clear timeout. 40×3s gives video
+// a full 2 minutes; photo containers still finish almost immediately either way.
+const IG_CONTAINER_POLL_ATTEMPTS = 40;
+const IG_CONTAINER_POLL_DELAY_MS = 3000;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -115,6 +122,11 @@ async function pollContainerUntilFinished(creationId: string, accessToken: strin
     }
     await sleep(IG_CONTAINER_POLL_DELAY_MS);
   }
+  // Used to fall through here and let the caller call media_publish anyway
+  // on a container that was never confirmed ready — Meta then rejected it
+  // with an unrelated-sounding "Media ID is not available" instead of this.
+  const totalSeconds = Math.round((IG_CONTAINER_POLL_ATTEMPTS * IG_CONTAINER_POLL_DELAY_MS) / 1000);
+  throw new Error(`Instagram no terminó de procesar el video en ${totalSeconds}s — se agotó el tiempo de espera`);
 }
 
 async function publishToInstagram(
