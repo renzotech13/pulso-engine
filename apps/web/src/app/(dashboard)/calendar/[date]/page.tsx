@@ -6,6 +6,7 @@ import {
   approveCreativeAction,
   createPhotoFrameCreativeAction,
   createStudentShowcaseCreativeAction,
+  deleteCreativeAction,
   regenerateCreativeAction,
   removePhotoFromCreativeAction,
   requestPublishAction,
@@ -363,6 +364,22 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                   {slot.hold_publish ? "Reactivar publicación automática" : "No publicar"}
                 </button>
               </form>
+              {creative && (
+                <form action={deleteCreativeAction}>
+                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                  <input type="hidden" name="slotId" value={slot.id} />
+                  <input type="hidden" name="date" value={date} />
+                  <input type="hidden" name="creativeId" value={creative.id} />
+                  <SubmitButton
+                    pendingText="Eliminando…"
+                    confirmMessage="¿Eliminar esta pieza? Se borra el creative y lo generado — el día queda libre en borrador. Esto no se puede deshacer."
+                    title="Borra esta pieza y deja el día libre (no se puede si ya se publicó de verdad)"
+                    className="rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-400 hover:border-red-500/60 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Eliminar
+                  </SubmitButton>
+                </form>
+              )}
             </div>
           </div>
 

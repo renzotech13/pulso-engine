@@ -260,6 +260,66 @@ export async function regenerateCreativeAction(formData: FormData): Promise<void
   revalidatePath("/calendar");
 }
 
+/**
+ * Frees up a day entirely — deletes the creative (and whatever got
+ * rendered for it) and resets the slot back to 'draft' with no
+ * creative_id, instead of regenerateCreativeAction's "delete + immediately
+ * ask for a replacement". Refuses on anything already actually published:
+ * clearing the internal record wouldn't undo the real post, it would just
+ * make the dashboard lie about what's live.
+ */
+export async function deleteCreativeAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const date = String(formData.get("date") ?? "");
+  const creativeId = String(formData.get("creativeId") ?? "");
+  const slotId = String(formData.get("slotId") ?? "");
+  if (!tenantId || !creativeId || !slotId) return;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const { data: creative } = await supabase
+    .from("creatives")
+    .select("tenant_id, type")
+    .eq("id", creativeId)
+    .maybeSingle();
+  if (!creative || creative.tenant_id !== tenantId) throw new Error("creative not found");
+
+  const { data: published } = await supabase
+    .from("publications")
+    .select("id")
+    .eq("creative_id", creativeId)
+    .eq("status", "published")
+    .limit(1);
+  if (published && published.length > 0) {
+    throw new Error("Esta pieza ya se publicó de verdad — no se puede eliminar, solo el registro quedaría inconsistente.");
+  }
+
+  if (creative.type === "carousel") {
+    const { data: files } = await supabase.storage
+      .from("creative-assets")
+      .list(tenantId, { search: `${creativeId}-` });
+    const paths = (files ?? []).map((f) => `${tenantId}/${f.name}`);
+    if (paths.length > 0) await supabase.storage.from("creative-assets").remove(paths);
+  } else {
+    const extension = creative.type === "video" ? "mp4" : "png";
+    await supabase.storage.from("creative-assets").remove([`${tenantId}/${creativeId}.${extension}`]);
+  }
+
+  const { error: deleteError } = await supabase.from("creatives").delete().eq("id", creativeId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  const { error: slotError } = await supabase
+    .from("content_calendar")
+    .update({ creative_id: null, status: "draft" })
+    .eq("id", slotId)
+    .eq("tenant_id", tenantId);
+  if (slotError) throw new Error(slotError.message);
+
+  revalidatePath(`/calendar/${date}`);
+  revalidatePath("/calendar");
+}
+
 export async function requestCalendarRegenerationAction(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
