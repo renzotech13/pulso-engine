@@ -13,14 +13,18 @@ import { createServiceRoleClient } from "@pulso/db/worker";
  * The owner is whoever already owns `--owner-from`, so the new tenant shows up
  * in that person's tenant switcher.
  *
- * usage: tsx src/create-tenant-once.ts <name> <slug> <rubroSlug> <ownerFromSlug>
+ * usage: tsx src/create-tenant-once.ts <name> <slug> <rubroSlug> <ownerFromSlug> [hitlMode]
  */
-const [name, slug, rubro, ownerFromSlug] = process.argv.slice(2);
+const HITL_MODES = ["full-auto", "approve-creatives", "approve-all"];
+const [name, slug, rubro, ownerFromSlug, hitlMode = "approve-all"] = process.argv.slice(2);
 if (!name || !slug || !rubro || !ownerFromSlug) {
   console.error(
-    "usage: tsx src/create-tenant-once.ts <name> <slug> <rubroSlug> <ownerFromTenantSlug>",
+    "usage: tsx src/create-tenant-once.ts <name> <slug> <rubroSlug> <ownerFromTenantSlug> [hitlMode]",
   );
   process.exit(1);
+}
+if (!HITL_MODES.includes(hitlMode)) {
+  throw new Error(`hitlMode "${hitlMode}" inválido. Opciones: ${HITL_MODES.join(", ")}`);
 }
 
 const service = createServiceRoleClient();
@@ -61,7 +65,7 @@ if (!ownerMembership) throw new Error(`"${ownerFromSlug}" no tiene un owner del 
 
 const { data: tenant, error: tenantError } = await service
   .from("tenants")
-  .insert({ name, slug, rubro })
+  .insert({ name, slug, rubro, hitl_mode: hitlMode })
   .select()
   .single();
 if (tenantError) throw new Error(`no se pudo crear el tenant: ${tenantError.message}`);

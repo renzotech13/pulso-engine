@@ -27,6 +27,7 @@ const BUSINESS_CATEGORIES = [
   { slug: "academia_deportiva", name: "Academia deportiva" },
   { slug: "consultoria", name: "Consultoría y servicios empresariales" },
   { slug: "escuela_artesania", name: "Escuela de artesanía y manualidades" },
+  { slug: "estudio_contable", name: "Estudio Contable" },
 ] as const;
 
 const EPHEMERIDES = [
