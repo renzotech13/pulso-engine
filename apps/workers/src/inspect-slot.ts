@@ -9,20 +9,22 @@ if (!tenantId || !date) {
 
 const service = createServiceRoleClient();
 
-const { data: slot, error: slotError } = await service
+const { data: slots, error: slotError } = await service
   .from("content_calendar")
-  .select("id, date, status, slot_type, theme, notes, creative_id")
+  .select("id, date, slot_index, publish_hour, status, slot_type, theme, notes, creative_id")
   .eq("tenant_id", tenantId)
   .eq("date", date)
-  .maybeSingle();
+  .order("slot_index");
 
 if (slotError) {
   console.error("slot query failed:", slotError.message);
   process.exit(1);
 }
-console.log("slot:", JSON.stringify(slot, null, 2));
+// A day can hold more than one slot now (see `tenants.publish_hours`), so
+// this prints all of them rather than assuming a single row.
+console.log("slots:", JSON.stringify(slots, null, 2));
 
-if (slot) {
+for (const slot of slots ?? []) {
   const { data: creatives, error: creativesError } = await service
     .from("creatives")
     .select("id, type, status, template_id, asset_urls, brief, created_at, updated_at")
@@ -33,7 +35,7 @@ if (slot) {
     console.error("creatives query failed:", creativesError.message);
     process.exit(1);
   }
-  console.log("creatives:", JSON.stringify(creatives, null, 2));
+  console.log(`creatives for slot ${slot.slot_index}:`, JSON.stringify(creatives, null, 2));
 }
 
 process.exit(0);
