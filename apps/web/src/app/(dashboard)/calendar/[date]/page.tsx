@@ -115,7 +115,7 @@ function PublicationBadges({ publications }: { publications: CreativePublication
 
 interface DetailPageProps {
   params: Promise<{ date: string }>;
-  searchParams: Promise<{ month?: string; view?: string }>;
+  searchParams: Promise<{ month?: string; view?: string; slot?: string }>;
 }
 
 export default async function CalendarDetailPage({ params, searchParams }: DetailPageProps) {
@@ -123,12 +123,21 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const sp = await searchParams;
   const backMonth = sp.month ?? date.slice(0, 7);
   const backView = sp.view ?? "grid";
+  // A day can hold more than one publication (see `tenants.publish_hours`),
+  // so the date alone no longer identifies a slot: `?slot=` says which one is
+  // being viewed. Without the param, the day's first.
+  const requestedSlotIndex = Number(sp.slot ?? "0");
 
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: slot }, { data: photoFrame }, { data: studentShowcase }] = await Promise.all([
-    supabase.from("content_calendar").select("*").eq("tenant_id", ctx.tenantId).eq("date", date).maybeSingle(),
+  const [{ data: daySlots }, { data: photoFrame }, { data: studentShowcase }] = await Promise.all([
+    supabase
+      .from("content_calendar")
+      .select("*")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("date", date)
+      .order("slot_index"),
     supabase
       .from("render_templates")
       .select("id")
@@ -142,6 +151,10 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
       .eq("component_ref", "student-showcase")
       .maybeSingle(),
   ]);
+
+  const slots = daySlots ?? [];
+  const slot = slots.find((s) => s.slot_index === requestedSlotIndex) ?? slots[0] ?? null;
+  const slotIndex = slot?.slot_index ?? requestedSlotIndex;
 
   // Days the Planner hasn't touched have no slot yet — that's fine here
   // (unlike the old behavior), since "Publicar con marco" can create one.
@@ -172,8 +185,28 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
       </Link>
 
       <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">{date}</p>
+        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
+          {date}
+          {slot?.publish_hour !== null && slot?.publish_hour !== undefined && ` · ${slot.publish_hour}:00`}
+        </p>
         <h1 className="font-display text-2xl font-semibold">{slot?.theme ?? "Sin contenido planificado"}</h1>
+        {slots.length > 1 && (
+          <div className="mt-3 flex gap-2">
+            {slots.map((daySlot) => (
+              <Link
+                key={daySlot.id}
+                href={`/calendar/${date}?month=${backMonth}&view=${backView}&slot=${daySlot.slot_index}`}
+                className={
+                  daySlot.slot_index === slotIndex
+                    ? "rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white"
+                    : "rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-400 hover:border-pulso-accent/60 hover:text-neutral-200"
+                }
+              >
+                {daySlot.publish_hour === null ? `Slot ${daySlot.slot_index + 1}` : `${daySlot.publish_hour}:00`}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {slot && (
@@ -218,6 +251,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                   creativeId={creative.id}
                   tenantId={ctx.tenantId}
                   date={date}
+                  slotIndex={slotIndex}
                 />
               ) : (
                 <ThumbnailGrid
@@ -542,6 +576,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
           <form action={createPhotoFrameCreativeAction} className="space-y-4">
             <input type="hidden" name="tenantId" value={ctx.tenantId} />
             <input type="hidden" name="date" value={date} />
+            <input type="hidden" name="slotIndex" value={slotIndex} />
 
             <MediaDropzone
               name="photos"
@@ -581,6 +616,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
           <form action={createStudentShowcaseCreativeAction} className="space-y-4">
             <input type="hidden" name="tenantId" value={ctx.tenantId} />
             <input type="hidden" name="date" value={date} />
+            <input type="hidden" name="slotIndex" value={slotIndex} />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>

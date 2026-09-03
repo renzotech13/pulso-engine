@@ -9,7 +9,8 @@
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
     "./llm": "./src/llm.ts",
-    "./image-gen": "./src/image-gen.ts"
+    "./image-gen": "./src/image-gen.ts",
+    "./time": "./src/time.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

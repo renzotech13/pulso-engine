@@ -831,6 +831,10 @@ async function clearCarouselRender(
 export async function regenerateCarouselSlideAction(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
+  // A day can hold several slots (see `tenants.publish_hours`), so date +
+  // index is what identifies one. Without the field, the day's first — which
+  // is what existed back when a day was a single slot.
+  const slotIndex = Number(formData.get("slotIndex") ?? "0");
   const creativeId = String(formData.get("creativeId") ?? "");
   const slideIndex = Number(formData.get("slideIndex"));
   if (!tenantId || !date || !creativeId || !Number.isInteger(slideIndex)) return;
@@ -844,7 +848,13 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
   if (slideText === undefined) throw new Error("ese slide no existe");
 
   const [{ data: slot }, { data: tenant }, { data: brandKit }] = await Promise.all([
-    supabase.from("content_calendar").select("theme").eq("tenant_id", tenantId).eq("date", date).maybeSingle(),
+    supabase
+      .from("content_calendar")
+      .select("theme")
+      .eq("tenant_id", tenantId)
+      .eq("date", date)
+      .eq("slot_index", slotIndex)
+      .maybeSingle(),
     supabase.from("tenants").select("rubro").eq("id", tenantId).single(),
     supabase.from("brand_kits").select("tone_description, voice_training").eq("tenant_id", tenantId).maybeSingle(),
   ]);
@@ -978,6 +988,7 @@ export async function replaceCarouselSlidePhotoAction(formData: FormData): Promi
 export async function createPhotoFrameCreativeAction(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
+  const slotIndex = Number(formData.get("slotIndex") ?? "0");
   const caption = String(formData.get("caption") ?? "").trim();
   if (!tenantId || !date) return;
 
@@ -1001,6 +1012,7 @@ export async function createPhotoFrameCreativeAction(formData: FormData): Promis
     .select("id, creative_id")
     .eq("tenant_id", tenantId)
     .eq("date", date)
+    .eq("slot_index", slotIndex)
     .maybeSingle();
 
   let slotId = existingSlot?.id;
@@ -1010,6 +1022,7 @@ export async function createPhotoFrameCreativeAction(formData: FormData): Promis
       .insert({
         tenant_id: tenantId,
         date,
+        slot_index: slotIndex,
         slot_type: photoUrls.length > 1 ? "carousel" : "post",
         theme: caption || "Publicación con marco",
         status: "approved",
@@ -1080,6 +1093,7 @@ async function uploadStudentShowcasePhotos(
 export async function createStudentShowcaseCreativeAction(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
+  const slotIndex = Number(formData.get("slotIndex") ?? "0");
   const eventName = String(formData.get("eventName") ?? "").trim();
   const eventYear = String(formData.get("eventYear") ?? "").trim();
   const studentName = String(formData.get("studentName") ?? "").trim();
@@ -1119,6 +1133,7 @@ export async function createStudentShowcaseCreativeAction(formData: FormData): P
     .select("id, creative_id")
     .eq("tenant_id", tenantId)
     .eq("date", date)
+    .eq("slot_index", slotIndex)
     .maybeSingle();
 
   let slotId = existingSlot?.id;
@@ -1128,6 +1143,7 @@ export async function createStudentShowcaseCreativeAction(formData: FormData): P
       .insert({
         tenant_id: tenantId,
         date,
+        slot_index: slotIndex,
         slot_type: "carousel",
         theme: `Alumna destacada: ${studentName}`,
         status: "approved",
@@ -1401,8 +1417,30 @@ export async function useNewsSuggestionAction(
     .maybeSingle();
   if (!suggestion || suggestion.status !== "pending") return { error: null };
 
-  const { data: tenant } = await service.from("tenants").select("hitl_mode").eq("id", tenantId).single();
+  const { data: tenant } = await service
+    .from("tenants")
+    .select("hitl_mode, publish_hours")
+    .eq("id", tenantId)
+    .single();
   const autoApproveSlot = tenant?.hitl_mode !== "approve-all";
+
+  // The day has as many slots as scheduled hours (none = a single one, the
+  // long-standing behaviour). Take the first free one instead of assuming
+  // "day taken" means "day full".
+  const publishHours = tenant?.publish_hours ?? [];
+  const slotsInDay = Math.max(publishHours.length, 1);
+
+  const { data: taken } = await service
+    .from("content_calendar")
+    .select("slot_index")
+    .eq("tenant_id", tenantId)
+    .eq("date", date);
+
+  const takenIndexes = new Set((taken ?? []).map((row) => row.slot_index));
+  const freeIndex = Array.from({ length: slotsInDay }, (_, i) => i).find((i) => !takenIndexes.has(i));
+  if (freeIndex === undefined) {
+    return { error: `Ya hay contenido planificado para el ${date}. Elige otro día.` };
+  }
 
   const { data: slot, error: slotError } = await service
     .from("content_calendar")
@@ -1410,21 +1448,23 @@ export async function useNewsSuggestionAction(
       {
         tenant_id: tenantId,
         date,
+        slot_index: freeIndex,
+        ...(publishHours[freeIndex] === undefined ? {} : { publish_hour: publishHours[freeIndex] }),
         slot_type: "post",
         theme: suggestion.angle,
         status: autoApproveSlot ? "approved" : "draft",
         source: { agent: "news", rationale: suggestion.headline },
       },
-      { onConflict: "tenant_id,date", ignoreDuplicates: true },
+      { onConflict: "tenant_id,date,slot_index", ignoreDuplicates: true },
     )
     .select("id")
     .maybeSingle();
   if (slotError) return { error: slotError.message };
 
-  // Unique tenant_id+date means a day that's already planned silently loses
-  // this insert (see upsertContentCalendarSlot's own doc comment) — surfaced
-  // here instead of failing silently, since the user explicitly picked this
-  // date and would otherwise have no idea why nothing happened.
+  // Another tab (or the news agent itself) claimed that index between the
+  // query above and this insert: the upsert ignores the conflict and returns
+  // null. Surfaced instead of failing silently, since the user picked this
+  // date deliberately.
   if (!slot) {
     return { error: `Ya hay contenido planificado para el ${date}. Elige otro día.` };
   }

@@ -10,6 +10,8 @@ interface CarouselSlideGridProps {
   creativeId: string;
   tenantId: string;
   date: string;
+  /** Which of the day's publications this is — see `tenants.publish_hours`. */
+  slotIndex: number;
 }
 
 /**
@@ -23,7 +25,13 @@ interface CarouselSlideGridProps {
  * the text sits right. Opening each one in its own tab (what this used to do)
  * made that a chore.
  */
-export function CarouselSlideGrid({ urls, creativeId, tenantId, date }: CarouselSlideGridProps) {
+export function CarouselSlideGrid({
+  urls,
+  creativeId,
+  tenantId,
+  date,
+  slotIndex,
+}: CarouselSlideGridProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const close = useCallback(() => setOpenIndex(null), []);
@@ -69,6 +77,7 @@ export function CarouselSlideGrid({ urls, creativeId, tenantId, date }: Carousel
               <form action={regenerateCarouselSlideAction}>
                 <input type="hidden" name="tenantId" value={tenantId} />
                 <input type="hidden" name="date" value={date} />
+                <input type="hidden" name="slotIndex" value={slotIndex} />
                 <input type="hidden" name="creativeId" value={creativeId} />
                 <input type="hidden" name="slideIndex" value={i} />
                 <SubmitButton
@@ -82,6 +91,7 @@ export function CarouselSlideGrid({ urls, creativeId, tenantId, date }: Carousel
               <form action={replaceCarouselSlidePhotoAction}>
                 <input type="hidden" name="tenantId" value={tenantId} />
                 <input type="hidden" name="date" value={date} />
+                <input type="hidden" name="slotIndex" value={slotIndex} />
                 <input type="hidden" name="creativeId" value={creativeId} />
                 <input type="hidden" name="slideIndex" value={i} />
                 <label

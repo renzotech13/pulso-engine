@@ -86,19 +86,30 @@ export interface TenantScopedClient {
   listActiveProducts(): Promise<ProductRow[]>;
   listContentCalendar(fromDate: string, toDate: string): Promise<ContentCalendarRow[]>;
   /**
-   * No-ops if a slot already exists for that date (unique tenant_id+date) —
-   * never overwrites a Planner or human decision. Returns the row only when
-   * the insert actually happened (Postgres omits ignored-conflict rows from
-   * RETURNING), so the caller can tell a fresh slot apart from a no-op.
+   * No-ops if a slot already exists for that date AND index (unique
+   * tenant_id+date+slot_index) — never overwrites a Planner or human
+   * decision. Returns the row only when the insert actually happened
+   * (Postgres omits ignored-conflict rows from RETURNING), so the caller can
+   * tell a fresh slot apart from a no-op.
    */
   upsertContentCalendarSlot(row: Omit<ContentCalendarInsert, "tenant_id">): Promise<ContentCalendarRow | null>;
   /**
-   * Slots already `approved` (hitl_mode auto-approved them) whose date has
+   * Slots already `approved` (hitl_mode auto-approved them) whose moment has
    * arrived, with a creative that's also `approved`, and no successful
    * Facebook publication yet (facebook is always attempted first in
    * publish.ts, so its 'published' row is a reliable "already handled" signal).
+   *
+   * "Moment" is date + `publish_hour`: a slot dated today only counts once
+   * `nowHour` (Lima time) has reached its hour, which is what keeps a
+   * tenant's two daily posts from going out back to back. A slot with no
+   * publish_hour, or one from a past date (catching up on stragglers),
+   * counts as soon as its date arrives — the behaviour every tenant had
+   * before slots got hours.
    */
-  listAutoPublishCandidates(today: string): Promise<Array<{ creativeId: string; calendarSlotId: string }>>;
+  listAutoPublishCandidates(
+    today: string,
+    nowHour: number,
+  ): Promise<Array<{ creativeId: string; calendarSlotId: string }>>;
   getContentCalendarSlotById(id: string): Promise<ContentCalendarRow | null>;
   setCalendarSlotCreative(calendarSlotId: string, creativeId: string): Promise<void>;
   /**
@@ -230,7 +241,10 @@ export function createTenantScopedClient(
     async upsertContentCalendarSlot(row) {
       const { data, error } = await client
         .from("content_calendar")
-        .upsert({ ...row, tenant_id: tenantId }, { onConflict: "tenant_id,date", ignoreDuplicates: true })
+        .upsert(
+          { ...row, tenant_id: tenantId },
+          { onConflict: "tenant_id,date,slot_index", ignoreDuplicates: true },
+        )
         .select("*")
         .maybeSingle();
 
@@ -243,10 +257,12 @@ export function createTenantScopedClient(
       return data ?? null;
     },
 
-    async listAutoPublishCandidates(today) {
+    async listAutoPublishCandidates(today, nowHour) {
       const { data, error } = await client
         .from("content_calendar")
-        .select("id, creative_id, published_at, creatives!content_calendar_creative_id_fkey(id, status)")
+        .select(
+          "id, date, publish_hour, creative_id, published_at, creatives!content_calendar_creative_id_fkey(id, status)",
+        )
         .eq("tenant_id", tenantId)
         .eq("status", "approved")
         .eq("hold_publish", false)
@@ -260,6 +276,7 @@ export function createTenantScopedClient(
 
       return (data ?? [])
         .filter((slot) => slot.creatives?.status === "approved")
+        .filter((slot) => slot.date < today || slot.publish_hour === null || slot.publish_hour <= nowHour)
         .map((slot) => ({ creativeId: slot.creative_id as string, calendarSlotId: slot.id }));
     },
 

@@ -2,19 +2,17 @@ import { createServiceRoleClient, createTenantScopedClient } from "@pulso/db/wor
 import { publishEvent } from "@pulso/events/publish";
 import { newCorrelationId } from "@pulso/shared/ids";
 import { createLogger } from "@pulso/shared/logger";
+import { limaHour, limaToday } from "@pulso/shared/time";
 
 const logger = createLogger({ agent: "publish-tick" });
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 /**
  * Only tenants in `hitl_mode = 'full-auto'` get here — approve-all and
  * approve-creatives both still require a human to click "Publicar", same as
  * today. For each such tenant, fires `publish.requested` for every slot
  * whose date has arrived (or passed, catching up on stragglers), has an
- * already-approved creative, and hasn't been published before under *any*
+ * already-approved creative, whose `publish_hour` (if it has one) has
+ * arrived in Lima time, and hasn't been published before under *any*
  * creative (`content_calendar.published_at`, not a per-creative check —
  * regenerating a creative deletes it and its publications history, so that
  * history can't be trusted to remember a previous creative already went
@@ -34,12 +32,14 @@ export async function runPublishTick(): Promise<void> {
     return;
   }
 
-  const todayStr = today();
+  // Both in Lima time, not UTC — see the comment in @pulso/shared/time.
+  const todayStr = limaToday();
+  const nowHour = limaHour();
   let firedCount = 0;
 
   for (const tenant of tenants ?? []) {
     const db = createTenantScopedClient(tenant.id, service);
-    const candidates = await db.listAutoPublishCandidates(todayStr);
+    const candidates = await db.listAutoPublishCandidates(todayStr, nowHour);
 
     for (const candidate of candidates) {
       await publishEvent(service, {
@@ -52,5 +52,5 @@ export async function runPublishTick(): Promise<void> {
     }
   }
 
-  logger.info({ tenantCount: tenants?.length ?? 0, firedCount }, "publish tick complete");
+  logger.info({ tenantCount: tenants?.length ?? 0, firedCount, nowHour }, "publish tick complete");
 }

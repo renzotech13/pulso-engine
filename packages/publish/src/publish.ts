@@ -9,6 +9,7 @@ import type { Json } from "@pulso/db/types";
 // @pulso/shared/image-gen — see apps/web/next.config.ts).
 import { executeAgentRun } from "@pulso/publish/base-agent";
 import { buildCaption } from "@pulso/publish/caption";
+import { limaHour, limaToday } from "@pulso/shared/time";
 
 const META_GRAPH_API_VERSION = "v21.0";
 // Real reels take noticeably longer than photo containers to finish
@@ -26,13 +27,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * 9am Peru time (UTC-5, no DST) on the slot's date, as Unix seconds — Meta's
- * scheduled_publish_time wants a specific moment, and content_calendar only
- * has a date, so this is the one fixed posting time every scheduled post uses.
+ * The slot's moment in Peru time (UTC-5, no DST) as Unix seconds — Meta's
+ * scheduled_publish_time wants an exact instant. A slot with no
+ * `publish_hour` falls back to 9am, which was the only possible time back
+ * when a day held a single publication.
  */
-function computeScheduledPublishTime(dateStr: string): number {
-  return Math.floor(new Date(`${dateStr}T09:00:00-05:00`).getTime() / 1000);
+function computeScheduledPublishTime(dateStr: string, publishHour: number | null): number {
+  const hour = String(publishHour ?? 9).padStart(2, "0");
+  return Math.floor(new Date(`${dateStr}T${hour}:00:00-05:00`).getTime() / 1000);
 }
+
+// Meta rejects a scheduled_publish_time less than 10 minutes out. If the
+// slot is that close there's no point trying: leave it to the tick at the
+// hour itself, which will publish it for real.
+const META_MIN_SCHEDULE_LEAD_SECONDS = 15 * 60;
 
 interface GraphResponse {
   id?: string;
@@ -313,15 +321,38 @@ export async function runPublishAgentForCreative(
       const isCarousel = creative.type === "carousel";
       const caption = buildCaption(creative.brief as Record<string, unknown>);
 
-      // A future-dated slot means "schedule what Meta lets us schedule, wait
+      // A still-to-come slot means "schedule what Meta lets us schedule, wait
       // on the rest" — Facebook can be handed to Meta right now (real
       // scheduled_publish_time, shows up in Business Suite today); Instagram
       // has no such mechanism for third-party apps, so it's left untouched
-      // and picked up for real when the tick notices the date has arrived
+      // and picked up for real when the tick notices its moment arrived
       // (published_at is still null, so listAutoPublishCandidates finds it).
-      const todayStr = new Date().toISOString().slice(0, 10);
-      const isFutureDate = Boolean(slot && slot.date > todayStr);
-      const scheduledPublishTime = isFutureDate ? computeScheduledPublishTime(slot!.date) : undefined;
+      //
+      // "Still to come" is the slot's MOMENT, not just its date. With two
+      // posts a day the afternoon one is generated in the morning: its date
+      // is today, so a date-only comparison sent it out immediately, hours
+      // before the hour it was scheduled for.
+      const todayStr = limaToday();
+      const nowHour = limaHour();
+      const isFuture = Boolean(
+        slot &&
+          (slot.date > todayStr ||
+            (slot.date === todayStr && slot.publish_hour !== null && slot.publish_hour > nowHour)),
+      );
+      const scheduledPublishTime = isFuture
+        ? computeScheduledPublishTime(slot!.date, slot!.publish_hour)
+        : undefined;
+
+      if (
+        scheduledPublishTime !== undefined &&
+        scheduledPublishTime - Math.floor(Date.now() / 1000) < META_MIN_SCHEDULE_LEAD_SECONDS
+      ) {
+        await skip("La hora de este slot está demasiado cerca para agendarla con Meta; la publica el tick.", {
+          creative_id: creativeId,
+          calendar_slot_id: creative.calendar_slot_id,
+        });
+        return;
+      }
 
       const platforms: Array<"facebook" | "instagram"> = ["facebook"];
       if (connection.instagram_business_account_id) platforms.push("instagram");
@@ -329,7 +360,7 @@ export async function runPublishAgentForCreative(
       const results: Record<string, string> = {};
 
       for (const platform of platforms) {
-        if (isFutureDate && platform === "instagram") continue;
+        if (isFuture && platform === "instagram") continue;
 
         const existing = await ctx.db.getHandledPublication(creativeId, platform);
         if (existing) {
@@ -337,7 +368,7 @@ export async function runPublishAgentForCreative(
           continue;
         }
 
-        const schedulingThisOne = isFutureDate && platform === "facebook";
+        const schedulingThisOne = isFuture && platform === "facebook";
 
         const publication = await ctx.db.insertPublication({
           creative_id: creativeId,
@@ -403,7 +434,7 @@ export async function runPublishAgentForCreative(
       const anyPublished = Object.values(results).some(
         (r) => r === "published" || r === "already published",
       );
-      if (!isFutureDate && anyPublished && creative.calendar_slot_id) {
+      if (!isFuture && anyPublished && creative.calendar_slot_id) {
         await ctx.db.markCalendarSlotPublished(creative.calendar_slot_id);
       }
 

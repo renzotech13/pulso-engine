@@ -12,8 +12,12 @@ import { runPublishAgentForCreative } from "@pulso/publish/agent";
 import { runPublishTick } from "./agents/publish-tick.js";
 import { runRenderTick } from "./agents/render-tick.js";
 import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
+import { fillNewsSlotForTenant } from "./agents/news-slot.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
+
+// Every schedule in here is a business hour in Peru, not a UTC one.
+const LIMA_TZ = "America/Lima";
 
 const logger = createLogger({ agent: "workers-main" });
 
@@ -66,10 +70,10 @@ async function processCoreJob(job: Job): Promise<void> {
       await runNewsAgentForTenant(event.tenant_id, event.correlation_id, job.id);
       return;
     case "news.suggestions.generated":
-      logger.info(
-        { tenantId: event.tenant_id, correlationId: event.correlation_id },
-        "news suggestions generated",
-      );
+      // The digest just ran; now one suggestion gets picked for the day's
+      // news slot. Chained to the event rather than given its own tick so
+      // the ordering between the two is deterministic (see news-slot.ts).
+      await fillNewsSlotForTenant(event.tenant_id, event.correlation_id);
       return;
     default:
       logger.warn({ eventType: event.type }, "core worker received unhandled event type");
@@ -144,25 +148,43 @@ async function main(): Promise<void> {
   });
 
   const coreQueue = getQueue("core");
+
+  // The interval-based repeatables the cron schedulers below replace live
+  // under their own keys; without this they would keep firing alongside the
+  // new ones after a deploy. Matched on `every` being set, so this only ever
+  // sees the old interval entries and never the cron schedulers themselves.
+  const CRON_TICK_NAMES = new Set(["planner.tick", "news.tick", "publish.tick"]);
+  for (const legacy of await coreQueue.getRepeatableJobs()) {
+    if (legacy.every && CRON_TICK_NAMES.has(legacy.name)) {
+      await coreQueue.removeRepeatableByKey(legacy.key);
+      logger.info({ name: legacy.name, key: legacy.key }, "removed legacy interval tick");
+    }
+  }
   await coreQueue.add(
     "orchestrator.tick",
     {},
     { repeat: { every: 60_000 }, jobId: "orchestrator-tick" },
   );
-  // Real "Planner: diario" cadence — to see it run without waiting 24h, use
-  // the dashboard's "Regenerar" button (or call the RPC directly), which
-  // fires the exact same calendar.plan.requested path.
-  await coreQueue.add(
-    "planner.tick",
-    {},
-    { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: "planner-tick" },
+  // The daily agents run on a Lima-time clock rather than `every: 24h`,
+  // which fired 24 hours after whenever the workers last happened to boot.
+  // That was fine while a slot published as soon as its date arrived, but
+  // slots now have hours: the news digest has to have run BEFORE the day's
+  // news slot is due (see news-slot.ts), and a digest whose time of day
+  // drifts with the last restart can't promise that. Planner first so the
+  // calendar exists, digest an hour later.
+  await coreQueue.upsertJobScheduler(
+    "planner-tick",
+    { pattern: "0 5 * * *", tz: LIMA_TZ },
+    { name: "planner.tick" },
   );
   // Only fires publish.requested for full-auto tenants (see publish-tick.ts)
   // — everyone else still needs a manual "Publicar" click, unaffected by this.
-  await coreQueue.add(
-    "publish.tick",
-    {},
-    { repeat: { every: 60 * 60 * 1000 }, jobId: "publish-tick" },
+  // On the hour, not every 60 minutes from boot, so a slot due at 09:00 goes
+  // out at 09:00-ish instead of at whatever minute the workers came up.
+  await coreQueue.upsertJobScheduler(
+    "publish-tick",
+    { pattern: "0 * * * *", tz: LIMA_TZ },
+    { name: "publish.tick" },
   );
   // Retries creatives whose render never completed (see render-tick.ts) —
   // this is what keeps a piece from sitting at "generando…" forever after a
@@ -173,12 +195,13 @@ async function main(): Promise<void> {
     { repeat: { every: 5 * 60 * 1000 }, jobId: "render-tick" },
   );
   // Always lands as 'pending' news_suggestions regardless of hitl_mode — see
-  // news.ts. To see it run without waiting 24h, call runNewsAgentForTenant
-  // directly for one tenant, same as the Planner's own dev-loop note above.
-  await coreQueue.add(
-    "news.tick",
-    {},
-    { repeat: { every: 24 * 60 * 60 * 1000 }, jobId: "news-tick" },
+  // news.ts. To see it run without waiting for tomorrow, call
+  // runNewsAgentForTenant directly for one tenant, same as the Planner's own
+  // dev-loop note above.
+  await coreQueue.upsertJobScheduler(
+    "news-tick",
+    { pattern: "0 6 * * *", tz: LIMA_TZ },
+    { name: "news.tick" },
   );
 
   logger.info(

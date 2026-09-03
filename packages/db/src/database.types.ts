@@ -294,7 +294,9 @@ export type Database = {
           hold_publish: boolean
           id: string
           notes: string | null
+          publish_hour: number | null
           published_at: string | null
+          slot_index: number
           slot_type: string
           source: Json
           status: string
@@ -309,7 +311,9 @@ export type Database = {
           hold_publish?: boolean
           id?: string
           notes?: string | null
+          publish_hour?: number | null
           published_at?: string | null
+          slot_index?: number
           slot_type: string
           source?: Json
           status?: string
@@ -324,7 +328,9 @@ export type Database = {
           hold_publish?: boolean
           id?: string
           notes?: string | null
+          publish_hour?: number | null
           published_at?: string | null
+          slot_index?: number
           slot_type?: string
           source?: Json
           status?: string
@@ -973,6 +979,7 @@ export type Database = {
           hitl_mode: string
           id: string
           name: string
+          publish_hours: number[]
           rubro: string | null
           slug: string
           status: string
@@ -985,6 +992,7 @@ export type Database = {
           hitl_mode?: string
           id?: string
           name: string
+          publish_hours?: number[]
           rubro?: string | null
           slug: string
           status?: string
@@ -997,6 +1005,7 @@ export type Database = {
           hitl_mode?: string
           id?: string
           name?: string
+          publish_hours?: number[]
           rubro?: string | null
           slug?: string
           status?: string

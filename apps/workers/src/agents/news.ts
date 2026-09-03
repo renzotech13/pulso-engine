@@ -31,6 +31,28 @@ const NEWS_FEEDS: Array<{ name: string; url: string }> = [
   },
 ];
 
+// Per-rubro feeds, added on top of the general ones above. Those three are
+// broad economy/business: a fine common floor, but for any specific trade
+// they rarely carry what that business could comment on with authority. An
+// accounting firm lives off SUNAT, filing deadlines and tax/labour changes —
+// none of which shows up searching "economía Perú".
+const RUBRO_FEEDS: Record<string, Array<{ name: string; url: string }>> = {
+  estudio_contable: [
+    {
+      name: "Google News Perú — SUNAT",
+      url: "https://news.google.com/rss/search?q=SUNAT&hl=es-419&gl=PE&ceid=PE:es-419",
+    },
+    {
+      name: "Google News Perú — Tributario",
+      url: "https://news.google.com/rss/search?q=tributario%20OR%20impuestos%20Peru&hl=es-419&gl=PE&ceid=PE:es-419",
+    },
+    {
+      name: "Google News Perú — Laboral y planillas",
+      url: "https://news.google.com/rss/search?q=planilla%20OR%20laboral%20OR%20Sunafil%20Peru&hl=es-419&gl=PE&ceid=PE:es-419",
+    },
+  ],
+};
+
 const MAX_ITEMS_PER_FEED = 12;
 // One fetch shared across every tenant in a tick (headlines don't vary by
 // tenant, only the relevance judgment does) instead of one per tenant.
@@ -45,17 +67,22 @@ const relevanceSchema = z.object({
   ),
 });
 
-let cachedHeadlines: { items: NewsHeadline[]; fetchedAt: number } | undefined;
+// Cached PER RUBRO, not globally: now that each rubro adds its own feeds,
+// two tenants of different trades no longer share headlines, and a single
+// cache would have served the second one the first one's results.
+const cachedHeadlines = new Map<string, { items: NewsHeadline[]; fetchedAt: number }>();
 
-async function fetchTodaysHeadlines(): Promise<NewsHeadline[]> {
-  if (cachedHeadlines && Date.now() - cachedHeadlines.fetchedAt < CACHE_MS) {
-    return cachedHeadlines.items;
+async function fetchTodaysHeadlines(rubro: string | null): Promise<NewsHeadline[]> {
+  const cacheKey = rubro ?? "general";
+  const cached = cachedHeadlines.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < CACHE_MS) {
+    return cached.items;
   }
 
   const parser = new Parser();
   const items: NewsHeadline[] = [];
 
-  for (const feed of NEWS_FEEDS) {
+  for (const feed of [...NEWS_FEEDS, ...(RUBRO_FEEDS[cacheKey] ?? [])]) {
     try {
       const parsed = await parser.parseURL(feed.url);
       for (const entry of (parsed.items ?? []).slice(0, MAX_ITEMS_PER_FEED)) {
@@ -74,7 +101,7 @@ async function fetchTodaysHeadlines(): Promise<NewsHeadline[]> {
   }
 
   const deduped = dedupeHeadlines(items);
-  cachedHeadlines = { items: deduped, fetchedAt: Date.now() };
+  cachedHeadlines.set(cacheKey, { items: deduped, fetchedAt: Date.now() });
   return deduped;
 }
 
@@ -102,7 +129,8 @@ export async function runNewsAgentForTenant(
   await executeAgentRun(
     { agent: "news", tenantId, trigger: "news.digest.requested", correlationId },
     async (ctx) => {
-      const headlines = await fetchTodaysHeadlines();
+      const tenant = await ctx.db.getTenant();
+      const headlines = await fetchTodaysHeadlines(tenant.rubro);
       if (headlines.length === 0) {
         await ctx.db.insertDecisionLog({
           agent: "news",
@@ -114,7 +142,6 @@ export async function runNewsAgentForTenant(
         return;
       }
 
-      const tenant = await ctx.db.getTenant();
       const service = createServiceRoleClient();
       const promptTemplate = await getActivePrompt(service, "news.relevance");
 

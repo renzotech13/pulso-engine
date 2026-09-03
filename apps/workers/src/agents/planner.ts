@@ -79,7 +79,14 @@ export async function runPlannerForTenant(
       formatDate(today),
       formatDate(horizonEnd),
     );
-    const filledDates = new Set(existingSlots.map((slot) => slot.date));
+    // The Planner owns slot 0 of each day and nothing else. Slot 1 (for
+    // tenants that publish twice — see `publish_hours`) is filled by the news
+    // agent with that day's headlines, in news-slot.ts. If the Planner looked
+    // at every slot it would swallow that opening days ahead, planning 30
+    // days out something that by definition has to be decided same-day.
+    const filledDates = new Set(
+      existingSlots.filter((slot) => slot.slot_index === 0).map((slot) => slot.date),
+    );
     const openDates = computeOpenDates(today, HORIZON_DAYS, filledDates);
 
     if (openDates.length === 0) {
@@ -131,6 +138,9 @@ export async function runPlannerForTenant(
     // difference between them is whether the *creative* also auto-approves
     // (handled in creative.ts), not whether the slot does.
     const autoApproveSlot = tenant.hitl_mode !== "approve-all";
+    // An empty publish_hours means the tenant has no per-hour schedule and
+    // its post goes out as soon as the date arrives, same as always.
+    const morningHour = tenant.publish_hours?.[0];
 
     for (const slot of proposal.slots) {
       if (!openDatesSet.has(slot.date)) {
@@ -143,6 +153,8 @@ export async function runPlannerForTenant(
 
       const inserted = await ctx.db.upsertContentCalendarSlot({
         date: slot.date,
+        slot_index: 0,
+        ...(morningHour === undefined ? {} : { publish_hour: morningHour }),
         slot_type: slot.slot_type,
         theme: slot.theme,
         source: { agent: "planner", rationale: slot.rationale },

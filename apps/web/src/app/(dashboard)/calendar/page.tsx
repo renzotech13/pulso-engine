@@ -55,9 +55,18 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     .eq("tenant_id", ctx.tenantId)
     .gte("date", start)
     .lte("date", end)
-    .order("date");
+    .order("date")
+    .order("slot_index");
 
-  const slotsByDate = new Map((slots ?? []).map((slot) => [slot.date, slot]));
+  // A day can hold more than one slot now that a tenant can publish several
+  // times a day (see `tenants.publish_hours`), so the date alone no longer
+  // identifies a publication.
+  const slotsByDate = new Map<string, NonNullable<typeof slots>>();
+  for (const slot of slots ?? []) {
+    const daySlots = slotsByDate.get(slot.date);
+    if (daySlots) daySlots.push(slot);
+    else slotsByDate.set(slot.date, [slot]);
+  }
   const grid = buildMonthGrid(monthParam);
   const listDates = grid.filter((cell) => cell.inMonth).map((cell) => cell.date);
 
@@ -133,8 +142,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           </div>
           <div className="grid grid-cols-7">
             {grid.map((cell) => {
-              const slot = slotsByDate.get(cell.date);
-              const creative = slot?.creatives ?? null;
+              const daySlots = slotsByDate.get(cell.date) ?? [];
+              const soleCreative = daySlots.length === 1 ? daySlots[0]?.creatives ?? null : null;
               const dayNumber = Number(cell.date.slice(8, 10));
               const cellContent = (
                 <div
@@ -146,17 +155,32 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                     <span className={`text-xs ${cell.inMonth ? "text-neutral-300" : "text-neutral-700"}`}>
                       {dayNumber}
                     </span>
-                    {slot && <span className={`h-2 w-2 rounded-full ${statusDotClass(creative, slot.status)}`} />}
+                    <div className="flex items-center gap-1">
+                      {daySlots.map((daySlot) => (
+                        <span
+                          key={daySlot.id}
+                          className={`h-2 w-2 rounded-full ${statusDotClass(daySlot.creatives ?? null, daySlot.status)}`}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  {slot && cell.inMonth && (
-                    <p className="line-clamp-2 text-[11px] leading-tight text-neutral-400">{slot.theme}</p>
-                  )}
-                  {creative && creative.asset_urls.length > 0 && cell.inMonth && (
+                  {cell.inMonth &&
+                    daySlots.map((daySlot) => (
+                      <p key={daySlot.id} className="line-clamp-1 text-[11px] leading-tight text-neutral-400">
+                        {daySlot.publish_hour !== null && (
+                          <span className="text-neutral-600">{daySlot.publish_hour}h </span>
+                        )}
+                        {daySlot.theme}
+                      </p>
+                    ))}
+                  {/* The thumbnail only fits when the day has a single slot;
+                      with two, the themes already fill the cell. */}
+                  {soleCreative && soleCreative.asset_urls.length > 0 && cell.inMonth && (
                     <div className="mt-auto h-8 w-8 overflow-hidden rounded">
-                      {creative.type === "video" ? (
-                        <video src={creative.asset_urls[0]} className="h-full w-full object-cover" muted />
+                      {soleCreative.type === "video" ? (
+                        <video src={soleCreative.asset_urls[0]} className="h-full w-full object-cover" muted />
                       ) : (
-                        <img src={creative.asset_urls[0]} alt="" className="h-full w-full object-cover" />
+                        <img src={soleCreative.asset_urls[0]} alt="" className="h-full w-full object-cover" />
                       )}
                     </div>
                   )}
@@ -179,19 +203,38 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         </div>
       ) : (
         <div className="space-y-1.5">
-          {listDates.map((date) => {
-            const slot = slotsByDate.get(date);
-            const creative = slot?.creatives ?? null;
+          {listDates.flatMap((date) => {
+            const daySlots = slotsByDate.get(date) ?? [];
 
-            return (
-              <div key={date} className="rounded-xl border border-ink-700 bg-ink-900 p-3 text-sm">
+            if (daySlots.length === 0) {
+              return (
+                <div key={date} className="rounded-xl border border-ink-700 bg-ink-900 p-3 text-sm">
+                  <div className="grid grid-cols-[90px_1fr] items-center gap-2">
+                    <span className="text-neutral-500">{date}</span>
+                    <span className="text-neutral-600">sin contenido planificado</span>
+                  </div>
+                </div>
+              );
+            }
+
+            // One row per slot, not per day: with two daily publications the
+            // date alone no longer says which one is meant, so each row
+            // carries its hour alongside.
+            return daySlots.map((slot) => {
+              const creative = slot.creatives ?? null;
+
+              return (
+                <div key={slot.id} className="rounded-xl border border-ink-700 bg-ink-900 p-3 text-sm">
                 <form
                   action={updateCalendarSlotAction}
                   className="grid grid-cols-[90px_1fr_110px_110px_70px] items-center gap-2"
                 >
-                  <span className="text-neutral-500">{date}</span>
-                  {slot ? (
-                    <>
+                  <span className="text-neutral-500">
+                    {date}
+                    {slot.publish_hour !== null && (
+                      <span className="ml-1 text-neutral-600">{slot.publish_hour}h</span>
+                    )}
+                  </span>
                       <input type="hidden" name="slotId" value={slot.id} />
                       <input
                         name="theme"
@@ -223,13 +266,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                       >
                         Guardar
                       </button>
-                    </>
-                  ) : (
-                    <span className="col-span-4 text-neutral-600">sin contenido planificado</span>
-                  )}
                 </form>
 
-                {slot?.creative_id &&
+                {slot.creative_id &&
                   (creative?.status === "failed" ? (
                     <div className="mt-2 flex items-center gap-3 border-t border-ink-700 pt-2">
                       <span className="text-sm text-status-pink">⚠ Falló el render</span>
@@ -313,18 +352,19 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                       )}
 
                       <Link
-                        href={`/calendar/${date}?month=${monthStr}&view=list`}
+                        href={`/calendar/${date}?month=${monthStr}&view=list&slot=${slot.slot_index}`}
                         className="ml-auto text-xs text-pulso-accent hover:underline"
                       >
                         Ver detalle →
                       </Link>
                     </div>
                   ))}
-                {slot?.status === "approved" && !slot.creative_id && (
+                {slot.status === "approved" && !slot.creative_id && (
                   <div className="mt-2 border-t border-ink-700 pt-2 text-sm text-neutral-600">generando…</div>
                 )}
-              </div>
-            );
+                </div>
+              );
+            });
           })}
         </div>
       )}
