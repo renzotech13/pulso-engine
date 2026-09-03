@@ -35,9 +35,14 @@ alter table public.content_calendar
 -- '{9,18}' = dos al día, el slot 0 a las 9am y el slot 1 a las 6pm.
 -- La cantidad de posts diarios se deriva de acá en vez de vivir en su propia
 -- columna, para que no puedan contradecirse entre sí.
+-- A literal array, not `array(select generate_series(0, 23))` — Postgres
+-- flatly rejects a subquery inside a CHECK constraint (0A000).
 alter table public.tenants
   add column publish_hours smallint[] not null default '{}'::smallint[]
     check (
       array_length(publish_hours, 1) is null
-      or (array_length(publish_hours, 1) <= 4 and publish_hours <@ array(select generate_series(0, 23))::smallint[])
+      or (
+        array_length(publish_hours, 1) <= 4
+        and publish_hours <@ array[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23]::smallint[]
+      )
     );
