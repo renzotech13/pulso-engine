@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyWeeklyCarouselCap,
   computeOpenDates,
   resolveEphemeridesInWindow,
+  weekStartDate,
   type EphemerisLike,
 } from "../src/agents/planner-helpers.js";
 
@@ -86,5 +88,54 @@ describe("resolveEphemeridesInWindow", () => {
     ];
     expect(resolveEphemeridesInWindow(ephemerides, today, 30, "ecommerce")).toHaveLength(1);
     expect(resolveEphemeridesInWindow(ephemerides, today, 30, null)).toHaveLength(1);
+  });
+});
+
+describe("weekStartDate", () => {
+  it("returns the Monday of a mid-week date", () => {
+    expect(weekStartDate("2026-09-03")).toBe("2026-08-31"); // Thursday -> Monday
+  });
+
+  it("is idempotent on a Monday", () => {
+    expect(weekStartDate("2026-08-31")).toBe("2026-08-31");
+  });
+
+  it("rolls Sunday back to the same week's Monday, not the next one", () => {
+    expect(weekStartDate("2026-09-06")).toBe("2026-08-31");
+  });
+});
+
+describe("applyWeeklyCarouselCap", () => {
+  const post = (date: string) => ({ date, slot_type: "post" });
+  const carousel = (date: string) => ({ date, slot_type: "carousel" });
+
+  it("passes every slot through unchanged when uncapped", () => {
+    const proposed = [carousel("2026-09-01"), carousel("2026-09-02")];
+    expect(applyWeeklyCarouselCap(proposed, [], undefined)).toEqual(proposed);
+  });
+
+  it("keeps the first carousel of the week and downgrades the rest to post", () => {
+    const proposed = [post("2026-08-31"), carousel("2026-09-01"), carousel("2026-09-03")];
+    const result = applyWeeklyCarouselCap(proposed, [], 1);
+    expect(result.map((s) => s.slot_type)).toEqual(["post", "carousel", "post"]);
+  });
+
+  it("counts a carousel already scheduled by a previous run against the same week's cap", () => {
+    const proposed = [carousel("2026-09-02")];
+    const alreadyScheduled = [carousel("2026-08-31")];
+    const result = applyWeeklyCarouselCap(proposed, alreadyScheduled, 1);
+    expect(result[0]!.slot_type).toBe("post");
+  });
+
+  it("does not let one week's cap affect the next week's budget", () => {
+    const proposed = [carousel("2026-08-31"), carousel("2026-09-07")];
+    const result = applyWeeklyCarouselCap(proposed, [], 1);
+    expect(result.map((s) => s.slot_type)).toEqual(["carousel", "carousel"]);
+  });
+
+  it("never touches a non-carousel slot", () => {
+    const proposed = [post("2026-09-01")];
+    const result = applyWeeklyCarouselCap(proposed, [carousel("2026-08-31")], 0);
+    expect(result[0]!.slot_type).toBe("post");
   });
 });

@@ -6,7 +6,12 @@ import { newCorrelationId } from "@pulso/shared/ids";
 import { createLogger } from "@pulso/shared/logger";
 import { callAgentLlm } from "../agent-llm.js";
 import { executeAgentRun } from "@pulso/publish/base-agent";
-import { computeOpenDates, formatDate, resolveEphemeridesInWindow } from "./planner-helpers.js";
+import {
+  applyWeeklyCarouselCap,
+  computeOpenDates,
+  formatDate,
+  resolveEphemeridesInWindow,
+} from "./planner-helpers.js";
 
 const logger = createLogger({ agent: "planner-tick" });
 
@@ -128,6 +133,11 @@ export async function runPlannerForTenant(
       tenant.rubro,
     );
 
+    const carouselLimit =
+      tenant.max_weekly_carousels !== null
+        ? `Máximo ${tenant.max_weekly_carousels} carrusel(es) por semana calendario (lunes a domingo) — para el resto de días libres de esa semana, usa post, story o reel.`
+        : "";
+
     const prompt = renderPrompt(promptTemplate, {
       RUBRO: tenant.rubro ?? "general",
       OPEN_DATES: openDates.join(", "),
@@ -135,6 +145,7 @@ export async function runPlannerForTenant(
       PROMOTIONS: formatPromotions(promotions),
       PRODUCTS: formatProducts(products),
       BRAND_TRAINING: brandTraining,
+      CAROUSEL_LIMIT: carouselLimit,
     });
 
     const proposal = await callAgentLlm({
@@ -156,7 +167,19 @@ export async function runPlannerForTenant(
     // its post goes out as soon as the date arrives, same as always.
     const morningHour = tenant.publish_hours?.[0];
 
-    for (const slot of proposal.slots) {
+    // A prompt hint alone isn't a real cap (local models don't reliably obey
+    // "don't do X" instructions), so this downgrades any carousel over the
+    // weekly budget to a post — same never-trust-the-model posture as the
+    // open-dates check below. `existingSlots` seeds the count so a second
+    // planner run this week doesn't stack more carousels on top of ones a
+    // previous run (or a human) already placed.
+    const cappedSlots = applyWeeklyCarouselCap(
+      proposal.slots,
+      existingSlots.filter((s) => s.slot_index === 0),
+      tenant.max_weekly_carousels ?? undefined,
+    );
+
+    for (const slot of cappedSlots) {
       if (!openDatesSet.has(slot.date)) {
         ctx.logger.warn(
           { date: slot.date },

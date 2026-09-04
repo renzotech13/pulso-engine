@@ -978,6 +978,7 @@ export type Database = {
           created_at: string
           hitl_mode: string
           id: string
+          max_weekly_carousels: number | null
           name: string
           publish_hours: number[]
           rubro: string | null
@@ -991,6 +992,7 @@ export type Database = {
           created_at?: string
           hitl_mode?: string
           id?: string
+          max_weekly_carousels?: number | null
           name: string
           publish_hours?: number[]
           rubro?: string | null
@@ -1004,6 +1006,7 @@ export type Database = {
           created_at?: string
           hitl_mode?: string
           id?: string
+          max_weekly_carousels?: number | null
           name?: string
           publish_hours?: number[]
           rubro?: string | null

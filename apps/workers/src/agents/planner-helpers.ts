@@ -89,3 +89,57 @@ export function resolveEphemeridesInWindow(
 
   return resolved;
 }
+
+/**
+ * The Monday (YYYY-MM-DD) of the calendar week `dateStr` falls in — a stable
+ * grouping key for "same week", not a real ISO week number (nothing here
+ * needs the actual week-of-year, just a consistent bucket per Mon-Sun span).
+ */
+export function weekStartDate(dateStr: string): string {
+  const date = new Date(`${dateStr}T00:00:00Z`);
+  const day = date.getUTCDay(); // 0=Sun..6=Sat
+  const diffToMonday = day === 0 ? 6 : day - 1;
+  date.setUTCDate(date.getUTCDate() - diffToMonday);
+  return formatDate(date);
+}
+
+/**
+ * Downgrades a proposed carousel to a plain post once its calendar week has
+ * already used up `maxWeeklyCarousels` — carousels are the one slot type
+ * that costs several Gemini calls (one per slide) instead of at most one, so
+ * a tenant that wants that cost bounded needs it enforced here, not just
+ * asked for in the prompt: the Planner's own doc comment already says never
+ * to trust the model's proposals blindly, and slot_type is no exception.
+ *
+ * `alreadyScheduled` seeds each week's count from carousels a PREVIOUS
+ * planner run (or a human) already placed, so a fresh run doesn't stack more
+ * on top of a week that's already at its cap. `maxWeeklyCarousels` of
+ * `undefined` means uncapped (the tenant's `publish_hours`-style default),
+ * and passes every carousel through unchanged.
+ */
+export function applyWeeklyCarouselCap<T extends { date: string; slot_type: string }>(
+  proposedSlots: readonly T[],
+  alreadyScheduled: readonly { date: string; slot_type: string }[],
+  maxWeeklyCarousels: number | undefined,
+): T[] {
+  if (maxWeeklyCarousels === undefined) return [...proposedSlots];
+
+  const countByWeek = new Map<string, number>();
+  for (const slot of alreadyScheduled) {
+    if (slot.slot_type !== "carousel") continue;
+    const week = weekStartDate(slot.date);
+    countByWeek.set(week, (countByWeek.get(week) ?? 0) + 1);
+  }
+
+  return proposedSlots.map((slot) => {
+    if (slot.slot_type !== "carousel") return slot;
+
+    const week = weekStartDate(slot.date);
+    const countSoFar = countByWeek.get(week) ?? 0;
+    if (countSoFar >= maxWeeklyCarousels) {
+      return { ...slot, slot_type: "post" };
+    }
+    countByWeek.set(week, countSoFar + 1);
+    return slot;
+  });
+}
