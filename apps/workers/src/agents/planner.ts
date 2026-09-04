@@ -101,12 +101,25 @@ export async function runPlannerForTenant(
     }
 
     const service = createServiceRoleClient();
-    const [ephemerides, promotions, products, promptTemplate] = await Promise.all([
+    const [ephemerides, promotions, products, brandKit, promptTemplate] = await Promise.all([
       ctx.db.listEphemerides(),
       ctx.db.listActivePromotions(),
       ctx.db.listActiveProducts(),
+      ctx.db.getBrandKit(),
       getActivePrompt(service, "planner.calendar"),
     ]);
+
+    // Same tenant-authored guidance creative.ts folds into every copy/image
+    // prompt (tone preset + free-text "entrenamiento"). Without this the
+    // Planner picked THEMES blind to it — a tenant could write a detailed
+    // content strategy (pillars, what never to say) into Brand Kit and it
+    // would only ever reach the copy step, once the topic was already
+    // chosen from raw catalog/promotions with no editorial judgment at all.
+    const brandVoiceParts = [brandKit?.tone_description, brandKit?.voice_training].filter(
+      (part): part is string => Boolean(part?.trim()),
+    );
+    const brandTraining =
+      brandVoiceParts.length > 0 ? brandVoiceParts.join("\n") : "(sin indicaciones de marca)";
 
     const resolvedEphemerides = resolveEphemeridesInWindow(
       ephemerides,
@@ -121,6 +134,7 @@ export async function runPlannerForTenant(
       EPHEMERIDES: formatEphemerides(resolvedEphemerides),
       PROMOTIONS: formatPromotions(promotions),
       PRODUCTS: formatProducts(products),
+      BRAND_TRAINING: brandTraining,
     });
 
     const proposal = await callAgentLlm({
