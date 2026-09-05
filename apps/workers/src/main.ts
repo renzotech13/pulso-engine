@@ -170,11 +170,17 @@ async function main(): Promise<void> {
   // That was fine while a slot published as soon as its date arrived, but
   // slots now have hours: the news digest has to have run BEFORE the day's
   // news slot is due (see news-slot.ts), and a digest whose time of day
-  // drifts with the last restart can't promise that. Planner first so the
-  // calendar exists, digest an hour later.
+  // drifts with the last restart can't promise that.
+  //
+  // Mid-morning, not dawn: these workers run on a laptop that sleeps
+  // overnight, and a 05:00 cron simply never fired the first day it was
+  // tried (the 06:00 one only ran because the machine happened to wake in
+  // time to catch up). The Planner plans 30 days ahead so its hour is
+  // irrelevant as long as it runs; the digest only has to precede the
+  // afternoon news slot.
   await coreQueue.upsertJobScheduler(
     "planner-tick",
-    { pattern: "0 5 * * *", tz: LIMA_TZ },
+    { pattern: "0 10 * * *", tz: LIMA_TZ },
     { name: "planner.tick" },
   );
   // Only fires publish.requested for full-auto tenants (see publish-tick.ts)
@@ -200,7 +206,7 @@ async function main(): Promise<void> {
   // dev-loop note above.
   await coreQueue.upsertJobScheduler(
     "news-tick",
-    { pattern: "0 6 * * *", tz: LIMA_TZ },
+    { pattern: "30 10 * * *", tz: LIMA_TZ },
     { name: "news.tick" },
   );
 

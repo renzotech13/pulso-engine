@@ -8,6 +8,7 @@ import { executeAgentRun } from "@pulso/publish/base-agent";
 import {
   buildBriefForComponentRef,
   creativeTypeForTemplateType,
+  findBannedPhrase,
   pickProductPhoto,
   templateNameForSlotType,
   type CreativeCopy,
@@ -78,6 +79,30 @@ const carouselCopySchema = z
     caption: z.string().nullable().optional(),
   })
   .transform((data) => ({ slides: data.slides, caption: data.caption ?? undefined }));
+
+// Rejecting a banned phrase at the SCHEMA layer is what makes it a real
+// guard: callLlmStructured treats a failed parse exactly like malformed
+// JSON and re-prompts the model with the issue message, so the retry names
+// the offending phrase and field. Stating the ban in the prompt alone was
+// already tried — the brand kit said "never 'sin sustos'" twice and a real
+// piece came back with it anyway.
+function withBannedPhraseGuard<S extends z.ZodTypeAny>(schema: S, bannedPhrases: readonly string[]) {
+  if (bannedPhrases.length === 0) return schema;
+  return schema.superRefine((copy, ctx) => {
+    const hit = findBannedPhrase(copy as Record<string, unknown>, bannedPhrases);
+    if (hit) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `el campo "${hit.field}" contiene la frase prohibida "${hit.phrase}" — reescríbelo sin usarla ni ninguna variante`,
+      });
+    }
+  });
+}
+
+// Two extra attempts (three total) instead of the default one: a content
+// rejection is a harder ask than fixing JSON shape, and the model is local,
+// so the retries cost time but no money.
+const COPY_MAX_RETRIES = 2;
 
 function renderPrompt(template: string, vars: Record<string, string>): string {
   let rendered = template;
@@ -252,6 +277,7 @@ export async function runCreativeAgentForSlot(
         BRAND_TRAINING: brandTrainingForCopy,
       });
 
+      const bannedPhrases = brandKit?.banned_phrases ?? [];
       const copy: CreativeCopy = isCarousel
         ? await callAgentLlm({
             agentName: "creative",
@@ -259,7 +285,8 @@ export async function runCreativeAgentForSlot(
             ...(jobId ? { jobId } : {}),
             correlationId,
             prompt,
-            schema: carouselCopySchema,
+            schema: withBannedPhraseGuard(carouselCopySchema, bannedPhrases),
+            options: { maxRetries: COPY_MAX_RETRIES },
           })
         : await callAgentLlm({
             agentName: "creative",
@@ -267,7 +294,8 @@ export async function runCreativeAgentForSlot(
             ...(jobId ? { jobId } : {}),
             correlationId,
             prompt,
-            schema: creativeCopySchema,
+            schema: withBannedPhraseGuard(creativeCopySchema, bannedPhrases),
+            options: { maxRetries: COPY_MAX_RETRIES },
           });
 
       let photoUrl = isCarousel ? undefined : pickProductPhoto(products, copy.productName);

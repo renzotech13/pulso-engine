@@ -111,3 +111,48 @@ export function pickProductPhoto(
   const match = products.find((p) => p.name.toLowerCase() === productName.toLowerCase());
   return match?.photo_urls[0];
 }
+
+// Lowercase + strip diacritics, so "Sin Sustos", "SIN SUSTOS" and a
+// tenant-typed "sin sústos" all hit the same banned entry.
+function normalizeForMatch(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+export interface BannedPhraseHit {
+  phrase: string;
+  field: string;
+}
+
+/**
+ * Scans every string (and every string inside an array, e.g. carousel
+ * slides) in a generated copy object for a tenant-banned phrase. Substring
+ * match on purpose: "sinergias" must trip a ban on "sinergia". Returns the
+ * first hit so the LLM retry prompt can name exactly what to remove.
+ *
+ * Exists because the ban already lived in the brand kit prose twice and the
+ * local model used the phrase anyway on a real piece — the guard has to be
+ * code, not a sentence in the prompt.
+ */
+export function findBannedPhrase(
+  copy: Record<string, unknown>,
+  bannedPhrases: readonly string[],
+): BannedPhraseHit | null {
+  const banned = bannedPhrases
+    .map((phrase) => ({ raw: phrase, normalized: normalizeForMatch(phrase).trim() }))
+    .filter((entry) => entry.normalized.length > 0);
+  if (banned.length === 0) return null;
+
+  for (const [field, value] of Object.entries(copy)) {
+    const texts = typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+    for (const text of texts) {
+      if (typeof text !== "string") continue;
+      const haystack = normalizeForMatch(text);
+      const hit = banned.find((entry) => haystack.includes(entry.normalized));
+      if (hit) return { phrase: hit.raw, field };
+    }
+  }
+  return null;
+}

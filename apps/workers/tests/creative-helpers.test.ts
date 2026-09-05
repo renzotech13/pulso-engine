@@ -4,6 +4,7 @@ import {
   creativeTypeForTemplateType,
   pickProductPhoto,
   templateNameForSlotType,
+  findBannedPhrase,
 } from "../src/agents/creative-helpers.js";
 
 describe("templateNameForSlotType", () => {
@@ -173,5 +174,40 @@ describe("pickProductPhoto", () => {
 
   it("returns undefined when no productName was given", () => {
     expect(pickProductPhoto(products, undefined)).toBeUndefined();
+  });
+});
+
+describe("findBannedPhrase", () => {
+  const banned = ["sin sustos", "sinergia"];
+
+  it("returns null when nothing is banned", () => {
+    expect(findBannedPhrase({ caption: "sin sustos" }, [])).toBeNull();
+  });
+
+  it("finds a banned phrase in a string field and names the field", () => {
+    expect(findBannedPhrase({ headline: "Hola", caption: "tu salto limpio y sin sustos" }, banned)).toEqual({
+      phrase: "sin sustos",
+      field: "caption",
+    });
+  });
+
+  it("ignores case and diacritics on both sides", () => {
+    expect(findBannedPhrase({ headline: "SIN SÚSTOS" }, banned)?.phrase).toBe("sin sustos");
+    expect(findBannedPhrase({ headline: "sinergia total" }, ["SINERGÍA"])?.phrase).toBe("SINERGÍA");
+  });
+
+  it("scans every string inside an array field (carousel slides)", () => {
+    expect(findBannedPhrase({ slides: ["uno", "dos", "buscamos sinergias"] }, banned)).toEqual({
+      phrase: "sinergia",
+      field: "slides",
+    });
+  });
+
+  it("skips undefined, null and non-string values without throwing", () => {
+    expect(findBannedPhrase({ subheadline: undefined, priceLabel: null, videoEffects: { hideLogo: true } }, banned)).toBeNull();
+  });
+
+  it("treats whitespace-only banned entries as absent", () => {
+    expect(findBannedPhrase({ caption: "anything" }, ["  ", ""])).toBeNull();
   });
 });

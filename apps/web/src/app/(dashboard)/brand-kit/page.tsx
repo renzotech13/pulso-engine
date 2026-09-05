@@ -117,6 +117,22 @@ export default async function BrandKitPage() {
         </div>
 
         <div className="sm:col-span-2">
+          <label className={labelClass}>Frases prohibidas</label>
+          <textarea
+            name="bannedPhrases"
+            rows={4}
+            placeholder={"sin sustos\nsinergia\nsoluciones integrales"}
+            defaultValue={(brandKit?.banned_phrases ?? []).join("\n")}
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-neutral-600">
+            Una por línea. A diferencia del entrenamiento de arriba, esto no es una sugerencia para el
+            modelo: si una pieza sale con alguna de estas frases, se rechaza y se vuelve a redactar
+            automáticamente. Sin distinguir mayúsculas ni tildes.
+          </p>
+        </div>
+
+        <div className="sm:col-span-2">
           <label className={labelClass}>Sitio web</label>
           <input
             name="websiteUrl"

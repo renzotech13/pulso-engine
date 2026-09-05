@@ -398,6 +398,11 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
   const toneDescription = String(formData.get("toneDescription") ?? "").trim() || null;
   const voiceTraining = String(formData.get("voiceTraining") ?? "").trim() || null;
   const websiteUrl = String(formData.get("websiteUrl") ?? "").trim() || null;
+  // One phrase per line in the textarea; blank lines are just spacing.
+  const bannedPhrases = String(formData.get("bannedPhrases") ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
 
   const supabase = await createSupabaseServerClient();
 
@@ -414,6 +419,7 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
     tone_description: string | null;
     voice_training: string | null;
     website_url: string | null;
+    banned_phrases: string[];
     logo_url?: string;
     brief_document_url?: string;
     brief_document_name?: string;
@@ -424,6 +430,7 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
     tone_description: toneDescription,
     voice_training: voiceTraining,
     website_url: websiteUrl,
+    banned_phrases: bannedPhrases,
   };
 
   if (logoEntry instanceof File && logoEntry.size > 0) {

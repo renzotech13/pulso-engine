@@ -93,8 +93,11 @@ async function callLlmStructuredInternal<S extends z.ZodTypeAny>(
   let lastUsage: LlmUsage = { promptTokens: 0, completionTokens: 0 };
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // Worded as "rejected", not "wrong format": a schema refinement can
+    // reject on CONTENT too (a tenant-banned phrase, see creative.ts), and
+    // the model needs to fix what the message names, not the JSON shape.
     const userContent = lastError
-      ? `${prompt}\n\nTu respuesta anterior no calzó con el formato esperado (${lastError}). Responde de nuevo, solo con el JSON, sin texto adicional ni markdown.`
+      ? `${prompt}\n\nTu respuesta anterior fue rechazada por este motivo: ${lastError}. Corrige exactamente eso y responde de nuevo, solo con el JSON, sin texto adicional ni markdown.`
       : prompt;
 
     const response = await openai.chat.completions.create({
