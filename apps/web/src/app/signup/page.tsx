@@ -2,10 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
+import { MailCheck } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { inputClass } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
+import { Field, inputClass } from "@/components/ui/field";
+import { Button, buttonClass } from "@/components/ui/button";
 
 type Status = "idle" | "sending" | "sent" | "error";
 
@@ -52,11 +53,19 @@ export default function SignupPage() {
   if (status === "sent") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
-        <Card className="w-full max-w-sm p-8 text-center">
-          <h1 className="font-display text-xl text-neutral-100">Revisa tu correo</h1>
+        <Card padding="none" className="w-full max-w-sm p-8 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pulso-primary/15 text-pulso-accent">
+            <MailCheck size={22} aria-hidden="true" />
+          </div>
+          <h1 className="font-display text-2xl tracking-wide text-neutral-100">Revisa tu correo</h1>
           <p className="mt-3 text-sm text-neutral-400">
             Te enviamos un enlace de confirmación a <span className="text-neutral-200">{email}</span>.
             Ábrelo para activar tu cuenta.
+          </p>
+          <p className="mt-6 text-xs text-neutral-500">
+            <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
+              Volver a ingresar
+            </Link>
           </p>
         </Card>
       </main>
@@ -65,43 +74,71 @@ export default function SignupPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
-      <Card className="w-full max-w-sm p-8">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <h1 className="font-display text-xl text-neutral-100">Crea tu cuenta</h1>
-          <p className="text-sm text-neutral-400">Necesitas una cuenta para configurar tu negocio.</p>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="tu@negocio.com"
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Contraseña (mínimo 6 caracteres)"
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            placeholder="Confirmar contraseña"
-            className={inputClass}
-          />
-          <Button type="submit" disabled={status === "sending"} className="w-full disabled:opacity-50">
-            {status === "sending" ? "Creando cuenta..." : "Crear cuenta"}
+      <Card padding="none" className="w-full max-w-sm p-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
+            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Crea tu cuenta</h1>
+            <p className="text-sm text-neutral-400">Necesitas una cuenta para configurar tu negocio.</p>
+          </div>
+
+          <div className="space-y-4">
+            <Field id="signup-email" label="Correo" required>
+              <input
+                id="signup-email"
+                type="email"
+                name="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="tu@negocio.com"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="signup-password" label="Contraseña" hint="Mínimo 6 caracteres." required>
+              <input
+                id="signup-password"
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="signup-confirm" label="Confirmar contraseña" required>
+              <input
+                id="signup-confirm"
+                type="password"
+                name="confirmPassword"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="••••••••"
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          {status === "error" && (
+            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+              {errorMessage}
+            </p>
+          )}
+
+          <Button type="submit" pending={status === "sending"} pendingText="Creando cuenta…" className="w-full">
+            Crear cuenta
           </Button>
-          {status === "error" && <p className="text-sm text-status-pink">{errorMessage}</p>}
+
           <p className="text-center text-xs text-neutral-500">
             ¿Ya tienes cuenta?{" "}
-            <Link href="/login" className="hover:text-pulso-accent hover:underline">
+            <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
               Ingresa
             </Link>
           </p>

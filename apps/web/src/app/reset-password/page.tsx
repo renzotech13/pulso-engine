@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { inputClass } from "@/components/ui/field";
-import { Button } from "@/components/ui/button";
+import { Field, inputClass } from "@/components/ui/field";
+import { Button, buttonClass } from "@/components/ui/button";
 
 type Status = "idle" | "sending" | "error";
 
@@ -38,36 +39,65 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    window.location.href = "/agents";
+    window.location.href = "/calendar";
   }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
-      <Card className="w-full max-w-sm p-8">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <h1 className="font-display text-xl text-neutral-100">Elige una nueva contraseña</h1>
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="Contraseña nueva (mínimo 6 caracteres)"
-            className={inputClass}
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={confirmPassword}
-            onChange={(event) => setConfirmPassword(event.target.value)}
-            placeholder="Confirmar contraseña nueva"
-            className={inputClass}
-          />
-          <Button type="submit" disabled={status === "sending"} className="w-full disabled:opacity-50">
-            {status === "sending" ? "Guardando..." : "Guardar contraseña"}
+      <Card padding="none" className="w-full max-w-sm p-8">
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-1">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
+            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Elige una nueva contraseña</h1>
+            <p className="text-sm text-neutral-400">Al guardarla entrarás directo a tu calendario.</p>
+          </div>
+
+          <div className="space-y-4">
+            <Field id="reset-password" label="Contraseña nueva" hint="Mínimo 6 caracteres." required>
+              <input
+                id="reset-password"
+                type="password"
+                name="password"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                className={inputClass}
+              />
+            </Field>
+            <Field id="reset-confirm" label="Confirmar contraseña nueva" required>
+              <input
+                id="reset-confirm"
+                type="password"
+                name="confirmPassword"
+                autoComplete="new-password"
+                required
+                minLength={6}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="••••••••"
+                className={inputClass}
+              />
+            </Field>
+          </div>
+
+          {status === "error" && (
+            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+              {errorMessage}
+            </p>
+          )}
+
+          <Button type="submit" pending={status === "sending"} pendingText="Guardando…" className="w-full">
+            Guardar contraseña
           </Button>
-          {status === "error" && <p className="text-sm text-status-pink">{errorMessage}</p>}
+
+          <p className="text-center text-xs text-neutral-500">
+            <Link href="/forgot-password" className={buttonClass("link", "sm", "text-xs")}>
+              Pedir un enlace nuevo
+            </Link>
+          </p>
         </form>
       </Card>
     </main>

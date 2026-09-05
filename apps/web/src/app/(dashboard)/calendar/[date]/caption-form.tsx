@@ -1,5 +1,5 @@
 import { updateCreativeCaptionAction } from "@/lib/actions";
-import { inputClass, labelClass } from "@/components/ui/field";
+import { Field, textareaClass } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
 
 export function CaptionForm({
@@ -13,19 +13,18 @@ export function CaptionForm({
   date: string;
   caption: string;
 }) {
+  const id = `caption-${creativeId}`;
   return (
-    <form action={updateCreativeCaptionAction} className="mt-3 space-y-2 border-t border-ink-700 pt-3">
+    <form action={updateCreativeCaptionAction} className="space-y-3">
       <input type="hidden" name="tenantId" value={tenantId} />
       <input type="hidden" name="date" value={date} />
       <input type="hidden" name="creativeId" value={creativeId} />
 
-      <p className={labelClass}>Copy de la publicación</p>
-      <textarea name="caption" defaultValue={caption} rows={6} className={inputClass} />
+      <Field id={id} label="Copy de la publicación" hint="Es el texto que acompaña la pieza en Facebook e Instagram.">
+        <textarea id={id} name="caption" defaultValue={caption} rows={6} className={textareaClass} />
+      </Field>
 
-      <SubmitButton
-        pendingText="Guardando…"
-        className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-      >
+      <SubmitButton variant="primary" size="sm" pendingText="Guardando…">
         Guardar copy
       </SubmitButton>
     </form>

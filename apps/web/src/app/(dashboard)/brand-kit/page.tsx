@@ -1,3 +1,4 @@
+import { ExternalLink, Images, X } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -9,9 +10,12 @@ import {
 } from "@/lib/actions";
 import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
-import { TonePresets } from "@/components/tone-presets";
-import { inputClass, labelClass } from "@/components/ui/field";
+import { ColorField, TonePresets } from "@/components/tone-presets";
 import { Card, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Field, inputClass, labelClass, selectClass, textareaClass } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
 
 const DEFAULT_COLOR_PRIMARY = "#7C6FF0";
 const DEFAULT_COLOR_SECONDARY = "#FF8B5E";
@@ -26,6 +30,26 @@ function aspectRatioFor(width: number | null, height: number | null): string {
   if (width === 1080 && height === 1350) return "4:5";
   if (width === 1080 && height === 1920) return "9:16";
   return "1:1";
+}
+
+/** What the photo bank says about each asset — never a raw DB field. */
+function assetStatus(asset: {
+  tagged_at: string | null;
+  last_used_at: string | null;
+  tag_attempts: number;
+}): { label: string; tone: StatusTone } {
+  if (asset.tagged_at) {
+    if (asset.last_used_at) {
+      const days = Math.max(0, Math.round((Date.now() - Date.parse(asset.last_used_at)) / 86_400_000));
+      return {
+        label: days === 0 ? "Usada hoy" : days === 1 ? "Usada ayer" : `Usada hace ${days} días`,
+        tone: "green",
+      };
+    }
+    return { label: "Sin usar todavía", tone: "grey" };
+  }
+  if (asset.tag_attempts >= 3) return { label: "Sin etiquetar — edítala a mano", tone: "pink" };
+  return { label: "Etiquetando…", tone: "orange" };
 }
 
 export default async function BrandKitPage() {
@@ -50,147 +74,143 @@ export default async function BrandKitPage() {
 
   const colorPrimary = brandKit?.color_primary ?? DEFAULT_COLOR_PRIMARY;
   const colorSecondary = brandKit?.color_secondary ?? DEFAULT_COLOR_SECONDARY;
+  const assets = mediaAssets ?? [];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
-          Marca
-        </p>
-        <h1 className="font-display text-2xl font-semibold">{ctx.tenantName}</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Esto es lo que el Creative usa para componer cada pieza: logo, colores y el tono con el
-          que le habla a tus clientes.
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={ctx.tenantName}
+        title="Marca"
+        description="Esto es lo que el Creative usa para componer cada pieza: logo, colores y el tono con el que le habla a tus clientes."
+      />
 
-      <form
-        action={upsertBrandKitAction}
-        className="grid grid-cols-1 gap-6 rounded-xl border border-ink-700 bg-ink-900 p-5 sm:grid-cols-2"
-      >
-        <input type="hidden" name="tenantId" value={ctx.tenantId} />
+      <Card>
+        <CardHeader
+          title="Identidad"
+          description="Logo, colores y voz. Todo agente parte de acá antes de escribir o diseñar."
+        />
+        <form action={upsertBrandKitAction} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <input type="hidden" name="tenantId" value={ctx.tenantId} />
 
-        <div className="sm:col-span-2">
-          <MediaDropzone
-            name="logo"
-            accept="image/*"
-            label="Logo"
-            hint="Arrastra tu logo acá o haz click para elegir"
-            multiple={false}
-            {...(brandKit?.logo_url ? { currentPreviewUrl: brandKit.logo_url } : {})}
-          />
-        </div>
+          <div className="sm:col-span-2">
+            <MediaDropzone
+              name="logo"
+              accept="image/*"
+              label="Logo"
+              hint="Arrastra tu logo acá o haz click para elegir"
+              multiple={false}
+              {...(brandKit?.logo_url ? { currentPreviewUrl: brandKit.logo_url } : {})}
+            />
+          </div>
 
-        <div>
-          <label className={labelClass}>Color primario</label>
-          <input
-            name="colorPrimary"
-            type="color"
-            defaultValue={colorPrimary}
-            className="h-10 w-full cursor-pointer rounded-lg border border-ink-700 bg-ink-900 p-1"
-          />
-        </div>
+          <ColorField name="colorPrimary" label="Color primario" defaultValue={colorPrimary} />
+          <ColorField name="colorSecondary" label="Color secundario" defaultValue={colorSecondary} />
 
-        <div>
-          <label className={labelClass}>Color secundario</label>
-          <input
-            name="colorSecondary"
-            type="color"
-            defaultValue={colorSecondary}
-            className="h-10 w-full cursor-pointer rounded-lg border border-ink-700 bg-ink-900 p-1"
-          />
-        </div>
+          <div className="sm:col-span-2">
+            <p className={labelClass}>Así se ven tus colores juntos</p>
+            <div
+              className="flex h-28 w-full max-w-sm items-end rounded-xl border border-ink-700 p-4"
+              style={{
+                background: `radial-gradient(circle at 30% 20%, ${colorSecondary} 0%, ${colorPrimary} 65%)`,
+              }}
+            >
+              <span className="font-display text-lg font-semibold text-white drop-shadow">
+                {ctx.tenantName}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-neutral-600">La vista previa se actualiza al guardar.</p>
+          </div>
 
-        <div className="sm:col-span-2">
-          <label className={labelClass}>Tono de voz</label>
-          <TonePresets name="toneDescription" defaultValue={brandKit?.tone_description ?? ""} />
-        </div>
+          <div className="sm:col-span-2">
+            <label htmlFor="toneDescription" className={labelClass}>
+              Tono de voz
+            </label>
+            <TonePresets
+              id="toneDescription"
+              name="toneDescription"
+              defaultValue={brandKit?.tone_description ?? ""}
+            />
+          </div>
 
-        <div className="sm:col-span-2">
-          <label className={labelClass}>Entrenamiento</label>
-          <textarea
-            name="voiceTraining"
-            rows={5}
-            placeholder="Ej: nunca menciones a la competencia. Somos expertos en trámites de importación, no solo logística. Evita la palabra 'sinergia'. El Puerto de Chancay ya no es novedad para nuestros clientes desde julio 2026..."
-            defaultValue={brandKit?.voice_training ?? ""}
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-neutral-600">
-            Indicaciones libres que todo agente tiene en cuenta al escribir copy o generar imágenes:
-            detalles del negocio, temas puntuales, cosas que evitar. Se suma al tono de voz de arriba,
-            no lo reemplaza.
-          </p>
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className={labelClass}>Frases prohibidas</label>
-          <textarea
-            name="bannedPhrases"
-            rows={4}
-            placeholder={"sin sustos\nsinergia\nsoluciones integrales"}
-            defaultValue={(brandKit?.banned_phrases ?? []).join("\n")}
-            className={inputClass}
-          />
-          <p className="mt-1 text-xs text-neutral-600">
-            Una por línea. A diferencia del entrenamiento de arriba, esto no es una sugerencia para el
-            modelo: si una pieza sale con alguna de estas frases, se rechaza y se vuelve a redactar
-            automáticamente. Sin distinguir mayúsculas ni tildes.
-          </p>
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className={labelClass}>Sitio web</label>
-          <input
-            name="websiteUrl"
-            type="url"
-            placeholder="https://tuempresa.com"
-            defaultValue={brandKit?.website_url ?? ""}
-            className={inputClass}
-          />
-        </div>
-
-        <div className="sm:col-span-2">
-          <MediaDropzone
-            name="briefDocument"
-            accept=".pdf,.txt,application/pdf,text/plain"
-            label="Brief del negocio (PDF o TXT)"
-            hint="Arrastra un PDF o TXT con contexto del negocio, o haz click para elegir"
-            multiple={false}
-          />
-          {brandKit?.brief_document_url && (
-            <p className="mt-2 text-xs text-neutral-500">
-              Archivo actual:{" "}
-              <a
-                href={brandKit.brief_document_url}
-                target="_blank"
-                rel="noreferrer"
-                className="text-pulso-accent hover:underline"
-              >
-                {brandKit.brief_document_name ?? "ver documento"}
-              </a>
-            </p>
-          )}
-        </div>
-
-        <div className="sm:col-span-2">
-          <button
-            type="submit"
-            className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
+          <Field
+            id="voiceTraining"
+            label="Entrenamiento"
+            hint="Indicaciones libres que todo agente tiene en cuenta al escribir copy o generar imágenes: detalles del negocio, temas puntuales, cosas que evitar. Se suma al tono de voz, no lo reemplaza. También dirige las fotos generadas: escenas, colores, qué evitar."
+            className="sm:col-span-2"
           >
-            Guardar
-          </button>
-        </div>
-      </form>
+            <textarea
+              id="voiceTraining"
+              name="voiceTraining"
+              rows={8}
+              placeholder="Ej: nunca menciones a la competencia. Somos expertos en trámites de importación, no solo logística. Evita la palabra 'sinergia'. El Puerto de Chancay ya no es novedad para nuestros clientes desde julio 2026..."
+              defaultValue={brandKit?.voice_training ?? ""}
+              className={textareaClass}
+            />
+          </Field>
 
-      <Card className="p-5">
-        <CardHeader title="Marco de publicaciones" />
-        <p className="mb-4 text-sm text-neutral-500">
-          Sube tu propio marco (PNG con transparencia) y elige en qué tamaño trabaja. Después, en
-          cada día del calendario vas a poder subir una o varias fotos y se van a componer
-          automáticamente detrás de este marco — cada foto se ajusta para cubrir todo el cuadro,
-          sin dejar espacios vacíos.
-        </p>
-        <form action={upsertPhotoFrameAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            id="bannedPhrases"
+            label="Frases prohibidas"
+            hint="Una por línea. A diferencia del entrenamiento, esto no es una sugerencia para el modelo: si una pieza sale con alguna de estas frases, se rechaza y se vuelve a redactar automáticamente. Sin distinguir mayúsculas ni tildes."
+            className="sm:col-span-2"
+          >
+            <textarea
+              id="bannedPhrases"
+              name="bannedPhrases"
+              rows={4}
+              placeholder={"sin sustos\nsinergia\nsoluciones integrales"}
+              defaultValue={(brandKit?.banned_phrases ?? []).join("\n")}
+              className={textareaClass}
+            />
+          </Field>
+
+          <Field id="websiteUrl" label="Sitio web" className="sm:col-span-2">
+            <input
+              id="websiteUrl"
+              name="websiteUrl"
+              type="url"
+              placeholder="https://tuempresa.com"
+              defaultValue={brandKit?.website_url ?? ""}
+              className={inputClass}
+            />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <MediaDropzone
+              name="briefDocument"
+              accept=".pdf,.txt,application/pdf,text/plain"
+              label="Brief del negocio (PDF o TXT)"
+              hint="Arrastra un PDF o TXT con contexto del negocio, o haz click para elegir"
+              multiple={false}
+            />
+            {brandKit?.brief_document_url && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+                Archivo actual:
+                <a
+                  href={brandKit.brief_document_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-pulso-accent hover:underline"
+                >
+                  {brandKit.brief_document_name ?? "ver documento"}
+                  <ExternalLink size={12} aria-hidden="true" />
+                </a>
+              </p>
+            )}
+          </div>
+
+          <div className="flex justify-end border-t border-ink-700 pt-4 sm:col-span-2">
+            <SubmitButton pendingText="Guardando…">Guardar</SubmitButton>
+          </div>
+        </form>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Marco de publicaciones"
+          description="Sube tu propio marco (PNG con transparencia) y elige en qué tamaño trabaja. En cada día del calendario vas a poder subir una o varias fotos y se componen automáticamente detrás de este marco — cada foto se ajusta para cubrir todo el cuadro, sin dejar espacios vacíos."
+        />
+        <form action={upsertPhotoFrameAction} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <input type="hidden" name="tenantId" value={ctx.tenantId} />
 
           <div className="sm:col-span-2">
@@ -204,12 +224,12 @@ export default async function BrandKitPage() {
             />
           </div>
 
-          <div>
-            <label className={labelClass}>Relación de aspecto</label>
+          <Field id="aspectRatio" label="Relación de aspecto">
             <select
+              id="aspectRatio"
               name="aspectRatio"
               defaultValue={aspectRatioFor(photoFrame?.canvas_width ?? null, photoFrame?.canvas_height ?? null)}
-              className={inputClass}
+              className={selectClass}
             >
               {PHOTO_FRAME_ASPECT_RATIOS.map((ratio) => (
                 <option key={ratio.value} value={ratio.value}>
@@ -217,28 +237,19 @@ export default async function BrandKitPage() {
                 </option>
               ))}
             </select>
-          </div>
+          </Field>
 
-          <div className="flex items-end sm:col-span-2">
-            <button
-              type="submit"
-              className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
-            >
-              Guardar marco
-            </button>
+          <div className="flex items-end justify-end">
+            <SubmitButton pendingText="Guardando…">Guardar marco</SubmitButton>
           </div>
         </form>
       </Card>
 
-      <Card className="p-5">
-        <CardHeader title="Banco de fotos" />
-        <p className="mb-4 text-sm text-neutral-500">
-          Sube fotos reales de tu negocio — el Creative las usa de fondo en tus posts (con título,
-          subtítulo y colores de marca encima). Cada foto se describe una sola vez con IA y desde ahí
-          se elige por tema: un post sobre SUNAT busca una foto etiquetada con eso. Puedes corregir las
-          etiquetas de cualquier foto. Las fotos generadas con IA se alternan con estas según lo que se
-          configure para tu negocio.
-        </p>
+      <Card>
+        <CardHeader
+          title="Banco de fotos"
+          description="Fotos reales de tu negocio que el Creative usa de fondo (con título, subtítulo y colores de marca encima). Cada foto se describe una sola vez con IA y desde ahí se elige por tema; puedes corregir las etiquetas de cualquiera. Las fotos generadas con IA se alternan con estas según lo configurado para tu negocio."
+        />
         <form action={uploadMediaAssetsAction} className="mb-5 flex flex-wrap items-end gap-3">
           <input type="hidden" name="tenantId" value={ctx.tenantId} />
           <div className="min-w-[220px] flex-1">
@@ -249,31 +260,27 @@ export default async function BrandKitPage() {
               hint="Arrastra fotos acá o haz click para elegir"
             />
           </div>
-          <SubmitButton
-            pendingText="Subiendo…"
-            className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Agregar al banco
-          </SubmitButton>
+          <SubmitButton pendingText="Subiendo…">Agregar al banco</SubmitButton>
         </form>
 
-        {mediaAssets && mediaAssets.length > 0 && (
+        {assets.length === 0 ? (
+          <EmptyState
+            icon={<Images size={28} aria-hidden="true" />}
+            title="Todavía no hay fotos en el banco"
+            description="Sube fotos reales de tu local, tu equipo o tus productos y el Creative las va a usar de fondo en los posts."
+          />
+        ) : (
           <>
-            <p className="mb-3 text-xs text-neutral-600">
-              {mediaAssets.length} fotos · {mediaAssets.filter((a) => !a.last_used_at).length} sin usar ·{" "}
-              {mediaAssets.filter((a) => a.tagged_at).length} etiquetadas
+            <p className="mb-3 text-xs text-neutral-500">
+              {assets.length} {assets.length === 1 ? "foto" : "fotos"} ·{" "}
+              {assets.filter((a) => !a.last_used_at).length} sin usar ·{" "}
+              {assets.filter((a) => a.tagged_at).length} etiquetadas
             </p>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {mediaAssets.map((asset) => {
-                const status = asset.tagged_at
-                  ? asset.last_used_at
-                    ? `Usada hace ${Math.max(0, Math.round((Date.now() - Date.parse(asset.last_used_at)) / 86_400_000))} días`
-                    : "Sin usar todavía"
-                  : asset.tag_attempts >= 3
-                    ? "No se pudo etiquetar sola — edítala a mano"
-                    : "Etiquetando…";
+              {assets.map((asset) => {
+                const status = assetStatus(asset);
                 return (
-                  <div key={asset.id} className="rounded-lg border border-ink-700 bg-ink-900 p-2">
+                  <div key={asset.id} className="rounded-lg border border-ink-700 bg-ink-950/60 p-2">
                     <div className="group relative aspect-square overflow-hidden rounded-md">
                       <img src={asset.url} alt={asset.description ?? ""} className="h-full w-full object-cover" />
                       <form action={deleteMediaAssetAction} className="absolute right-1 top-1">
@@ -283,9 +290,9 @@ export default async function BrandKitPage() {
                           type="submit"
                           title="Eliminar esta foto"
                           aria-label="Eliminar esta foto"
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink group-hover:opacity-100"
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-ink-950/80 text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60 group-hover:opacity-100"
                         >
-                          ×
+                          <X size={12} aria-hidden="true" />
                         </button>
                       </form>
                     </div>
@@ -302,7 +309,9 @@ export default async function BrandKitPage() {
                         <span className="px-1 text-[10px] text-neutral-600">+{asset.tags.length - 4}</span>
                       )}
                     </div>
-                    <p className="mt-1 text-[10px] text-neutral-600">{status}</p>
+                    <div className="mt-2">
+                      <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                    </div>
                     <details className="mt-1">
                       <summary className="cursor-pointer text-[11px] text-pulso-accent hover:underline">
                         Editar etiquetas
@@ -312,21 +321,20 @@ export default async function BrandKitPage() {
                         <input type="hidden" name="assetId" value={asset.id} />
                         <input
                           name="tags"
+                          aria-label="Etiquetas"
                           defaultValue={asset.tags.join(", ")}
                           placeholder="emprendedora, taller, sunat"
                           className={`${inputClass} text-xs`}
                         />
                         <textarea
                           name="description"
+                          aria-label="Descripción"
                           rows={2}
                           defaultValue={asset.description ?? ""}
                           placeholder="Qué se ve en la foto"
-                          className={`${inputClass} text-xs`}
+                          className={`${textareaClass} text-xs`}
                         />
-                        <SubmitButton
-                          pendingText="Guardando…"
-                          className="rounded-lg bg-ink-800 px-3 py-1 text-xs text-neutral-200 hover:bg-ink-700"
-                        >
+                        <SubmitButton variant="subtle" size="sm" pendingText="Guardando…">
                           Guardar
                         </SubmitButton>
                       </form>
@@ -338,22 +346,6 @@ export default async function BrandKitPage() {
           </>
         )}
       </Card>
-
-      <section>
-        <h2 className="mb-3 font-display text-sm font-semibold text-neutral-300">
-          Así se ven tus colores juntos
-        </h2>
-        <div
-          className="flex h-32 w-full max-w-sm items-end rounded-xl p-4"
-          style={{
-            background: `radial-gradient(circle at 30% 20%, ${colorSecondary} 0%, ${colorPrimary} 65%)`,
-          }}
-        >
-          <span className="font-display text-lg font-semibold text-white drop-shadow">
-            {ctx.tenantName}
-          </span>
-        </div>
-      </section>
     </div>
   );
 }

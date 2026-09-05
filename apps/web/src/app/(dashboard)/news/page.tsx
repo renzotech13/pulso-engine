@@ -1,31 +1,42 @@
+import { ExternalLink, Newspaper } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { dismissNewsSuggestionAction } from "@/lib/actions";
+import { formatRelative, limaToday } from "@/lib/labels";
 import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SubmitButton } from "@/components/submit-button";
 import { UseIdeaForm } from "./use-idea-form";
 
 /**
- * Starting tomorrow, the first date with no content_calendar row yet —
- * content_calendar has one slot per day, so proposing an already-taken date
- * as the default would just make the common case hit the "day already
- * planned" error the form now has to handle anyway.
+ * Starting tomorrow (Lima), the first date that still has a free slot. A day
+ * holds as many slots as the tenant has publish hours (none = a single one,
+ * same rule as useNewsSuggestionAction), so a day is only "taken" once it has
+ * that many rows — proposing a half-full day as the default is fine.
  */
-function nextFreeDate(takenDates: ReadonlySet<string>): string {
-  const d = new Date();
+function nextFreeDate(slotsPerDay: ReadonlyMap<string, number>, capacity: number, today: string): string {
+  const d = new Date(`${today}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   for (let i = 0; i < 90; i++) {
     const iso = d.toISOString().slice(0, 10);
-    if (!takenDates.has(iso)) return iso;
+    if ((slotsPerDay.get(iso) ?? 0) < capacity) return iso;
     d.setUTCDate(d.getUTCDate() + 1);
   }
   return d.toISOString().slice(0, 10);
+}
+
+function pendingLabel(count: number): string {
+  if (count === 0) return "Sin ideas pendientes por ahora.";
+  if (count === 1) return "1 idea pendiente.";
+  return `${count} ideas pendientes.`;
 }
 
 export default async function NewsPage() {
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: suggestions }, { data: plannedSlots }] = await Promise.all([
+  const [{ data: suggestions }, { data: plannedSlots }, { data: tenant }] = await Promise.all([
     supabase
       .from("news_suggestions")
       .select("*")
@@ -33,62 +44,74 @@ export default async function NewsPage() {
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
     supabase.from("content_calendar").select("date").eq("tenant_id", ctx.tenantId),
+    supabase.from("tenants").select("publish_hours").eq("id", ctx.tenantId).maybeSingle(),
   ]);
 
-  const defaultDate = nextFreeDate(new Set((plannedSlots ?? []).map((s) => s.date)));
+  const slotsPerDay = new Map<string, number>();
+  for (const slot of plannedSlots ?? []) {
+    slotsPerDay.set(slot.date, (slotsPerDay.get(slot.date) ?? 0) + 1);
+  }
+  const capacity = Math.max(tenant?.publish_hours?.length ?? 0, 1);
+  const defaultDate = nextFreeDate(slotsPerDay, capacity, limaToday());
+
+  const pending = suggestions ?? [];
+  const now = new Date();
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">Noticias</p>
-        <h1 className="font-display text-2xl font-semibold">Ideas del día para {ctx.tenantName}</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Cada día el agente de noticias revisa los titulares y te deja acá los que le sirven a tu negocio,
-          con una idea de contenido concreta para cada uno. Nada se publica solo — tú eliges cuáles usar y
-          para qué día.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow={ctx.tenantName}
+        title="Noticias"
+        description={`${pendingLabel(pending.length)} El agente revisa los titulares cada día y te deja acá los que le sirven a tu negocio, con una idea concreta para cada uno. Nada se publica solo: tú eliges cuáles usar y para qué día.`}
+      />
 
-      {(!suggestions || suggestions.length === 0) && (
-        <Card className="p-5 text-sm text-neutral-500">
-          Todavía no hay noticias sugeridas. El agente corre una vez al día — vuelve mañana, o pídele a
-          alguien del equipo que lo dispare manualmente si necesitas verlo antes.
-        </Card>
-      )}
-
-      <div className="space-y-4">
-        {suggestions?.map((s) => (
-          <Card key={s.id} className="p-5">
-            <p className="text-xs uppercase tracking-[0.15em] text-neutral-600">{s.source_name ?? "Fuente"}</p>
-            <h2 className="mt-1 font-display text-lg font-semibold text-neutral-100">
-              <a href={s.source_url} target="_blank" rel="noreferrer" className="hover:text-pulso-accent">
-                {s.headline}
-              </a>
-            </h2>
-            {s.summary && <p className="mt-1 text-sm text-neutral-500">{s.summary}</p>}
-
-            <div className="mt-3 rounded-lg border border-ink-700 bg-ink-950 p-3 text-sm text-neutral-300">
-              <span className="text-xs uppercase tracking-[0.15em] text-pulso-accent">Ángulo sugerido</span>
-              <p className="mt-1">{s.angle}</p>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <UseIdeaForm tenantId={ctx.tenantId} suggestionId={s.id} defaultDate={defaultDate} />
-
-              <form action={dismissNewsSuggestionAction}>
-                <input type="hidden" name="tenantId" value={ctx.tenantId} />
-                <input type="hidden" name="suggestionId" value={s.id} />
-                <button
-                  type="submit"
-                  className="rounded-lg border border-ink-700 px-4 py-2 text-sm text-neutral-400 hover:border-status-pink/60 hover:text-status-pink"
+      {pending.length === 0 ? (
+        <EmptyState
+          icon={<Newspaper size={28} aria-hidden="true" />}
+          title="Sin ideas pendientes"
+          description="El agente de noticias corre todos los días a las 10:30. Vuelve más tarde o pídele a alguien del equipo que lo dispare manualmente si necesitas verlo antes."
+        />
+      ) : (
+        <div className="space-y-4">
+          {pending.map((s) => (
+            <Card key={s.id} padding="sm">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+                <span className="uppercase tracking-[0.15em] text-neutral-500">{s.source_name ?? "Fuente"}</span>
+                <span title={s.created_at}>{formatRelative(s.created_at, now)}</span>
+              </div>
+              <h2 className="mt-1 font-display text-lg font-semibold text-neutral-100">
+                <a
+                  href={s.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-start gap-1.5 hover:text-pulso-accent"
                 >
-                  Descartar
-                </button>
-              </form>
-            </div>
-          </Card>
-        ))}
-      </div>
+                  <span>{s.headline}</span>
+                  <ExternalLink size={14} className="mt-1.5 shrink-0 text-neutral-600" aria-hidden="true" />
+                </a>
+              </h2>
+              {s.summary && <p className="mt-1 text-sm text-neutral-500">{s.summary}</p>}
+
+              <div className="mt-3 rounded-lg border border-ink-700 bg-ink-950 p-3 text-sm text-neutral-300">
+                <span className="text-xs uppercase tracking-[0.15em] text-pulso-accent">Ángulo sugerido</span>
+                <p className="mt-1">{s.angle}</p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-end gap-3">
+                <UseIdeaForm tenantId={ctx.tenantId} suggestionId={s.id} defaultDate={defaultDate} />
+
+                <form action={dismissNewsSuggestionAction}>
+                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                  <input type="hidden" name="suggestionId" value={s.id} />
+                  <SubmitButton variant="dangerGhost" size="sm" pendingText="Descartando…">
+                    Descartar
+                  </SubmitButton>
+                </form>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

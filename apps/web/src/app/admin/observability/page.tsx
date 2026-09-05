@@ -1,5 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
-import { TokenUsageChart } from "@/components/token-usage-chart";
+import { StackedBarChart } from "@/components/charts";
 import { Card, CardHeader } from "@/components/ui/card";
 
 const CHART_DAYS = 14;
@@ -80,7 +80,7 @@ export default async function AdminObservabilityPage() {
   const chartData = Array.from({ length: CHART_DAYS }, (_, i) => {
     const day = startOfDayUTC(CHART_DAYS - 1 - i);
     const key = day.toISOString().slice(0, 10);
-    return { date: key.slice(5), tokens: dailyTokens.get(key) ?? 0 };
+    return { label: key.slice(5), tokens: dailyTokens.get(key) ?? 0 };
   });
 
   return (
@@ -95,13 +95,14 @@ export default async function AdminObservabilityPage() {
         </p>
       </div>
 
-      <Card className="p-5">
+      <Card>
         <CardHeader title={`Tokens por día (últimos ${CHART_DAYS})`} />
-        <TokenUsageChart data={chartData} />
+        <StackedBarChart data={chartData} series={[{ key: "tokens", name: "Tokens" }]} height={220} />
       </Card>
 
-      <Card className="overflow-hidden p-5">
-        <table className="w-full text-sm">
+      <Card>
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-neutral-500">
               <th className="pb-2">Tenant</th>
@@ -138,6 +139,7 @@ export default async function AdminObservabilityPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

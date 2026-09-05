@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, RefreshCw, Upload, X } from "lucide-react";
 import { regenerateCarouselSlideAction, replaceCarouselSlidePhotoAction } from "@/lib/actions";
 import { SubmitButton } from "@/components/submit-button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { AutoSubmitFileInput } from "@/components/auto-submit-file-input";
 
 interface CarouselSlideGridProps {
@@ -73,7 +75,7 @@ export function CarouselSlideGrid({
             <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
               {i + 1}
             </span>
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/75 py-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/75 py-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
               <form action={regenerateCarouselSlideAction}>
                 <input type="hidden" name="tenantId" value={tenantId} />
                 <input type="hidden" name="date" value={date} />
@@ -81,11 +83,13 @@ export function CarouselSlideGrid({
                 <input type="hidden" name="creativeId" value={creativeId} />
                 <input type="hidden" name="slideIndex" value={i} />
                 <SubmitButton
-                  pendingText="⏳"
+                  variant="subtle"
+                  size="sm"
                   title="Regenerar esta imagen con IA"
-                  className="rounded px-1 text-sm text-white hover:text-pulso-accent disabled:opacity-50"
+                  aria-label={`Regenerar slide ${i + 1} con IA`}
+                  pendingText={<span className="sr-only">Regenerando…</span>}
                 >
-                  ↻
+                  <RefreshCw size={14} aria-hidden="true" />
                 </SubmitButton>
               </form>
               <form action={replaceCarouselSlidePhotoAction}>
@@ -96,9 +100,10 @@ export function CarouselSlideGrid({
                 <input type="hidden" name="slideIndex" value={i} />
                 <label
                   title="Reemplazar con una foto propia"
-                  className="cursor-pointer rounded px-1 text-sm text-white hover:text-pulso-accent"
+                  className={buttonClass("subtle", "sm", "cursor-pointer")}
                 >
-                  ⤴
+                  <Upload size={14} aria-hidden="true" />
+                  <span className="sr-only">Reemplazar slide {i + 1} con una foto propia</span>
                   <AutoSubmitFileInput name="photo" accept="image/*" className="hidden" />
                 </label>
               </form>
@@ -115,27 +120,32 @@ export function CarouselSlideGrid({
           onClick={close}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
         >
-          <button
+          <Button
             type="button"
+            variant="subtle"
+            size="sm"
             onClick={close}
             title="Cerrar (Esc)"
-            className="absolute right-4 top-4 rounded-lg px-3 py-1.5 text-2xl leading-none text-neutral-300 transition-colors duration-200 hover:text-white"
+            aria-label="Cerrar"
+            className="absolute right-4 top-4"
           >
-            ×
-          </button>
+            <X size={16} aria-hidden="true" />
+          </Button>
 
           {urls.length > 1 && (
-            <button
+            <Button
               type="button"
+              variant="subtle"
               onClick={(e) => {
                 e.stopPropagation();
                 step(-1);
               }}
               title="Anterior (←)"
-              className="absolute left-2 rounded-full bg-black/50 px-4 py-3 text-2xl leading-none text-neutral-200 transition-colors duration-200 hover:bg-black/80 hover:text-white sm:left-6"
+              aria-label="Slide anterior"
+              className="absolute left-2 rounded-full sm:left-6"
             >
-              ‹
-            </button>
+              <ChevronLeft size={20} aria-hidden="true" />
+            </Button>
           )}
 
           {/* Stops the overlay's click-to-close from firing on the image itself. */}
@@ -149,29 +159,26 @@ export function CarouselSlideGrid({
               <span>
                 Slide {openIndex + 1} de {urls.length}
               </span>
-              <a
-                href={urls[openIndex]}
-                target="_blank"
-                rel="noreferrer"
-                className="text-pulso-accent transition-colors duration-200 hover:text-white"
-              >
+              <a href={urls[openIndex]} target="_blank" rel="noreferrer" className={buttonClass("link")}>
                 Abrir original
               </a>
             </figcaption>
           </figure>
 
           {urls.length > 1 && (
-            <button
+            <Button
               type="button"
+              variant="subtle"
               onClick={(e) => {
                 e.stopPropagation();
                 step(1);
               }}
               title="Siguiente (→)"
-              className="absolute right-2 rounded-full bg-black/50 px-4 py-3 text-2xl leading-none text-neutral-200 transition-colors duration-200 hover:bg-black/80 hover:text-white sm:right-6"
+              aria-label="Slide siguiente"
+              className="absolute right-2 rounded-full sm:right-6"
             >
-              ›
-            </button>
+              <ChevronRight size={20} aria-hidden="true" />
+            </Button>
           )}
         </div>
       )}

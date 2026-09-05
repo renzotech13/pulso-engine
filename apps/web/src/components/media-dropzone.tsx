@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { FileText, UploadCloud, X } from "lucide-react";
+import { labelClass } from "@/components/ui/field";
 
 interface MediaDropzoneProps {
   name: string;
@@ -62,14 +64,15 @@ export function MediaDropzone({
     addFiles(event.dataTransfer.files);
   }
 
+  const showCurrent = files.length === 0 && Boolean(currentPreviewUrl);
+
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-neutral-500">
-        {label}
-      </label>
+      <span className={labelClass}>{label}</span>
       <div
         role="button"
         tabIndex={0}
+        aria-label={`${label}: ${hint}`}
         onDragOver={(event) => {
           event.preventDefault();
           setIsDragging(true);
@@ -78,20 +81,25 @@ export function MediaDropzone({
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
         onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") inputRef.current?.click();
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            inputRef.current?.click();
+          }
         }}
-        className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors duration-300 ease-in-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-pulso-accent ${
+        className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60 ${
           isDragging
             ? "animate-pulse-ring border-pulso-primary bg-pulso-primary/10"
             : "border-ink-700 hover:border-pulso-accent/60 hover:bg-ink-800"
         }`}
       >
-        {files.length === 0 && currentPreviewUrl && (
+        {showCurrent ? (
           <img
             src={currentPreviewUrl}
             alt=""
-            className="mx-auto mb-2 h-12 w-12 rounded object-cover"
+            className="mx-auto mb-2 h-12 w-12 rounded-md border border-ink-700 bg-ink-950 object-contain"
           />
+        ) : (
+          <UploadCloud size={22} className="mx-auto mb-2 text-neutral-600" aria-hidden="true" />
         )}
         <p className="text-sm text-neutral-400">{hint}</p>
         <input
@@ -101,6 +109,7 @@ export function MediaDropzone({
           accept={accept}
           multiple={multiple}
           className="hidden"
+          tabIndex={-1}
           onChange={(event: ChangeEvent<HTMLInputElement>) => addFiles(event.target.files)}
         />
       </div>
@@ -114,7 +123,7 @@ export function MediaDropzone({
               {previewUrls[index] ? (
                 <img src={previewUrls[index]} alt="" className="h-6 w-6 rounded object-cover" />
               ) : (
-                <span aria-hidden>🎬</span>
+                <FileText size={14} className="text-neutral-500" aria-hidden="true" />
               )}
               <span className="max-w-[10rem] truncate">{file.name}</span>
               <button
@@ -123,10 +132,10 @@ export function MediaDropzone({
                   event.stopPropagation();
                   removeFile(index);
                 }}
-                className="text-neutral-500 hover:text-status-pink"
+                className="rounded p-0.5 text-neutral-500 transition-colors duration-200 hover:text-status-pink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60"
                 aria-label={`Quitar ${file.name}`}
               >
-                ×
+                <X size={12} aria-hidden="true" />
               </button>
             </li>
           ))}

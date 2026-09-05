@@ -396,8 +396,15 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
-  const colorPrimary = String(formData.get("colorPrimary") ?? "").trim() || null;
-  const colorSecondary = String(formData.get("colorSecondary") ?? "").trim() || null;
+  // A blank or malformed hex is dropped from the update entirely (kept
+  // untouched, like logo/brief document below) instead of writing null —
+  // the client's `required`/`pattern` can't be trusted alone since a Server
+  // Action can be invoked directly, bypassing the form.
+  const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+  const colorPrimaryRaw = String(formData.get("colorPrimary") ?? "").trim();
+  const colorSecondaryRaw = String(formData.get("colorSecondary") ?? "").trim();
+  const colorPrimary = HEX_COLOR_RE.test(colorPrimaryRaw) ? colorPrimaryRaw : undefined;
+  const colorSecondary = HEX_COLOR_RE.test(colorSecondaryRaw) ? colorSecondaryRaw : undefined;
   const toneDescription = String(formData.get("toneDescription") ?? "").trim() || null;
   const voiceTraining = String(formData.get("voiceTraining") ?? "").trim() || null;
   const websiteUrl = String(formData.get("websiteUrl") ?? "").trim() || null;
@@ -417,8 +424,8 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
   const briefDocumentEntry = formData.get("briefDocument");
   const update: {
     tenant_id: string;
-    color_primary: string | null;
-    color_secondary: string | null;
+    color_primary?: string;
+    color_secondary?: string;
     tone_description: string | null;
     voice_training: string | null;
     website_url: string | null;
@@ -428,8 +435,8 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
     brief_document_name?: string;
   } = {
     tenant_id: tenantId,
-    color_primary: colorPrimary,
-    color_secondary: colorSecondary,
+    ...(colorPrimary ? { color_primary: colorPrimary } : {}),
+    ...(colorSecondary ? { color_secondary: colorSecondary } : {}),
     tone_description: toneDescription,
     voice_training: voiceTraining,
     website_url: websiteUrl,
@@ -1262,6 +1269,8 @@ async function updateTenantLimitsActionImpl(formData: FormData): Promise<void> {
   // budget means unlimited — both exactly what every existing tenant has.
   const geminiShareRaw = String(formData.get("geminiShare") ?? "").trim();
   const geminiBudgetRaw = String(formData.get("geminiDailyImageBudget") ?? "").trim();
+  // Unchecked checkboxes send nothing at all in FormData, not "false".
+  const reelsPaused = formData.has("reelsPaused");
 
   const service = createServiceRoleClient();
   const { error } = await service
@@ -1272,6 +1281,7 @@ async function updateTenantLimitsActionImpl(formData: FormData): Promise<void> {
       ...(hitlMode ? { hitl_mode: hitlMode } : {}),
       gemini_share: geminiShareRaw ? Number(geminiShareRaw) : null,
       gemini_daily_image_budget: geminiBudgetRaw ? Number(geminiBudgetRaw) : null,
+      reels_paused: reelsPaused,
     })
     .eq("id", tenantId);
 

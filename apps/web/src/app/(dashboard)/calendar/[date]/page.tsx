@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AlertTriangle, ArrowLeft, ImageOff, Loader2, X } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -13,11 +14,29 @@ import {
   toggleHoldPublishAction,
   updateCalendarSlotAction,
 } from "@/lib/actions";
-import { inputClass as fieldClass, labelClass } from "@/components/ui/field";
+import {
+  BRIEF_KEYS,
+  CREATIVE_STATUS,
+  PHOTO_SOURCE,
+  PLATFORM,
+  PUB_STATUS,
+  SELECT_OPTIONS,
+  formatCalendarDay,
+  label,
+  limaToday,
+  slotDisplayState,
+} from "@/lib/labels";
+import { Field, inputClass, selectClass, textareaClass } from "@/components/ui/field";
 import { Card, CardHeader } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Segmented } from "@/components/ui/segmented";
+import { StatusBadge, type StatusTone } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonClass } from "@/components/ui/button";
 import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { CarouselSlideGrid } from "@/components/carousel-slide-grid";
+import { CreativePreview } from "@/components/creative-preview";
 import { MoveDateForm } from "./move-date-form";
 import { CaptionForm } from "./caption-form";
 
@@ -38,6 +57,11 @@ const STUDENT_COUNTRIES = [
   { code: "US", name: "Estados Unidos" },
 ] as const;
 
+// Brief keys that are plumbing for the render service, not content the
+// user wrote or wants to review — never shown.
+const HIDDEN_BRIEF_KEYS = new Set(["photoUrl", "photoUrls", "photoAssetId", "photoAssetIds", "photoSource", "photoSources", "caption"]);
+const isColourKey = (key: string) => /colou?r/i.test(key);
+
 interface CreativePublication {
   platform: string;
   status: string;
@@ -53,6 +77,37 @@ interface SlotCreative {
   asset_urls: string[] | null;
   template_id: string | null;
   publications: CreativePublication[] | null;
+}
+
+function creativeTone(status: string): StatusTone {
+  switch (status) {
+    case "approved":
+      return "green";
+    case "ready":
+      return "orange";
+    case "failed":
+      return "pink";
+    default:
+      return "blue";
+  }
+}
+
+function publicationTone(status: string): StatusTone {
+  if (status === "published") return "green";
+  if (status === "failed") return "pink";
+  return "blue";
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatHour(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }
 
 interface ThumbnailGridProps {
@@ -81,13 +136,16 @@ function ThumbnailGrid({ urls, creativeId, tenantId, date, canDelete }: Thumbnai
               <input type="hidden" name="date" value={date} />
               <input type="hidden" name="creativeId" value={creativeId} />
               <input type="hidden" name="index" value={i} />
-              <button
-                type="submit"
+              <SubmitButton
+                variant="danger"
+                size="sm"
                 title="Eliminar esta foto"
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink group-hover:opacity-100"
+                aria-label={`Eliminar foto ${i + 1}`}
+                pendingText={<span className="sr-only">Quitando…</span>}
+                className="rounded-full opacity-0 transition-opacity duration-150 focus-visible:opacity-100 group-hover:opacity-100"
               >
-                ×
-              </button>
+                <X size={14} aria-hidden="true" />
+              </SubmitButton>
             </form>
           )}
         </div>
@@ -96,26 +154,73 @@ function ThumbnailGrid({ urls, creativeId, tenantId, date, canDelete }: Thumbnai
   );
 }
 
+/** One badge per platform, with the failure reason spelled out instead of hidden in a tooltip. */
 function PublicationBadges({ publications }: { publications: CreativePublication[] | null }) {
   if (!publications || publications.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-2 text-xs">
+    <ul className="space-y-1.5">
       {publications.map((pub, i) => (
-        <span
-          key={i}
-          className={pub.status === "published" ? "text-emerald-400" : "text-status-pink"}
-          title={pub.error_message ?? undefined}
-        >
-          {pub.status === "published" ? "✓" : "✗"} {pub.platform}
-        </span>
+        <li key={i} className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={publicationTone(pub.status)}>
+            {label(PLATFORM, pub.platform)} · {label(PUB_STATUS, pub.status)}
+          </StatusBadge>
+          {pub.status === "failed" && pub.error_message && (
+            <span className="text-xs text-status-pink">{pub.error_message}</span>
+          )}
+        </li>
       ))}
+    </ul>
+  );
+}
+
+/** The creative's brief as labelled rows — never the raw JSON dump this used to be. */
+function BriefRows({ brief }: { brief: unknown }) {
+  const record = asRecord(brief);
+  if (!record) return null;
+
+  const known = Object.keys(BRIEF_KEYS).filter((key) => !HIDDEN_BRIEF_KEYS.has(key));
+  const extra = Object.keys(record).filter(
+    (key) => !(key in BRIEF_KEYS) && !HIDDEN_BRIEF_KEYS.has(key) && !isColourKey(key),
+  );
+  const rows = [...known, ...extra]
+    .map((key) => [key, record[key]] as const)
+    .filter((entry): entry is readonly [string, string] => typeof entry[1] === "string" && entry[1].length > 0);
+
+  const photoUrl = typeof record.photoUrl === "string" && record.photoUrl ? record.photoUrl : null;
+  const photoSource = typeof record.photoSource === "string" ? label(PHOTO_SOURCE, record.photoSource) : "";
+
+  if (rows.length === 0 && !photoUrl) return null;
+
+  return (
+    <div className="space-y-3">
+      {rows.length > 0 && (
+        <dl className="space-y-2">
+          {rows.map(([key, value]) => (
+            <div key={key}>
+              <dt className="text-[11px] uppercase tracking-wide text-neutral-500">{label(BRIEF_KEYS, key)}</dt>
+              <dd className="text-sm text-neutral-200">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {photoUrl && (
+        <div className="flex items-center gap-3">
+          <a href={photoUrl} target="_blank" rel="noreferrer" title="Abrir la foto original" className="shrink-0">
+            <img src={photoUrl} alt="" className="h-12 w-12 rounded-lg border border-ink-700 object-cover" />
+          </a>
+          <div>
+            <p className="text-[11px] uppercase tracking-wide text-neutral-500">Foto</p>
+            {photoSource && <p className="text-xs text-neutral-400">{photoSource}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 interface DetailPageProps {
   params: Promise<{ date: string }>;
-  searchParams: Promise<{ month?: string; view?: string; slot?: string }>;
+  searchParams: Promise<{ month?: string; view?: string; slot?: string; filtro?: string }>;
 }
 
 export default async function CalendarDetailPage({ params, searchParams }: DetailPageProps) {
@@ -123,6 +228,11 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const sp = await searchParams;
   const backMonth = sp.month ?? date.slice(0, 7);
   const backView = sp.view ?? "grid";
+  // Round-trips the "solo atención" filter through the day detail page —
+  // without this, filtering the list to what needs attention and opening one
+  // loses the filter on the way back, dropping the reviewer back into the
+  // full unfiltered month.
+  const backFilterQuery = sp.filtro === "atencion" ? "&filtro=atencion" : "";
   // A day can hold more than one publication (see `tenants.publish_hours`),
   // so the date alone no longer identifies a slot: `?slot=` says which one is
   // being viewed. Without the param, the day's first.
@@ -175,345 +285,342 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const otherPhotoFrameCreatives = photoFrameCreatives.filter((c) => c.id !== creative?.id);
   const isAppendable = (c: SlotCreative) => !c.publications?.some((p) => p.status === "published");
 
+  const displayState = slot ? slotDisplayState(slot, creative, limaToday()) : null;
+  const isGenerating = creative?.status === "pending" || creative?.status === "rendering";
+  const caption = asRecord(creative?.brief)?.caption;
+  const captionText = typeof caption === "string" ? caption : "";
+
+  const backHref = `/calendar?month=${backMonth}&view=${backView}${backFilterQuery}`;
+  const title =
+    capitalize(formatCalendarDay(date)) +
+    (slot?.publish_hour !== null && slot?.publish_hour !== undefined ? ` · ${formatHour(slot.publish_hour)}` : "");
+
   return (
     <div className="space-y-6">
-      <Link
-        href={`/calendar?month=${backMonth}&view=${backView}`}
-        className="text-sm text-pulso-accent hover:underline"
-      >
-        ← Volver al calendario
+      <Link href={backHref} className={buttonClass("link", "sm", "text-sm")}>
+        <ArrowLeft size={14} aria-hidden="true" />
+        Volver al calendario
       </Link>
 
-      <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
-          {date}
-          {slot?.publish_hour !== null && slot?.publish_hour !== undefined && ` · ${slot.publish_hour}:00`}
-        </p>
-        <h1 className="font-display text-2xl font-semibold">{slot?.theme ?? "Sin contenido planificado"}</h1>
-        {slots.length > 1 && (
-          <div className="mt-3 flex gap-2">
-            {slots.map((daySlot) => (
-              <Link
-                key={daySlot.id}
-                href={`/calendar/${date}?month=${backMonth}&view=${backView}&slot=${daySlot.slot_index}`}
-                className={
-                  daySlot.slot_index === slotIndex
-                    ? "rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white"
-                    : "rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-400 hover:border-pulso-accent/60 hover:text-neutral-200"
-                }
-              >
-                {daySlot.publish_hour === null ? `Slot ${daySlot.slot_index + 1}` : `${daySlot.publish_hour}:00`}
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      <PageHeader
+        eyebrow={ctx.tenantName}
+        title={title}
+        description={slot?.theme ?? "Sin contenido planificado"}
+        actions={
+          slots.length > 1 ? (
+            <Segmented
+              ariaLabel="Publicación del día"
+              items={slots.map((daySlot) => ({
+                href: `/calendar/${date}?month=${backMonth}&view=${backView}&slot=${daySlot.slot_index}${backFilterQuery}`,
+                label:
+                  daySlot.publish_hour === null
+                    ? `Publicación ${daySlot.slot_index + 1}`
+                    : formatHour(daySlot.publish_hour),
+                active: daySlot.slot_index === slotIndex,
+              }))}
+            />
+          ) : undefined
+        }
+      />
 
-      {slot && (
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="overflow-hidden rounded-xl border border-ink-700 bg-ink-900">
-          {creative && creative.status !== "failed" ? (
-            creative.type === "video" ? (
-              <video
-                src={`${RENDER_TEMPLATES_URL}/api/render/${creative.id}.mp4`}
-                className="w-full"
-                controls
-              />
-            ) : (
-              <img
-                src={`${RENDER_TEMPLATES_URL}/api/render/${creative.id}.png`}
-                alt=""
-                className="w-full"
-              />
-            )
-          ) : creative?.status === "failed" ? (
-            <div className="flex h-64 items-center justify-center text-status-pink">⚠ Falló el render</div>
-          ) : (
-            <div className="flex h-64 items-center justify-center text-neutral-600">
-              {slot.status === "approved" ? "generando…" : "sin creative todavía"}
-            </div>
-          )}
-
-          {creative && creative.asset_urls && creative.asset_urls.length > 1 && (
-            <div className="border-t border-ink-700 p-3">
-              <p className="mb-2 text-xs text-neutral-500">
-                {creative.asset_urls.length}{" "}
-                {creative.type === "carousel"
-                  ? "slides — pasa el mouse sobre uno para regenerarlo con IA (↻) o reemplazarlo con tu propia foto (⤴)."
-                  : "fotos listas — click para descargar cada una"}
-                {photoFrame && creative.template_id === photoFrame.id && isAppendable(creative)
-                  ? ", pasa el mouse y click en × para eliminar una"
-                  : ""}
-              </p>
-              {creative.type === "carousel" ? (
-                <CarouselSlideGrid
-                  urls={creative.asset_urls}
-                  creativeId={creative.id}
-                  tenantId={ctx.tenantId}
-                  date={date}
-                  slotIndex={slotIndex}
-                />
-              ) : (
-                <ThumbnailGrid
-                  urls={creative.asset_urls}
-                  creativeId={creative.id}
-                  tenantId={ctx.tenantId}
-                  date={date}
-                  canDelete={Boolean(photoFrame && creative.template_id === photoFrame.id && isAppendable(creative))}
-                />
-              )}
-            </div>
-          )}
-
-          {creative && photoFrame && creative.template_id === photoFrame.id && isAppendable(creative) && (
-            <form
-              action={addPhotosToCreativeAction}
-              className="flex flex-wrap items-end gap-3 border-t border-ink-700 p-3"
-            >
-              <input type="hidden" name="tenantId" value={ctx.tenantId} />
-              <input type="hidden" name="date" value={date} />
-              <input type="hidden" name="creativeId" value={creative.id} />
-              <div className="min-w-[220px] flex-1">
-                <MediaDropzone
-                  name="photos"
-                  accept="image/*"
-                  label="Agregar más fotos a esta publicación"
-                  hint="Arrastra fotos acá o haz click para elegir"
+      {slot && displayState && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <Card padding="none" className="overflow-hidden">
+            {creative && creative.status === "failed" ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={<AlertTriangle size={28} aria-hidden="true" />}
+                  title="Falló la generación de la pieza"
+                  description="Escribe una indicación y usa «Guardar y regenerar», o elimina la pieza para dejar el día libre."
                 />
               </div>
-              <SubmitButton
-                pendingText="Agregando…"
-                className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Agregar fotos
-              </SubmitButton>
-            </form>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-xl border border-ink-700 bg-ink-900 p-4 text-sm">
-            <p className={labelClass}>Estado</p>
-            <p className="text-neutral-200">
-              Slot: <span className="text-neutral-400">{slot.status}</span>
-              {creative && (
-                <>
-                  {" · "}Creative: <span className="text-neutral-400">{creative.status}</span>
-                </>
-              )}
-            </p>
-            {slot.hold_publish && (
-              <p className="mt-2 rounded-lg bg-status-pink/15 px-3 py-1.5 text-xs font-medium text-status-pink">
-                ⏸ No publicar activado — la publicación automática de este día está en pausa. La generación
-                sigue normal.
-              </p>
+            ) : creative && isGenerating ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={<Loader2 size={28} className="animate-spin" aria-hidden="true" />}
+                  title="Generando la pieza…"
+                  description="Suele tardar entre 1 y 3 minutos. Recarga la página para ver si ya está."
+                />
+              </div>
+            ) : creative ? (
+              creative.type === "video" ? (
+                <video src={`${RENDER_TEMPLATES_URL}/api/render/${creative.id}.mp4`} className="w-full" controls />
+              ) : (
+                <CreativePreview src={`${RENDER_TEMPLATES_URL}/api/render/${creative.id}.png`} />
+              )
+            ) : slot.status === "approved" ? (
+              <div className="p-4">
+                <EmptyState
+                  icon={<Loader2 size={28} className="animate-spin" aria-hidden="true" />}
+                  title="Generando la pieza…"
+                  description="Suele tardar entre 1 y 3 minutos. Recarga la página para ver si ya está."
+                />
+              </div>
+            ) : (
+              <div className="p-4">
+                <EmptyState
+                  icon={<ImageOff size={28} aria-hidden="true" />}
+                  title="Sin pieza todavía"
+                  description="Cambia el estado a «Aprobado» y guarda para que el agente creativo la genere."
+                />
+              </div>
             )}
 
-            <div className="mt-3 border-t border-ink-700 pt-3">
-              <MoveDateForm tenantId={ctx.tenantId} slotId={slot.id} date={date} />
-            </div>
-
-            {creative?.brief ? (
-              <div className="mt-3 space-y-1 border-t border-ink-700 pt-3 text-neutral-400">
-                {typeof creative.brief === "object" &&
-                  creative.brief !== null &&
-                  Object.entries(creative.brief as Record<string, unknown>).map(([key, value]) =>
-                    key !== "caption" && typeof value === "string" && value ? (
-                      <p key={key}>
-                        <span className="text-neutral-600">{key}:</span> {value}
-                      </p>
-                    ) : null,
-                  )}
+            {creative && creative.asset_urls && creative.asset_urls.length > 1 && (
+              <div className="border-t border-ink-700 p-3">
+                <p className="mb-2 text-xs text-neutral-500">
+                  {creative.asset_urls.length}{" "}
+                  {creative.type === "carousel"
+                    ? "slides — pasa el mouse sobre uno para regenerarlo con IA o reemplazarlo con tu propia foto."
+                    : "fotos listas — click para descargar cada una"}
+                  {photoFrame && creative.template_id === photoFrame.id && isAppendable(creative)
+                    ? ", pasa el mouse y usa la × para eliminar una"
+                    : ""}
+                </p>
+                {creative.type === "carousel" ? (
+                  <CarouselSlideGrid
+                    urls={creative.asset_urls}
+                    creativeId={creative.id}
+                    tenantId={ctx.tenantId}
+                    date={date}
+                    slotIndex={slotIndex}
+                  />
+                ) : (
+                  <ThumbnailGrid
+                    urls={creative.asset_urls}
+                    creativeId={creative.id}
+                    tenantId={ctx.tenantId}
+                    date={date}
+                    canDelete={Boolean(photoFrame && creative.template_id === photoFrame.id && isAppendable(creative))}
+                  />
+                )}
               </div>
-            ) : null}
+            )}
+
+            {creative && photoFrame && creative.template_id === photoFrame.id && isAppendable(creative) && (
+              <form action={addPhotosToCreativeAction} className="flex flex-wrap items-end gap-3 border-t border-ink-700 p-3">
+                <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                <input type="hidden" name="date" value={date} />
+                <input type="hidden" name="creativeId" value={creative.id} />
+                <div className="min-w-[220px] flex-1">
+                  <MediaDropzone
+                    name="photos"
+                    accept="image/*"
+                    label="Agregar más fotos a esta publicación"
+                    hint="Arrastra fotos acá o haz click para elegir"
+                  />
+                </div>
+                <SubmitButton variant="primary" size="sm" pendingText="Agregando…">
+                  Agregar fotos
+                </SubmitButton>
+              </form>
+            )}
+          </Card>
+
+          <div className="space-y-4">
+            <Card padding="sm">
+              <CardHeader
+                title="Estado"
+                actions={<StatusBadge tone={displayState.tone}>{displayState.label}</StatusBadge>}
+              />
+
+              <div className="space-y-4 text-sm">
+                {slot.hold_publish && (
+                  <p className="rounded-lg bg-status-orange/10 px-3 py-2 text-xs text-status-orange">
+                    La publicación automática de este día está en pausa. La generación sigue normal.
+                  </p>
+                )}
+
+                {creative?.publications && creative.publications.length > 0 && (
+                  <div>
+                    <p className="mb-1.5 text-[11px] uppercase tracking-wide text-neutral-500">Publicaciones</p>
+                    <PublicationBadges publications={creative.publications} />
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {creative && creative.status !== "approved" && (
+                    <form action={approveCreativeAction}>
+                      <input type="hidden" name="creativeId" value={creative.id} />
+                      <SubmitButton variant="success" size="sm" pendingText="Aprobando…">
+                        Aprobar
+                      </SubmitButton>
+                    </form>
+                  )}
+                  {creative?.status === "approved" && (
+                    <form action={requestPublishAction}>
+                      <input type="hidden" name="creativeId" value={creative.id} />
+                      <SubmitButton
+                        variant="primary"
+                        size="sm"
+                        pendingText="Publicando…"
+                        confirmMessage="Se publicará ahora en las redes conectadas. ¿Continuar?"
+                      >
+                        Publicar
+                      </SubmitButton>
+                    </form>
+                  )}
+                  <form action={toggleHoldPublishAction}>
+                    <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                    <input type="hidden" name="slotId" value={slot.id} />
+                    <input type="hidden" name="date" value={date} />
+                    <input type="hidden" name="holdPublish" value={String(!slot.hold_publish)} />
+                    <SubmitButton
+                      variant={slot.hold_publish ? "secondary" : "dangerGhost"}
+                      size="sm"
+                      pendingText="Guardando…"
+                      title={
+                        slot.hold_publish
+                          ? "Vuelve a permitir que este día se publique solo"
+                          : "El contenido se sigue generando normal — solo bloquea que se publique automáticamente"
+                      }
+                    >
+                      {slot.hold_publish ? "Reactivar publicación automática" : "No publicar"}
+                    </SubmitButton>
+                  </form>
+                  {creative && (
+                    <form action={deleteCreativeAction}>
+                      <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                      <input type="hidden" name="slotId" value={slot.id} />
+                      <input type="hidden" name="date" value={date} />
+                      <input type="hidden" name="creativeId" value={creative.id} />
+                      <SubmitButton
+                        variant="dangerGhost"
+                        size="sm"
+                        pendingText="Eliminando…"
+                        confirmMessage="¿Eliminar esta pieza? Se borra el creative y lo generado — el día queda libre en borrador. Esto no se puede deshacer."
+                        title="Borra esta pieza y deja el día libre (no se puede si ya se publicó de verdad)"
+                      >
+                        Eliminar
+                      </SubmitButton>
+                    </form>
+                  )}
+                </div>
+
+                <div className="border-t border-ink-700 pt-4">
+                  <MoveDateForm tenantId={ctx.tenantId} slotId={slot.id} date={date} />
+                </div>
+              </div>
+            </Card>
 
             {creative && (
-              <CaptionForm
-                tenantId={ctx.tenantId}
-                creativeId={creative.id}
-                date={date}
-                caption={
-                  typeof (creative.brief as { caption?: unknown } | null)?.caption === "string"
-                    ? ((creative.brief as { caption: string }).caption)
-                    : ""
-                }
-              />
+              <Card padding="sm">
+                <CardHeader
+                  title="Contenido de la pieza"
+                  description="Lo que el agente creativo armó para este día."
+                />
+                <div className="space-y-4">
+                  <BriefRows brief={creative.brief} />
+                  <div className="border-t border-ink-700 pt-4">
+                    <CaptionForm tenantId={ctx.tenantId} creativeId={creative.id} date={date} caption={captionText} />
+                  </div>
+                </div>
+              </Card>
             )}
 
-            {creative?.publications && creative.publications.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2 border-t border-ink-700 pt-3 text-xs">
-                {creative.publications.map((pub, i) => (
-                  <span
-                    key={i}
-                    className={pub.status === "published" ? "text-emerald-400" : "text-status-pink"}
-                    title={pub.error_message ?? undefined}
-                  >
-                    {pub.status === "published" ? "✓" : "✗"} {pub.platform}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <div className="mt-3 flex flex-wrap gap-2 border-t border-ink-700 pt-3">
-              {creative && creative.status !== "approved" && (
-                <form action={approveCreativeAction}>
-                  <input type="hidden" name="creativeId" value={creative.id} />
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
-                  >
-                    Aprobar
-                  </button>
-                </form>
-              )}
-              {creative?.status === "approved" && (
-                <form action={requestPublishAction}>
-                  <input type="hidden" name="creativeId" value={creative.id} />
-                  <button
-                    type="submit"
-                    className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
-                  >
-                    Publicar
-                  </button>
-                </form>
-              )}
-              <form action={toggleHoldPublishAction}>
-                <input type="hidden" name="tenantId" value={ctx.tenantId} />
+            <Card padding="sm">
+              <CardHeader title="Planificación" description="Tema, tipo y estado del día." />
+              <form action={updateCalendarSlotAction} className="space-y-3">
                 <input type="hidden" name="slotId" value={slot.id} />
-                <input type="hidden" name="date" value={date} />
-                <input type="hidden" name="holdPublish" value={String(!slot.hold_publish)} />
-                <button
-                  type="submit"
-                  title={
-                    slot.hold_publish
-                      ? "Vuelve a permitir que este día se publique solo"
-                      : "El contenido se sigue generando normal — solo bloquea que se publique automáticamente"
-                  }
-                  className={
-                    slot.hold_publish
-                      ? "rounded-lg bg-status-pink px-3 py-1.5 text-sm font-medium text-white hover:bg-status-pink/80"
-                      : "rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-300 hover:border-status-pink/60 hover:text-status-pink"
-                  }
+                {creative && <input type="hidden" name="creativeId" value={creative.id} />}
+                <input type="hidden" name="calendarSlotId" value={slot.id} />
+
+                <Field id="slot-theme" label="Tema">
+                  <input id="slot-theme" name="theme" defaultValue={slot.theme} className={inputClass} />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field id="slot-type" label="Tipo">
+                    <select id="slot-type" name="slotType" defaultValue={slot.slot_type} className={selectClass}>
+                      {SELECT_OPTIONS.slotType.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.text}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field id="slot-status" label="Estado">
+                    <select id="slot-status" name="status" defaultValue={slot.status} className={selectClass}>
+                      {SELECT_OPTIONS.slotStatus.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.text}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+                <Field
+                  id="slot-notes"
+                  label="Indicación para mejorar esta pieza"
+                  hint="Se usa para el texto (titular, subtítulo, precio) tanto en imágenes como en videos. Cambios de tamaño de letra, layout o recorte de video todavía no son ajustables desde acá."
                 >
-                  {slot.hold_publish ? "Reactivar publicación automática" : "No publicar"}
-                </button>
-              </form>
-              {creative && (
-                <form action={deleteCreativeAction}>
-                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
-                  <input type="hidden" name="slotId" value={slot.id} />
-                  <input type="hidden" name="date" value={date} />
-                  <input type="hidden" name="creativeId" value={creative.id} />
-                  <SubmitButton
-                    pendingText="Eliminando…"
-                    confirmMessage="¿Eliminar esta pieza? Se borra el creative y lo generado — el día queda libre en borrador. Esto no se puede deshacer."
-                    title="Borra esta pieza y deja el día libre (no se puede si ya se publicó de verdad)"
-                    className="rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-400 hover:border-red-500/60 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Eliminar
+                  <textarea
+                    id="slot-notes"
+                    name="notes"
+                    rows={4}
+                    defaultValue={slot.notes ?? ""}
+                    placeholder="Ej: usa un tono más cercano, agranda la idea principal, prueba con otra foto…"
+                    className={textareaClass}
+                  />
+                </Field>
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <SubmitButton variant="secondary" size="sm" pendingText="Guardando…">
+                    Guardar
                   </SubmitButton>
-                </form>
-              )}
-            </div>
+                  {creative && (
+                    <SubmitButton
+                      variant="danger"
+                      size="sm"
+                      formAction={regenerateCreativeAction}
+                      pendingText="Regenerando…"
+                      confirmMessage="Borra la pieza actual y crea otra. ¿Continuar?"
+                    >
+                      Guardar y regenerar
+                    </SubmitButton>
+                  )}
+                </div>
+              </form>
+            </Card>
           </div>
-
-          <form action={updateCalendarSlotAction} className="rounded-xl border border-ink-700 bg-ink-900 p-4">
-            <input type="hidden" name="slotId" value={slot.id} />
-            {creative && <input type="hidden" name="creativeId" value={creative.id} />}
-            <input type="hidden" name="calendarSlotId" value={slot.id} />
-
-            <div className="mb-3">
-              <label className={labelClass}>Tema</label>
-              <input name="theme" defaultValue={slot.theme} className={fieldClass} />
-            </div>
-            <div className="mb-3 grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Tipo</label>
-                <select name="slotType" defaultValue={slot.slot_type} className={fieldClass}>
-                  <option value="post">post</option>
-                  <option value="carousel">carousel</option>
-                  <option value="story">story</option>
-                  <option value="reel">reel</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Estado</label>
-                <select name="status" defaultValue={slot.status} className={fieldClass}>
-                  <option value="draft">draft</option>
-                  <option value="approved">approved</option>
-                  <option value="skipped">skipped</option>
-                </select>
-              </div>
-            </div>
-            <div className="mb-4">
-              <label className={labelClass}>Indicación para mejorar esta pieza</label>
-              <textarea
-                name="notes"
-                rows={4}
-                defaultValue={slot.notes ?? ""}
-                placeholder="Ej: usa un tono más cercano, agranda la idea principal, prueba con otra foto…"
-                className={fieldClass}
-              />
-              <p className="mt-1 text-xs text-neutral-600">
-                Se usa para el texto (titular, subtítulo, precio) tanto en imágenes como en videos. Cambios de
-                tamaño de letra, layout o recorte de video todavía no son ajustables desde acá.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="submit"
-                className="rounded-lg border border-ink-700 px-3 py-1.5 text-sm text-neutral-200 hover:border-pulso-accent/60"
-              >
-                Guardar
-              </button>
-              {creative && (
-                <button
-                  type="submit"
-                  formAction={regenerateCreativeAction}
-                  className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
-                >
-                  Guardar y regenerar
-                </button>
-              )}
-            </div>
-          </form>
         </div>
-      </div>
       )}
 
       {otherPhotoFrameCreatives.length > 0 && (
-        <Card className="p-5">
-          <CardHeader title="Otras publicaciones con marco de este día" />
+        <Card>
+          <CardHeader
+            title="Otras publicaciones con marco de este día"
+            description="Piezas creadas a mano para este mismo día, además de la principal."
+          />
           <div className="space-y-4">
             {otherPhotoFrameCreatives.map((c) => (
-              <div key={c.id} className="rounded-xl border border-ink-700 bg-ink-900 p-4">
+              <Card key={c.id} padding="sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm text-neutral-300">
-                    {(c.asset_urls?.length ?? 0)} foto{(c.asset_urls?.length ?? 0) !== 1 ? "s" : ""} ·{" "}
-                    <span className="text-neutral-500">{c.status}</span>
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+                    <span>
+                      {c.asset_urls?.length ?? 0} foto{(c.asset_urls?.length ?? 0) !== 1 ? "s" : ""}
+                    </span>
+                    <StatusBadge tone={creativeTone(c.status)}>{label(CREATIVE_STATUS, c.status)}</StatusBadge>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {c.status !== "approved" && (
                       <form action={approveCreativeAction}>
                         <input type="hidden" name="creativeId" value={c.id} />
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
-                        >
+                        <SubmitButton variant="success" size="sm" pendingText="Aprobando…">
                           Aprobar
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                     {c.status === "approved" && (
                       <form action={requestPublishAction}>
                         <input type="hidden" name="creativeId" value={c.id} />
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
+                        <SubmitButton
+                          variant="primary"
+                          size="sm"
+                          pendingText="Publicando…"
+                          confirmMessage="Se publicará ahora en las redes conectadas. ¿Continuar?"
                         >
                           Publicar
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                   </div>
@@ -534,10 +641,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 <PublicationBadges publications={c.publications} />
 
                 {isAppendable(c) && (
-                  <form
-                    action={addPhotosToCreativeAction}
-                    className="mt-3 flex flex-wrap items-end gap-3 border-t border-ink-700 pt-3"
-                  >
+                  <form action={addPhotosToCreativeAction} className="mt-3 flex flex-wrap items-end gap-3 border-t border-ink-700 pt-3">
                     <input type="hidden" name="tenantId" value={ctx.tenantId} />
                     <input type="hidden" name="date" value={date} />
                     <input type="hidden" name="creativeId" value={c.id} />
@@ -549,56 +653,47 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                         hint="Arrastra fotos acá o haz click para elegir"
                       />
                     </div>
-                    <SubmitButton
-                      pendingText="Agregando…"
-                      className="rounded-lg bg-pulso-primary px-3 py-1.5 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-                    >
+                    <SubmitButton variant="primary" size="sm" pendingText="Agregando…">
                       Agregar fotos
                     </SubmitButton>
                   </form>
                 )}
-              </div>
+              </Card>
             ))}
           </div>
         </Card>
       )}
 
       {photoFrame && (
-        <Card className="p-5">
-          <CardHeader title="Crear nueva publicación con marco" />
+        <Card>
+          <CardHeader
+            title="Crear nueva publicación con marco"
+            description="Una publicación nueva y separada para este día."
+          />
           <p className="mb-4 text-sm text-neutral-500">
-            Esto arma una publicación <strong>nueva y separada</strong> para este día — úsalo cuando
-            quieras publicar otra cosa distinta, no para sumar fotos a la que ya hiciste (para eso usa
-            &quot;Agregar más fotos&quot; arriba). Sube una o varias fotos — cada una se compone
-            automáticamente detrás de tu marco (configurado en Marca). Una foto crea una publicación
-            normal; dos o más crean un carrusel.
+            Úsalo cuando quieras publicar otra cosa distinta, no para sumar fotos a la que ya hiciste (para eso
+            usa &quot;Agregar más fotos&quot; arriba). Sube una o varias fotos — cada una se compone
+            automáticamente detrás de tu marco (configurado en Marca). Una foto crea una publicación normal;
+            dos o más crean un carrusel.
           </p>
           <form action={createPhotoFrameCreativeAction} className="space-y-4">
             <input type="hidden" name="tenantId" value={ctx.tenantId} />
             <input type="hidden" name="date" value={date} />
             <input type="hidden" name="slotIndex" value={slotIndex} />
 
-            <MediaDropzone
-              name="photos"
-              accept="image/*"
-              label="Fotos"
-              hint="Arrastra fotos acá o haz click para elegir"
-            />
+            <MediaDropzone name="photos" accept="image/*" label="Fotos" hint="Arrastra fotos acá o haz click para elegir" />
 
-            <div>
-              <label className={labelClass}>Texto de la publicación</label>
+            <Field id="photo-frame-caption" label="Texto de la publicación">
               <textarea
+                id="photo-frame-caption"
                 name="caption"
                 rows={3}
                 placeholder="Ej: Nuestra categoría Sub-13 se enfrentó a Academia Los Leones…"
-                className={fieldClass}
+                className={textareaClass}
               />
-            </div>
+            </Field>
 
-            <SubmitButton
-              pendingText="Creando…"
-              className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
+            <SubmitButton variant="primary" pendingText="Creando…">
               Crear publicación
             </SubmitButton>
           </form>
@@ -606,12 +701,11 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
       )}
 
       {studentShowcase && (
-        <Card className="p-5">
-          <CardHeader title="Alumna destacada" />
+        <Card>
+          <CardHeader title="Alumna destacada" description="Arma el carrusel de una alumna con lo que tengas de cada tipo." />
           <p className="mb-4 text-sm text-neutral-500">
-            Arma el carrusel de una alumna: sube lo que tengas de cada tipo — fotos de sus trabajos,
-            certificado, retrato — cada una es opcional, y el carrusel sale solo con las que llenes,
-            siempre en ese orden.
+            Sube fotos de sus trabajos, certificado y retrato — cada una es opcional, y el carrusel sale solo con
+            las que llenes, siempre en ese orden.
           </p>
           <form action={createStudentShowcaseCreativeAction} className="space-y-4">
             <input type="hidden" name="tenantId" value={ctx.tenantId} />
@@ -619,26 +713,29 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
             <input type="hidden" name="slotIndex" value={slotIndex} />
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>Nombre del evento</label>
+              <Field id="showcase-event-name" label="Nombre del evento" required>
                 <input
+                  id="showcase-event-name"
                   name="eventName"
                   required
                   placeholder="Expo Desfile Joyería Punto Peruano"
-                  className={fieldClass}
+                  className={inputClass}
                 />
-              </div>
-              <div>
-                <label className={labelClass}>Año</label>
-                <input name="eventYear" required placeholder="2026" className={fieldClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Nombre de la alumna</label>
-                <input name="studentName" required placeholder="Diana Gonzales" className={fieldClass} />
-              </div>
-              <div>
-                <label className={labelClass}>País (opcional, agrega la bandera)</label>
-                <select name="countryCode" defaultValue="" className={fieldClass}>
+              </Field>
+              <Field id="showcase-event-year" label="Año" required>
+                <input id="showcase-event-year" name="eventYear" required placeholder="2026" className={inputClass} />
+              </Field>
+              <Field id="showcase-student-name" label="Nombre de la alumna" required>
+                <input
+                  id="showcase-student-name"
+                  name="studentName"
+                  required
+                  placeholder="Diana Gonzales"
+                  className={inputClass}
+                />
+              </Field>
+              <Field id="showcase-country" label="País" hint="Opcional — agrega la bandera al carrusel.">
+                <select id="showcase-country" name="countryCode" defaultValue="" className={selectClass}>
                   <option value="">Sin bandera</option>
                   {STUDENT_COUNTRIES.map((c) => (
                     <option key={c.code} value={c.code}>
@@ -646,55 +743,43 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
             </div>
 
-            <div>
-              <label className={labelClass}>Trabajos de la alumna (1 o 2 fotos)</label>
-              <MediaDropzone
-                name="photosWork"
-                accept="image/*"
-                label="Fotos de trabajos"
-                hint="Arrastra hasta 2 fotos, o deja vacío para omitir este slide"
-              />
-            </div>
+            <MediaDropzone
+              name="photosWork"
+              accept="image/*"
+              label="Trabajos de la alumna (1 o 2 fotos)"
+              hint="Arrastra hasta 2 fotos, o deja vacío para omitir este slide"
+            />
 
-            <div>
-              <label className={labelClass}>Certificado (1 foto)</label>
-              <MediaDropzone
-                name="photoCertificate"
-                accept="image/*"
-                label="Certificado"
-                hint="Una foto, o deja vacío para omitir este slide"
-                multiple={false}
-              />
-            </div>
+            <MediaDropzone
+              name="photoCertificate"
+              accept="image/*"
+              label="Certificado (1 foto)"
+              hint="Una foto, o deja vacío para omitir este slide"
+              multiple={false}
+            />
 
-            <div>
-              <label className={labelClass}>Retrato (1 foto)</label>
-              <MediaDropzone
-                name="photoPortrait"
-                accept="image/*"
-                label="Retrato"
-                hint="Una foto, o deja vacío para omitir este slide"
-                multiple={false}
-              />
-            </div>
+            <MediaDropzone
+              name="photoPortrait"
+              accept="image/*"
+              label="Retrato (1 foto)"
+              hint="Una foto, o deja vacío para omitir este slide"
+              multiple={false}
+            />
 
-            <div>
-              <label className={labelClass}>Texto de la publicación</label>
+            <Field id="showcase-caption" label="Texto de la publicación">
               <textarea
+                id="showcase-caption"
                 name="caption"
                 rows={3}
                 placeholder="Ej: Felicitamos a Diana por su certificación como especialista…"
-                className={fieldClass}
+                className={textareaClass}
               />
-            </div>
+            </Field>
 
-            <SubmitButton
-              pendingText="Creando…"
-              className="rounded-lg bg-pulso-primary px-4 py-2 text-sm font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent disabled:cursor-not-allowed disabled:opacity-60"
-            >
+            <SubmitButton variant="primary" pendingText="Creando…">
               Crear publicación
             </SubmitButton>
           </form>

@@ -1,106 +1,164 @@
 import { createServiceRoleClient } from "@/lib/supabase/service";
 import { updateTenantLimitsAction } from "@/lib/actions";
+import { SELECT_OPTIONS } from "@/lib/labels";
 import { Card } from "@/components/ui/card";
-import { inputClass } from "@/components/ui/field";
+import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SubmitButton } from "@/components/submit-button";
+import { inputClass, selectClass } from "@/components/ui/field";
+import { Gauge } from "lucide-react";
+
+const COLUMNS = ["Negocio", "Tokens/día", "Tokens/trabajo", "Modo", "% IA", "IA/día", "Reels"];
 
 export default async function AdminLimitsPage() {
   const service = createServiceRoleClient();
   const { data: tenants } = await service
     .from("tenants")
-    .select("id, name, slug, token_limit_daily, token_limit_per_job, hitl_mode, gemini_share, gemini_daily_image_budget")
+    .select(
+      "id, name, slug, token_limit_daily, token_limit_per_job, hitl_mode, gemini_share, gemini_daily_image_budget, reels_paused",
+    )
     .order("name");
+
+  const rows = tenants ?? [];
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
-          Panel interno
-        </p>
-        <h1 className="font-display text-2xl font-semibold">Límites y automatización por tenant</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Límites de tokens: vacío = sin límite (con LM Studio no protege gasto, protege que un agente
-          en loop no sature la máquina local). Modo: quién aprueba cada paso — en{" "}
-          <span className="text-neutral-300">full-auto</span> el sistema publica solo, sin ningún
-          click, en las redes conectadas de ese tenant.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Operador"
+        title="Límites por tenant"
+        description="Tokens: vacío = sin límite (con LM Studio no protege gasto, protege que un agente en loop no sature la máquina). Modo: quién aprueba cada paso — en Automático el sistema publica solo en las redes conectadas de ese negocio."
+      />
 
-      <Card className="overflow-hidden p-5">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-neutral-500">
-              <th className="pb-2">Tenant</th>
-              <th className="pb-2">Límite diario (tokens)</th>
-              <th className="pb-2">Límite por job (tokens)</th>
-              <th className="pb-2"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(tenants ?? []).map((tenant) => (
-              <tr key={tenant.id} className="border-t border-ink-700">
-                <td className="py-2">
-                  {tenant.name} <span className="text-neutral-500">({tenant.slug})</span>
-                </td>
-                <td className="py-2" colSpan={3}>
-                  <form action={updateTenantLimitsAction} className="flex items-center gap-2">
-                    <input type="hidden" name="tenantId" value={tenant.id} />
-                    <input
-                      type="number"
-                      name="tokenLimitDaily"
-                      min={0}
-                      defaultValue={tenant.token_limit_daily ?? ""}
-                      placeholder="sin límite"
-                      className={`w-32 ${inputClass}`}
-                    />
-                    <input
-                      type="number"
-                      name="tokenLimitPerJob"
-                      min={0}
-                      defaultValue={tenant.token_limit_per_job ?? ""}
-                      placeholder="sin límite"
-                      className={`w-32 ${inputClass}`}
-                    />
-                    <select
-                      name="hitlMode"
-                      defaultValue={tenant.hitl_mode}
-                      title="Nivel de automatización: qué se aprueba solo vs. a mano"
-                      className={inputClass}
-                    >
-                      <option value="approve-all">approve-all (todo manual)</option>
-                      <option value="approve-creatives">approve-creatives (slot auto, creative manual)</option>
-                      <option value="full-auto">full-auto (publica solo)</option>
-                    </select>
-                    <input
-                      type="number"
-                      name="geminiShare"
-                      min={0}
-                      max={100}
-                      defaultValue={tenant.gemini_share ?? ""}
-                      placeholder="% IA"
-                      title="Porcentaje objetivo de posts con imagen generada por Gemini (vacío = solo banco de fotos, como siempre)"
-                      className={`w-24 ${inputClass}`}
-                    />
-                    <input
-                      type="number"
-                      name="geminiDailyImageBudget"
-                      min={0}
-                      defaultValue={tenant.gemini_daily_image_budget ?? ""}
-                      placeholder="IA/día"
-                      title="Máximo de imágenes Gemini exitosas por día (vacío = sin tope)"
-                      className={`w-24 ${inputClass}`}
-                    />
-                    <button
-                      type="submit"
-                      className="rounded-lg bg-pulso-primary px-3 py-1.5 text-xs font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"
-                    >
-                      Guardar
-                    </button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <Card padding="none" className="overflow-hidden">
+        {rows.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              icon={<Gauge size={28} />}
+              title="Sin negocios registrados"
+              description="Cuando exista al menos un tenant, sus límites aparecerán aquí."
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-sm">
+              <thead>
+                <tr className="border-b border-ink-700 text-left text-xs uppercase tracking-wide text-neutral-500">
+                  {COLUMNS.map((col) => (
+                    <th key={col} scope="col" className="px-4 py-3 font-medium">
+                      {col}
+                    </th>
+                  ))}
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    <span className="sr-only">Acción</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((tenant) => {
+                  // One form per row, living in the action cell: the inputs in
+                  // the other cells point at it through the `form` attribute,
+                  // which keeps the markup a valid table while the SubmitButton
+                  // stays inside the form for useFormStatus.
+                  const formId = `limits-${tenant.id}`;
+                  return (
+                    <tr key={tenant.id} className="border-b border-ink-700/60 last:border-b-0 hover:bg-ink-800/40">
+                      <td className="px-4 py-3 align-middle">
+                        <p className="font-medium text-neutral-100">{tenant.name}</p>
+                        <p className="text-xs text-neutral-500">{tenant.slug}</p>
+                      </td>
+                      <td className="px-2 py-3 align-middle">
+                        <input
+                          form={formId}
+                          type="number"
+                          name="tokenLimitDaily"
+                          min={0}
+                          defaultValue={tenant.token_limit_daily ?? ""}
+                          placeholder="Sin límite"
+                          aria-label={`Tokens por día de ${tenant.name}`}
+                          className={`min-w-[7rem] ${inputClass}`}
+                        />
+                      </td>
+                      <td className="px-2 py-3 align-middle">
+                        <input
+                          form={formId}
+                          type="number"
+                          name="tokenLimitPerJob"
+                          min={0}
+                          defaultValue={tenant.token_limit_per_job ?? ""}
+                          placeholder="Sin límite"
+                          aria-label={`Tokens por trabajo de ${tenant.name}`}
+                          className={`min-w-[7rem] ${inputClass}`}
+                        />
+                      </td>
+                      <td className="px-2 py-3 align-middle">
+                        <select
+                          form={formId}
+                          name="hitlMode"
+                          defaultValue={tenant.hitl_mode}
+                          title="Nivel de automatización: qué se aprueba solo y qué a mano"
+                          aria-label={`Modo de ${tenant.name}`}
+                          className={`min-w-[11rem] ${selectClass}`}
+                        >
+                          {SELECT_OPTIONS.hitlMode.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.text}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-3 align-middle">
+                        <input
+                          form={formId}
+                          type="number"
+                          name="geminiShare"
+                          min={0}
+                          max={100}
+                          defaultValue={tenant.gemini_share ?? ""}
+                          placeholder="Banco"
+                          title="Porcentaje objetivo de publicaciones con imagen generada (vacío = solo banco de fotos)"
+                          aria-label={`Porcentaje de imágenes IA de ${tenant.name}`}
+                          className={`min-w-[5rem] ${inputClass}`}
+                        />
+                      </td>
+                      <td className="px-2 py-3 align-middle">
+                        <input
+                          form={formId}
+                          type="number"
+                          name="geminiDailyImageBudget"
+                          min={0}
+                          defaultValue={tenant.gemini_daily_image_budget ?? ""}
+                          placeholder="Sin tope"
+                          title="Máximo de imágenes generadas con éxito por día (vacío = sin tope)"
+                          aria-label={`Imágenes IA por día de ${tenant.name}`}
+                          className={`min-w-[5rem] ${inputClass}`}
+                        />
+                      </td>
+                      <td className="px-2 py-3 align-middle text-center">
+                        <input
+                          form={formId}
+                          type="checkbox"
+                          name="reelsPaused"
+                          defaultChecked={tenant.reels_paused}
+                          title="Pausa la generación de reels — el sistema publica un post en su lugar. No afecta posts, carruseles ni historias."
+                          aria-label={`Pausar reels de ${tenant.name}`}
+                          className="h-4 w-4 accent-status-pink"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right align-middle">
+                        <form id={formId} action={updateTenantLimitsAction}>
+                          <input type="hidden" name="tenantId" value={tenant.id} />
+                          <SubmitButton size="sm" pendingText="Guardando…">
+                            Guardar
+                          </SubmitButton>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
