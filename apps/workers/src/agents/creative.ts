@@ -188,6 +188,26 @@ export async function runCreativeAgentForSlot(
         return;
       }
 
+      const tenant = await ctx.db.getTenant();
+
+      // "hasta nuevo aviso" switch (tenants.reels_paused) — real reel bugs
+      // are still open, so instead of leaving these slots stuck forever
+      // (they were already approved as 'reel' weeks out by the Planner, not
+      // just newly proposed ones), reassign to 'post' and generate that
+      // instead. Content still goes out on schedule; nothing renders a reel
+      // while this is on.
+      if (slot.slot_type === "reel" && tenant.reels_paused) {
+        await ctx.db.updateCalendarSlotType(calendarSlotId, "post");
+        slot.slot_type = "post";
+        await ctx.db.insertDecisionLog({
+          agent: "creative",
+          observed: { calendar_slot_id: calendarSlotId, original_slot_type: "reel" },
+          decision: { action: "reassign_slot_type", slot_type: "post" },
+          rationale: "Reels en pausa para este tenant (tenants.reels_paused) — se genera un post en su lugar.",
+          correlation_id: correlationId,
+        });
+      }
+
       const templateName = templateNameForSlotType(slot.slot_type);
       if (!templateName) {
         await skip(`Todavía no hay una plantilla de render para el tipo de slot "${slot.slot_type}".`, {
@@ -211,8 +231,7 @@ export async function runCreativeAgentForSlot(
 
       const service = createServiceRoleClient();
       const config = loadConfig();
-      const [tenant, brandKit, promotions, products, promptTemplate, ephemerides, mediaAssets] = await Promise.all([
-        ctx.db.getTenant(),
+      const [brandKit, promotions, products, promptTemplate, ephemerides, mediaAssets] = await Promise.all([
         ctx.db.getBrandKit(),
         ctx.db.listActivePromotions(),
         ctx.db.listActiveProducts(),
@@ -400,7 +419,12 @@ export async function runCreativeAgentForSlot(
 
         for (const [i, slideText] of slides.entries()) {
           const isMiddle = i > 0 && i < slides.length - 1;
-          const best = rankBankPhotos(bankAssets, { texts: [slot.theme, slideText], now, excludeIds: usedInCarousel })[0];
+          const best = rankBankPhotos(bankAssets, {
+            texts: [slot.theme],
+            hints: [slideText],
+            now,
+            excludeIds: usedInCarousel,
+          })[0];
           let url: string | undefined;
           let source: PhotoSource = "gradient";
           let assetId: string | undefined;
@@ -453,7 +477,8 @@ export async function runCreativeAgentForSlot(
           // the ranked bank only as a fallback — and only if it actually
           // relates, never "any photo is better than none".
           const best = rankBankPhotos(bankAssets, {
-            texts: [newsHeadline, slot.theme, ...keywords],
+            texts: [newsHeadline, slot.theme],
+            hints: keywords,
             now,
             excludeIds,
             preferPortrait,
@@ -478,7 +503,8 @@ export async function runCreativeAgentForSlot(
           }
         } else {
           const best = rankBankPhotos(bankAssets, {
-            texts: [slot.theme, ...keywords, copy.headline, copy.subheadline],
+            texts: [slot.theme],
+            hints: [...keywords, copy.headline, copy.subheadline],
             now,
             excludeIds,
             preferPortrait,

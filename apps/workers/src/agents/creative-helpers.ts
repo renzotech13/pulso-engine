@@ -210,55 +210,106 @@ const STOPWORDS = new Set(
   ).split(/\s+/),
 );
 
-/** Crude stem: lowercase, no diacritics, first 5 letters — "formalización"/"formalizar" agree. */
-const STEM_LENGTH = 5;
+// Crude stem: drop a Spanish plural, then keep six letters. Five collided in
+// practice — "de forma" stemmed to the same thing as "formalización" (a
+// tax-office photo ranked on a shop-tidying theme) and "Te contamos" to the
+// same as "contabilidad". The plural strip is what lets six letters still
+// treat "venta"/"ventas" and "cliente"/"clientes" as one word.
+const STEM_LENGTH = 6;
 
-export function tokenize(text: string): string[] {
-  const seen = new Set<string>();
+function stemWord(word: string): string {
+  const singular =
+    word.length > 4 && word.endsWith("es")
+      ? word.slice(0, -2)
+      : word.length > 3 && word.endsWith("s")
+        ? word.slice(0, -1)
+        : word;
+  return singular.slice(0, STEM_LENGTH);
+}
+
+/** Content words, normalized, stopwords and bare numbers dropped. Not stemmed. */
+function contentWords(text: string): string[] {
   const out: string[] = [];
   for (const raw of normalizeForMatch(text).split(/[^a-z0-9]+/u)) {
     if (raw.length < 3 || /^\d+$/.test(raw) || STOPWORDS.has(raw)) continue;
-    const stem = raw.slice(0, STEM_LENGTH);
-    if (seen.has(stem)) continue;
-    seen.add(stem);
-    out.push(stem);
+    out.push(raw);
   }
   return out;
 }
 
+export function tokenize(text: string): string[] {
+  return [...new Set(contentWords(text).map(stemWord))];
+}
+
 /**
  * Query-side only: a theme that says "RUC" should also reach photos tagged
- * "sunat" or "formalizacion". Keys and values are stems (see tokenize).
+ * "sunat" or "formalizacion". Keyed by WHOLE WORDS, never stems — keying by
+ * stem meant "contamos" pulled in the accounting group and "de forma" the
+ * formalization one. The values get stemmed like anything else at match time.
  */
 export const THEME_SYNONYMS: Record<string, readonly string[]> = {
-  ruc: ["sunat", "forma", "tribu", "negoc"],
-  sunat: ["tribu", "impue", "decla"],
-  decla: ["sunat", "impue", "tribu"],
-  impue: ["sunat", "tribu", "decla"],
-  tribu: ["sunat", "impue"],
-  plani: ["traba", "emple", "equip"],
-  factu: ["venta", "clien", "negoc"],
-  igv: ["impue", "sunat", "venta"],
-  renta: ["impue", "sunat"],
-  mype: ["empre", "negoc", "tiend"],
-  conta: ["docum", "orden", "ofici"],
-  ahorr: ["tranq", "diner"],
-  empre: ["tiend", "talle", "negoc", "empre"],
-  forma: ["sunat", "ruc", "docum"],
-  socio: ["equip", "reuni"],
-  credi: ["banco", "prest", "diner"],
-  banco: ["credi", "prest"],
-  multa: ["sunat", "docum"],
-  yape: ["celul", "venta", "cobro"],
-  const: ["forma", "empre", "docum"],
-  cierr: ["docum", "orden"],
-  fisca: ["sunat", "docum"],
-  buzon: ["sunat", "notif"],
+  ruc: ["sunat", "formalizacion", "tributario", "negocio"],
+  sunat: ["tributario", "impuesto", "declaracion"],
+  declaracion: ["sunat", "impuesto", "tributario"],
+  declarar: ["sunat", "impuesto"],
+  impuesto: ["sunat", "tributario", "declaracion"],
+  impuestos: ["sunat", "tributario", "declaracion"],
+  tributario: ["sunat", "impuesto"],
+  tributaria: ["sunat", "impuesto"],
+  planilla: ["trabajador", "empleado", "equipo"],
+  planillas: ["trabajador", "empleado", "equipo"],
+  factura: ["venta", "cliente", "negocio"],
+  facturas: ["venta", "cliente", "negocio"],
+  facturar: ["venta", "cliente"],
+  igv: ["impuesto", "sunat", "venta"],
+  renta: ["impuesto", "sunat"],
+  mype: ["empresa", "negocio", "tienda"],
+  contabilidad: ["documento", "orden", "oficina"],
+  contable: ["documento", "orden", "oficina"],
+  ahorro: ["tranquilidad", "dinero"],
+  ahorrar: ["tranquilidad", "dinero"],
+  empresa: ["tienda", "taller", "negocio"],
+  formalizacion: ["sunat", "ruc", "documento"],
+  formalizar: ["sunat", "ruc", "documento"],
+  formalizarse: ["sunat", "ruc", "documento"],
+  socio: ["equipo", "reunion"],
+  socios: ["equipo", "reunion"],
+  credito: ["banco", "prestamo", "dinero"],
+  banco: ["credito", "prestamo"],
+  multa: ["sunat", "documento"],
+  multas: ["sunat", "documento"],
+  yape: ["celular", "venta", "cobro"],
+  constitucion: ["formalizacion", "empresa", "documento"],
+  constituir: ["formalizacion", "empresa", "documento"],
+  cierre: ["documento", "orden"],
+  fiscalizacion: ["sunat", "documento"],
+  buzon: ["sunat", "notificacion"],
 };
 
-/** A query token plus its synonyms — matching ANY of them counts as matching the token. */
-function tokenGroup(token: string): string[] {
-  return [token, ...(THEME_SYNONYMS[token] ?? [])];
+interface QueryTerm {
+  stem: string;
+  synonymStems: string[];
+  /** Scored terms set the denominator; hint terms can only add. */
+  scored: boolean;
+}
+
+function buildQueryTerms(scoredText: string, hintText: string): QueryTerm[] {
+  const terms: QueryTerm[] = [];
+  const seen = new Set<string>();
+
+  const collect = (text: string, scored: boolean): void => {
+    for (const word of contentWords(text)) {
+      const stem = stemWord(word);
+      if (seen.has(stem)) continue;
+      seen.add(stem);
+      const synonymStems = [...new Set((THEME_SYNONYMS[word] ?? []).map(stemWord))].filter((s) => s !== stem);
+      terms.push({ stem, synonymStems, scored });
+    }
+  };
+
+  collect(scoredText, true);
+  collect(hintText, false);
+  return terms;
 }
 
 export interface BankPhotoLookup {
@@ -286,6 +337,12 @@ export const MAX_BANK_CANDIDATES = 80;
 const TAG_WEIGHT = 3;
 const FILENAME_WEIGHT = 2;
 const DESCRIPTION_WEIGHT = 1;
+/**
+ * A synonym hit, or a hit on a hint word, counts half of a direct one. Full
+ * weight let a corner-shop photo tagged "negocio" tie a photo tagged "ruc"
+ * on a RUC theme, and the last-used tiebreak then decided which went out.
+ */
+const LOOSE_MATCH_FACTOR = 0.5;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The words of a stock filename minus the `library-{uuid}-` prefix, date stamp and extension. */
@@ -301,22 +358,37 @@ function filenameTokens(url: string): string[] {
 }
 
 export interface RankBankPhotosQuery {
+  /**
+   * What the photo is judged against — normally just the slot theme. These
+   * words set the denominator, so keep them few: folding the headline in
+   * here dropped a perfectly tagged photo from 0.50 to 0.12 on filler words
+   * alone, and pushed the decision back onto the local model's phrasing.
+   */
   texts: readonly (string | undefined)[];
+  /**
+   * Extra context — headline, subheadline, the copywriter's imageKeywords.
+   * A match adds to the score at half weight; a miss costs nothing. This is
+   * what keeps the weak local model off the critical path.
+   */
+  hints?: readonly (string | undefined)[] | undefined;
   now: Date;
   excludeIds?: readonly string[] | undefined;
   preferPortrait?: boolean | undefined;
 }
 
+const joinTexts = (texts: readonly (string | undefined)[] | undefined): string =>
+  (texts ?? []).filter((text): text is string => Boolean(text)).join(" ");
+
 export function rankBankPhotos(
   assets: readonly BankPhotoLookup[],
   query: RankBankPhotosQuery,
 ): RankedBankPhoto[] {
-  const queryTokens = tokenize(query.texts.filter((t): t is string => Boolean(t)).join(" "));
+  const terms = buildQueryTerms(joinTexts(query.texts), joinTexts(query.hints));
   const excluded = new Set(query.excludeIds ?? []);
   const nowMs = query.now.getTime();
-  // Synonyms widen what a token can match but never inflate the denominator:
-  // a one-word theme that hits its photo squarely scores 1.0, not 1/(1+n).
-  const maxScore = TAG_WEIGHT * queryTokens.length;
+  // Only the scored terms (the theme) size the denominator — synonyms and
+  // hints widen what can match without ever diluting.
+  const maxScore = TAG_WEIGHT * terms.filter((term) => term.scored).length;
 
   const ranked: RankedBankPhoto[] = [];
   for (const asset of assets.slice(0, MAX_BANK_CANDIDATES)) {
@@ -330,23 +402,29 @@ export function rankBankPhotos(
 
     let sum = 0;
     const matched: string[] = [];
-    for (const token of queryTokens) {
-      let bestWeight = 0;
-      let bestWord = token;
-      for (const word of tokenGroup(token)) {
-        const weight = weightOf(word);
-        if (weight > bestWeight) {
-          bestWeight = weight;
-          bestWord = word;
+    for (const term of terms) {
+      const directWeight = weightOf(term.stem);
+      let weight = directWeight;
+      let via = term.stem;
+      if (directWeight === 0) {
+        for (const synonym of term.synonymStems) {
+          const synonymWeight = weightOf(synonym) * LOOSE_MATCH_FACTOR;
+          if (synonymWeight > weight) {
+            weight = synonymWeight;
+            via = `${term.stem}→${synonym}`;
+          }
         }
       }
-      if (bestWeight === 0) continue;
-      sum += bestWeight;
-      // "ruc→sunat" in the decision log says which synonym did the work.
-      matched.push(bestWord === token ? token : `${token}→${bestWord}`);
+      if (weight === 0) continue;
+      // A hint is advisory context, not what the photo is judged on.
+      if (!term.scored) weight *= LOOSE_MATCH_FACTOR;
+      sum += weight;
+      matched.push(term.scored && via === term.stem ? via : `~${via}`);
     }
 
-    let score = maxScore > 0 ? sum / maxScore : 0;
+    // Hints and synonyms can push the numerator past the denominator; the
+    // score stays a 0-1 "how well does this photo fit" for the thresholds.
+    let score = maxScore > 0 ? Math.min(1, sum / maxScore) : 0;
     if (asset.last_used_at) {
       const ageDays = (nowMs - Date.parse(asset.last_used_at)) / DAY_MS;
       if (ageDays <= 3) score *= 0.2;
@@ -389,8 +467,13 @@ export interface PhotoSourceDecisionInput {
  */
 export function decidePhotoSource(input: PhotoSourceDecisionInput): "bank" | "gemini" | "gradient" {
   if (input.bestBankScore === null) return input.geminiAvailable ? "gemini" : "gradient";
-  if (!input.geminiAvailable) return "bank";
+  // Legacy first: a tenant with no share configured keeps pure rotation,
+  // relevant photo or not — exactly what it had before this policy existed.
   if (input.geminiShare === null || input.geminiShare === 0) return "bank";
+  // Share configured but Gemini is out (no key, or the daily budget spent):
+  // still never publish an unrelated photo — that is the whole complaint
+  // this replaces. The gradient is the honest fallback.
+  if (!input.geminiAvailable) return input.bestBankScore >= BANK_WEAK_MATCH ? "bank" : "gradient";
 
   const recent = input.recentSources.filter((s) => s === "bank" || s === "gemini");
   const lastN = (n: number) => recent.slice(0, n);

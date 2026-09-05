@@ -225,12 +225,29 @@ describe("findBannedPhrase", () => {
 });
 
 describe("tokenize", () => {
-  it("lowercases, strips diacritics and stopwords, drops numbers, stems to 5 chars, dedupes", () => {
+  it("lowercases, strips diacritics and stopwords, drops numbers, stems to 6 chars, dedupes", () => {
     expect(tokenize("La diferencia entre RUC 10 y RUC 20: formalización y Formalizar")).toEqual([
-      "difer",
+      "difere",
       "ruc",
-      "forma",
+      "formal",
     ]);
+  });
+
+  it("treats singular and plural as one word", () => {
+    for (const [singular, plural] of [
+      ["venta", "ventas"],
+      ["cliente", "clientes"],
+      ["impuesto", "impuestos"],
+      ["documento", "documentos"],
+    ]) {
+      expect(tokenize(singular!)).toEqual(tokenize(plural!));
+    }
+  });
+
+  it("keeps words that only collided because five letters was too few", () => {
+    // "de forma" must not stem to "formalización", nor "contamos" to "contabilidad".
+    expect(tokenize("forma")).not.toEqual(tokenize("formalizacion"));
+    expect(tokenize("contamos")).not.toEqual(tokenize("contabilidad"));
   });
 });
 
@@ -253,7 +270,9 @@ describe("rankBankPhotos", () => {
     const ranked = rankBankPhotos([bulb, sunat], { texts: ["La diferencia entre RUC 10 y RUC 20"], now });
     expect(ranked[0]?.asset.id).toBe("sunat-doc");
     expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
-    expect(ranked[0]!.matched).toContain("ruc→sunat");
+    // "~" marks a loose (synonym) hit: this photo has no "ruc" tag, it is
+    // reached through ruc→sunat and therefore scores at half weight.
+    expect(ranked[0]!.matched).toContain("~ruc→sunat");
   });
 
   it("penalizes a photo used in the last three days and honours excludeIds", () => {
@@ -275,7 +294,7 @@ describe("rankBankPhotos", () => {
 
   it("matches words from the stock filename when a photo has no tags yet", () => {
     const untagged = photo("businesswoman-thinking-office", []);
-    expect(rankBankPhotos([untagged], { texts: ["oficina businesswoman"], now })[0]!.matched).toContain("busin");
+    expect(rankBankPhotos([untagged], { texts: ["oficina businesswoman"], now })[0]!.matched).toContain("busine");
   });
 
   it("breaks ties deterministically: never used first, then by id", () => {
@@ -315,5 +334,76 @@ describe("decidePhotoSource", () => {
     expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["bank", "gemini", "bank", "bank", "bank"] })).toBe("gemini");
     // 2 of 4 = 50% ≥ 40% → bank
     expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["gemini", "bank", "gemini", "bank"] })).toBe("bank");
+  });
+});
+
+describe("rankBankPhotos — defects an adversarial review reproduced", () => {
+  const now = new Date("2026-09-05T12:00:00Z");
+  const photo = (id: string, tags: string[], last: string | null = null): BankPhotoLookup => ({
+    id,
+    url: `https://x/brand-assets/t/library-00000000-0000-0000-0000-000000000000-${id}.jpg`,
+    tags,
+    description: null,
+    has_people: true,
+    orientation: "landscape",
+    last_used_at: last,
+  });
+  const sunat = photo("sunat", ["emprendedora", "documento", "sunat", "formalizacion", "oficina", "ruc", "impuestos"]);
+  const theme = "La diferencia entre RUC 10 y RUC 20";
+
+  it("does not let headline, subheadline and LLM keywords dilute the score below the thresholds", () => {
+    const themeOnly = rankBankPhotos([sunat], { texts: [theme], now })[0]!.score;
+    const withCopy = rankBankPhotos([sunat], {
+      texts: [theme],
+      hints: [
+        "¿RUC 10 o RUC 20? Elige bien desde el inicio",
+        "Te explicamos cuál conviene para tu negocio y evita multas",
+        "professional",
+        "modern",
+        "clean",
+        "bright",
+        "minimal",
+        "corporate",
+      ],
+      now,
+    })[0]!.score;
+    expect(withCopy).toBeGreaterThanOrEqual(themeOnly);
+    expect(withCopy).toBeGreaterThanOrEqual(BANK_STRONG_MATCH);
+    expect(withCopy).toBeLessThanOrEqual(1);
+  });
+
+  it("ranks a direct tag hit above a synonym hit instead of tying on last_used_at", () => {
+    // The corner-shop photo is reachable only through ruc→negocio, and it has
+    // waited longer — under equal weights it won the tiebreak and went out.
+    const bodega = photo("bodega", ["tienda", "bodega", "cliente", "venta", "negocio"], "2026-01-01T00:00:00Z");
+    const ranked = rankBankPhotos([bodega, sunat], { texts: [theme], now });
+    expect(ranked[0]?.asset.id).toBe("sunat");
+    expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
+  });
+
+  it("does not fire the formalización or contabilidad synonyms on 'de forma' / 'Te contamos'", () => {
+    const tienda = photo("tienda", ["tienda", "orden", "estante"]);
+    const shop = rankBankPhotos([sunat, tienda], { texts: ["Cómo organizar tu tienda de forma eficiente"], now });
+    expect(shop[0]?.asset.id).toBe("tienda");
+    expect(shop.find((r) => r.asset.id === "sunat")!.score).toBe(0);
+
+    const bulb = photo("bulb", ["foco", "idea", "brainstorming", "oficina"]);
+    const cliente = photo("cliente", ["cliente", "atencion", "mostrador"]);
+    const service = rankBankPhotos([bulb, cliente], { texts: ["Te contamos cómo atender mejor a tus clientes"], now });
+    expect(service[0]?.asset.id).toBe("cliente");
+    expect(service.find((r) => r.asset.id === "bulb")!.score).toBe(0);
+  });
+});
+
+describe("decidePhotoSource — Gemini unavailable", () => {
+  const recentSources = [] as const;
+
+  it("falls back to the gradient rather than an unrelated photo when the budget is spent", () => {
+    expect(decidePhotoSource({ bestBankScore: 0, geminiAvailable: false, recentSources, geminiShare: 40 })).toBe("gradient");
+    expect(decidePhotoSource({ bestBankScore: 0.3, geminiAvailable: false, recentSources, geminiShare: 40 })).toBe("bank");
+  });
+
+  it("still gives a legacy tenant (no share configured) its plain rotation", () => {
+    expect(decidePhotoSource({ bestBankScore: 0, geminiAvailable: false, recentSources, geminiShare: null })).toBe("bank");
   });
 });
