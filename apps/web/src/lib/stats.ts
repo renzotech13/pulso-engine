@@ -54,7 +54,6 @@ export interface StatsSnapshot {
     publishHours: number[];
     hitlMode: string;
     maxWeeklyCarousels: number | null;
-    geminiShare: number | null;
   };
   /** True once anything has ever gone out in the period — drives the empty state. */
   hasPublished: boolean;
@@ -224,7 +223,7 @@ export async function getTenantStats(
       .limit(60),
     supabase
       .from("tenants")
-      .select("publish_hours, hitl_mode, max_weekly_carousels, gemini_share")
+      .select("publish_hours, hitl_mode, max_weekly_carousels")
       .eq("id", tenantId)
       .maybeSingle(),
     supabase
@@ -409,7 +408,6 @@ export async function getTenantStats(
       publishHours,
       hitlMode: tenant?.hitl_mode ?? "approve-all",
       maxWeeklyCarousels: tenant?.max_weekly_carousels ?? null,
-      geminiShare: tenant?.gemini_share ?? null,
     },
     hasPublished: publishedCount > 0 || platformCount > 0,
     totals: { planned: periodSlots.length, published: publishedCount, upcoming7 },
