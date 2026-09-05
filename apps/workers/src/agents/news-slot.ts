@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@pulso/db/worker";
 import { publishEvent } from "@pulso/events/publish";
-import { limaToday } from "@pulso/shared/time";
+import { limaDatePlusDays, limaHour, limaToday } from "@pulso/shared/time";
 import { executeAgentRun } from "@pulso/publish/base-agent";
 
 /**
@@ -33,7 +33,13 @@ export async function fillNewsSlotForTenant(
       // that predates this function.
       if (newsHour === undefined) return;
 
-      const date = limaToday();
+      // The digest runs mid-morning (see main.ts). A tenant whose second
+      // publish hour is earlier than that would get today's slot created
+      // after it was already due, and publish-tick's straggler catch-up
+      // would then post it hours late. Fill tomorrow's slot instead so it
+      // still goes out at its configured hour.
+      const today = limaToday();
+      const date = newsHour > limaHour() ? today : limaDatePlusDays(today, 1);
       const service = createServiceRoleClient();
 
       const existing = await ctx.db.listContentCalendar(date, date);

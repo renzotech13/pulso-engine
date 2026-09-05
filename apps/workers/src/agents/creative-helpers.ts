@@ -112,13 +112,16 @@ export function pickProductPhoto(
   return match?.photo_urls[0];
 }
 
-// Lowercase + strip diacritics, so "Sin Sustos", "SIN SUSTOS" and a
-// tenant-typed "sin sústos" all hit the same banned entry.
+// Lowercase + strip diacritics + collapse whitespace, so "Sin Sustos",
+// "SIN SUSTOS", a tenant-typed "sin sústos" and a caption that wraps the
+// phrase across a line break (or a non-breaking space — local models emit
+// both) all hit the same banned entry. `\s` covers NBSP and newlines.
 function normalizeForMatch(text: string): string {
   return text
     .toLowerCase()
     .normalize("NFD")
-    .replace(/\p{M}/gu, "");
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/gu, " ");
 }
 
 export interface BannedPhraseHit {

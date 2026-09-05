@@ -207,6 +207,12 @@ describe("findBannedPhrase", () => {
     expect(findBannedPhrase({ subheadline: undefined, priceLabel: null, videoEffects: { hideLogo: true } }, banned)).toBeNull();
   });
 
+  it("matches across a line break, a non-breaking space and doubled spaces", () => {
+    for (const caption of ["sin\nsustos", "sin\u00a0sustos", "sin  sustos", "SIN\n\nSustos ni multas"]) {
+      expect(findBannedPhrase({ caption }, banned)?.phrase).toBe("sin sustos");
+    }
+  });
+
   it("treats whitespace-only banned entries as absent", () => {
     expect(findBannedPhrase({ caption: "anything" }, ["  ", ""])).toBeNull();
   });

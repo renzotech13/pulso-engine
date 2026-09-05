@@ -454,7 +454,17 @@ export async function upsertBrandKitAction(formData: FormData): Promise<void> {
     update.brief_document_name = briefDocumentEntry.name;
   }
 
-  const { error } = await supabase.from("brand_kits").upsert(update, { onConflict: "tenant_id" });
+  let { error } = await supabase.from("brand_kits").upsert(update, { onConflict: "tenant_id" });
+  // Migration 26 not applied yet on this database: PostgREST rejects the
+  // whole payload over the one unknown column (PGRST204), which would make
+  // EVERY brand-kit save fail — colors, tone, logo included — until it
+  // lands. Retry once without the list so the rest of the form still saves.
+  // Not gated on the list being empty on purpose: once the column exists an
+  // emptied textarea has to be able to clear a previously saved list.
+  if (error?.code === "PGRST204" && error.message.includes("banned_phrases")) {
+    const { banned_phrases: _pendingMigration, ...withoutBannedPhrases } = update;
+    ({ error } = await supabase.from("brand_kits").upsert(withoutBannedPhrases, { onConflict: "tenant_id" }));
+  }
   if (error) throw new Error(error.message);
   revalidatePath("/brand-kit");
 }

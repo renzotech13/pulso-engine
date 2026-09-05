@@ -3,8 +3,22 @@ import { publishEvent } from "@pulso/events/publish";
 import { loadConfig } from "@pulso/shared/config";
 import { newCorrelationId } from "@pulso/shared/ids";
 import { createLogger } from "@pulso/shared/logger";
+import { limaDatePlusDays, limaToday } from "@pulso/shared/time";
 
 const logger = createLogger({ agent: "render-tick" });
+
+/**
+ * How far ahead an approved slot with no creative gets one requested. Short
+ * on purpose: a creative fires an eager publish, and for a future date that
+ * means a Facebook post scheduled with Meta right away — regenerating the
+ * piece later does NOT cancel that, so pieces are better generated close to
+ * their date than a month out.
+ */
+const CREATIVE_LOOKAHEAD_DAYS = 2;
+/** Bounds retries on a slot whose copy keeps getting rejected (see creative.ts). */
+const MAX_CREATIVE_REQUESTS_PER_DAY = 3;
+/** A request already in flight (LLM + render can take minutes) is not re-fired. */
+const CREATIVE_REQUEST_COOLDOWN_MS = 30 * 60 * 1000;
 
 /**
  * A creative is only picked up once it has been sitting untouched this long,
@@ -38,9 +52,72 @@ const BATCH_LIMIT = 5;
  * (mirroring creative.ts), so the human review gate is preserved everywhere
  * else.
  */
+/**
+ * Approved slots that never got a creative. Two real ways to land here: a
+ * human (or a script) approved slots directly in the database, so the
+ * Planner's insert-time `creative.requested` never fired; or the Creative
+ * agent gave up on the copy (creative.ts skips instead of throwing) and the
+ * slot was left as approved-but-empty. Either way nothing else would ever
+ * pick it up — the calendar just says "generando…" until someone notices.
+ */
+async function requestMissingCreatives(service: ReturnType<typeof createServiceRoleClient>): Promise<number> {
+  const today = limaToday();
+  const { data: slots, error } = await service
+    .from("content_calendar")
+    .select("id, tenant_id, date")
+    .eq("status", "approved")
+    .is("creative_id", null)
+    .eq("hold_publish", false)
+    .gte("date", today)
+    .lte("date", limaDatePlusDays(today, CREATIVE_LOOKAHEAD_DAYS))
+    .order("date", { ascending: true })
+    .limit(BATCH_LIMIT);
+
+  if (error) {
+    logger.error({ err: error }, "failed to list approved slots without a creative");
+    return 0;
+  }
+
+  const now = Date.now();
+  const dayAgo = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  let requested = 0;
+
+  for (const slot of slots ?? []) {
+    const { data: recent } = await service
+      .from("events")
+      .select("created_at")
+      .eq("tenant_id", slot.tenant_id)
+      .eq("type", "creative.requested")
+      .eq("payload->>calendarSlotId", slot.id)
+      .gte("created_at", dayAgo);
+
+    const attemptsToday = recent?.length ?? 0;
+    if (attemptsToday >= MAX_CREATIVE_REQUESTS_PER_DAY) continue;
+    const inFlight = (recent ?? []).some(
+      (e) => Date.parse(e.created_at) > now - CREATIVE_REQUEST_COOLDOWN_MS,
+    );
+    if (inFlight) continue;
+
+    await publishEvent(service, {
+      tenantId: slot.tenant_id,
+      type: "creative.requested",
+      payload: { calendarSlotId: slot.id },
+      correlationId: newCorrelationId(),
+    });
+    requested++;
+  }
+
+  return requested;
+}
+
 export async function runRenderTick(): Promise<void> {
   const config = loadConfig();
   const service = createServiceRoleClient();
+
+  const requestedCount = await requestMissingCreatives(service);
+  if (requestedCount > 0) {
+    logger.info({ requestedCount }, "requested creatives for approved slots that had none");
+  }
 
   const now = Date.now();
   const staleBefore = new Date(now - STALE_AFTER_MS).toISOString();

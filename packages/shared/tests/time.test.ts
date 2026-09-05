@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { limaHour, limaToday } from "../src/time.js";
+import { limaDatePlusDays, limaHour, limaToday } from "../src/time.js";
 
 describe("limaToday", () => {
   it("returns Lima's day, not UTC's", () => {
@@ -22,5 +22,19 @@ describe("limaHour", () => {
 
   it("reports midnight in Lima as 0, never 24", () => {
     expect(limaHour(new Date("2026-09-03T05:00:00Z"))).toBe(0);
+  });
+});
+
+describe("limaDatePlusDays", () => {
+  it("adds days across a month boundary", () => {
+    expect(limaDatePlusDays("2026-09-30", 2)).toBe("2026-10-02");
+  });
+
+  it("subtracts days across a year boundary", () => {
+    expect(limaDatePlusDays("2027-01-01", -1)).toBe("2026-12-31");
+  });
+
+  it("is the identity for zero", () => {
+    expect(limaDatePlusDays("2026-09-04", 0)).toBe("2026-09-04");
   });
 });

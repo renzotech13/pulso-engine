@@ -58,7 +58,10 @@ describe("callLlmStructured", () => {
     expect(mockCreate).toHaveBeenCalledTimes(2);
 
     const secondCallArgs = mockCreate.mock.calls[1]?.[0] as { messages: { content: string }[] };
-    expect(secondCallArgs.messages[0]?.content).toContain("no calzó con el formato esperado");
+    // Worded as a rejection, not a format error: the same retry now carries
+    // content rejections too (a tenant-banned phrase from creative.ts).
+    expect(secondCallArgs.messages[0]?.content).toContain("fue rechazada por este motivo");
+    expect(secondCallArgs.messages[0]?.content).toContain("test prompt");
   });
 
   it("throws LlmOutputError after exhausting retries on persistently invalid output", async () => {

@@ -34,3 +34,9 @@ export function limaHour(now: Date = new Date()): number {
   // en-GB with hour12:false reports midnight as "24" on some runtimes.
   return Number(hourFormatter.format(now)) % 24;
 }
+
+/** `dateStr` (YYYY-MM-DD) shifted by `days` — pure calendar arithmetic, no time zone involved. */
+export function limaDatePlusDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}

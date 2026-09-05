@@ -3,6 +3,7 @@ import { createServiceRoleClient, getActivePrompt } from "@pulso/db/worker";
 import type { Database, Json } from "@pulso/db/types";
 import { publishEvent } from "@pulso/events/publish";
 import { loadConfig } from "@pulso/shared/config";
+import { AppError } from "@pulso/shared/errors";
 import { callAgentLlm } from "../agent-llm.js";
 import { executeAgentRun } from "@pulso/publish/base-agent";
 import {
@@ -278,25 +279,50 @@ export async function runCreativeAgentForSlot(
       });
 
       const bannedPhrases = brandKit?.banned_phrases ?? [];
-      const copy: CreativeCopy = isCarousel
-        ? await callAgentLlm({
-            agentName: "creative",
-            tenantId,
-            ...(jobId ? { jobId } : {}),
-            correlationId,
-            prompt,
-            schema: withBannedPhraseGuard(carouselCopySchema, bannedPhrases),
-            options: { maxRetries: COPY_MAX_RETRIES },
-          })
-        : await callAgentLlm({
-            agentName: "creative",
-            tenantId,
-            ...(jobId ? { jobId } : {}),
-            correlationId,
-            prompt,
-            schema: withBannedPhraseGuard(creativeCopySchema, bannedPhrases),
-            options: { maxRetries: COPY_MAX_RETRIES },
-          });
+      let copy: CreativeCopy;
+      try {
+        copy = isCarousel
+          ? await callAgentLlm({
+              agentName: "creative",
+              tenantId,
+              ...(jobId ? { jobId } : {}),
+              correlationId,
+              prompt,
+              schema: withBannedPhraseGuard(carouselCopySchema, bannedPhrases),
+              options: { maxRetries: COPY_MAX_RETRIES },
+            })
+          : await callAgentLlm({
+              agentName: "creative",
+              tenantId,
+              ...(jobId ? { jobId } : {}),
+              correlationId,
+              prompt,
+              schema: withBannedPhraseGuard(creativeCopySchema, bannedPhrases),
+              options: { maxRetries: COPY_MAX_RETRIES },
+            });
+      } catch (err) {
+        // Every attempt came back unusable (malformed JSON or a banned phrase
+        // the model kept repeating). Throwing here would strand the slot: the
+        // outbox event is already marked dispatched and the BullMQ job has a
+        // single attempt, so nothing would ever retry it and the calendar
+        // would show "generando…" forever. Skip like the other dead-end
+        // paths above and make it visible instead — render-tick re-requests
+        // approved slots that still have no creative (bounded per day), and
+        // the alert tells a human why this one keeps failing.
+        if (!(err instanceof AppError && err.code === "LLM_OUTPUT_INVALID")) throw err;
+        await skip(`La copy fue rechazada en ${COPY_MAX_RETRIES + 1} intentos: ${err.message}`, {
+          calendar_slot_id: calendarSlotId,
+          theme: slot.theme,
+          action: "copy_rejected",
+        });
+        await service.from("alerts").insert({
+          tenant_id: tenantId,
+          severity: "warning",
+          type: "creative_copy_rejected",
+          message: `La pieza del ${slot.date} ("${slot.theme}") no pudo redactarse: ${err.message}`,
+        });
+        return;
+      }
 
       let photoUrl = isCarousel ? undefined : pickProductPhoto(products, copy.productName);
       let carouselPhotoUrls: Array<string | undefined> | undefined;
