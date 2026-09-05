@@ -129,6 +129,11 @@ Promociones activas del negocio:
 Catálogo de productos/servicios:
 {{PRODUCTS}}
 
+Indicaciones de marca del negocio (tono, líneas de contenido a priorizar, cosas que nunca debe decir). Si las hay, son la guía principal para elegir CADA tema y su enfoque — por encima del catálogo o las promociones cuando entren en conflicto:
+{{BRAND_TRAINING}}
+
+{{CAROUSEL_LIMIT}}
+
 Para cada fecha libre que tenga sentido llenar (no es obligatorio llenar todas), propone un tema de contenido.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
 {"slots": [{"date": "YYYY-MM-DD", "slot_type": "post"|"carousel"|"story"|"reel", "theme": "string corto", "rationale": "string breve explicando por qué"}]}`;
@@ -448,6 +453,10 @@ async function upsertDemoVideoCreative(client: ReturnType<typeof createServiceRo
   if (error) throw new Error(`failed to seed demo video creative for tenant ${tenantId}: ${error.message}`);
 }
 
+// Text matches production's live version (v3: brand training + carousel cap
+// placeholders, both filled by apps/workers/src/agents/planner.ts). Seeded as
+// version 1 only on a fresh database — skip-if-exists, so re-seeding never
+// touches the versions production has moved on to.
 async function upsertPlannerPrompt(client: ReturnType<typeof createServiceRoleClient>) {
   const { data: existing } = await client
     .from("prompts")
