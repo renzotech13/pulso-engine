@@ -106,6 +106,12 @@ async function updateCalendarSlotActionImpl(formData: FormData): Promise<void> {
 
 export interface MoveCalendarSlotDateState {
   error: string | null;
+  /**
+   * Set when the only thing in the way is another (unpublished) piece: the
+   * form then offers to swap the two instead of making the owner go delete
+   * one of them. Carries what is sitting there so the offer can name it.
+   */
+  swapWith?: { theme: string; date: string; slotIndex: number } | undefined;
 }
 
 /**
@@ -125,6 +131,7 @@ export async function moveCalendarSlotDateAction(
   const newDate = String(formData.get("newDate") ?? "");
   // "" = whichever turn is free on that day; "0"/"1"/… = that turn exactly.
   const requestedSlot = String(formData.get("newSlotIndex") ?? "").trim();
+  const wantsSwap = String(formData.get("swap") ?? "") === "1";
   if (!tenantId || !slotId || !newDate) return { error: "Falta la fecha." };
 
   const supabase = await createSupabaseServerClient();
@@ -152,24 +159,89 @@ export async function moveCalendarSlotDateAction(
   // asked for, or the first free one that day.
   const { data: taken } = await supabase
     .from("content_calendar")
-    .select("id, slot_index")
+    .select("id, slot_index, theme, published_at")
     .eq("tenant_id", tenantId)
     .eq("date", newDate);
   const takenIndexes = new Set((taken ?? []).filter((row) => row.id !== slotId).map((row) => row.slot_index));
 
+  const occupantOf = (index: number) => (taken ?? []).find((row) => row.id !== slotId && row.slot_index === index);
+  const turnLabel = (index: number) =>
+    publishHours[index] === undefined ? `turno ${index + 1}` : `turno de las ${publishHours[index]}:00`;
+
   let targetIndex: number;
   if (requestedSlot !== "") {
     targetIndex = Number(requestedSlot);
-    if (takenIndexes.has(targetIndex)) {
-      const turnName = publishHours[targetIndex] === undefined ? "turno" : `turno de las ${publishHours[targetIndex]}:00`;
-      return { error: `El ${turnName} del ${newDate} ya está ocupado. Elige el otro turno u otro día.` };
-    }
   } else {
     const free = Array.from({ length: turnsPerDay }, (_, i) => i).find((i) => !takenIndexes.has(i));
-    if (free === undefined) {
-      return { error: `El ${newDate} ya tiene sus ${turnsPerDay} publicaciones. Elige otro día.` };
+    // Every turn is taken: rather than a dead end, aim at the last one and
+    // let the swap offer below deal with whatever is sitting there.
+    targetIndex = free ?? turnsPerDay - 1;
+  }
+
+  const occupant = occupantOf(targetIndex);
+  if (occupant) {
+    // A piece that already went out can't be shuffled — the post exists on
+    // Facebook and Instagram; moving its calendar row would just lie.
+    if (occupant.published_at) {
+      return {
+        error: `El ${turnLabel(targetIndex)} del ${newDate} ya se publicó, así que no se puede reemplazar. Elige otro turno u otro día.`,
+      };
     }
-    targetIndex = free;
+    if (!wantsSwap) {
+      return {
+        error: `El ${turnLabel(targetIndex)} del ${newDate} está ocupado por "${occupant.theme}".`,
+        swapWith: { theme: occupant.theme, date: newDate, slotIndex: targetIndex },
+      };
+    }
+
+    // Swap, in three steps because (tenant_id, date, slot_index) is unique
+    // and PostgREST gives us no transaction: park the occupant on a free
+    // index of its own day, move ours in, then drop the occupant into the
+    // hole we just left.
+    const parkIndex = [3, 2, 1, 0].find((i) => i !== targetIndex && !takenIndexes.has(i));
+    if (parkIndex === undefined) {
+      return { error: `No hay espacio libre en el ${newDate} para hacer el intercambio.` };
+    }
+
+    const park = await supabase
+      .from("content_calendar")
+      .update({ slot_index: parkIndex })
+      .eq("id", occupant.id)
+      .eq("tenant_id", tenantId);
+    if (park.error) return { error: park.error.message };
+
+    const moveOurs = await supabase
+      .from("content_calendar")
+      .update({
+        date: newDate,
+        slot_index: targetIndex,
+        ...(publishHours[targetIndex] === undefined ? {} : { publish_hour: publishHours[targetIndex] }),
+      })
+      .eq("id", slotId)
+      .eq("tenant_id", tenantId);
+    if (moveOurs.error) {
+      // Put the occupant back where it was before giving up.
+      await supabase
+        .from("content_calendar")
+        .update({ slot_index: targetIndex })
+        .eq("id", occupant.id)
+        .eq("tenant_id", tenantId);
+      return { error: moveOurs.error.message };
+    }
+
+    const moveOccupant = await supabase
+      .from("content_calendar")
+      .update({
+        date: slot.date,
+        slot_index: slot.slot_index,
+        ...(publishHours[slot.slot_index] === undefined ? {} : { publish_hour: publishHours[slot.slot_index] }),
+      })
+      .eq("id", occupant.id)
+      .eq("tenant_id", tenantId);
+    if (moveOccupant.error) return { error: moveOccupant.error.message };
+
+    revalidatePath("/calendar");
+    redirect(`/calendar/${newDate}?slot=${targetIndex}`);
   }
 
   if (slot.date === newDate && slot.slot_index === targetIndex) return { error: null };

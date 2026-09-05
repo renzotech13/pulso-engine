@@ -23,31 +23,66 @@ export function MoveDateForm({
   publishHours: number[];
 }) {
   const [state, formAction] = useActionState(moveCalendarSlotDateAction, initialState);
-  const id = `move-date-${slotId}`;
-  const slotId_ = `move-slot-${slotId}`;
+  const dateFieldId = `move-date-${slotId}`;
+  const turnFieldId = `move-turn-${slotId}`;
 
   return (
-    <form action={formAction} className="flex flex-wrap items-start gap-3">
+    <form action={formAction} className="space-y-3">
       <input type="hidden" name="tenantId" value={tenantId} />
       <input type="hidden" name="slotId" value={slotId} />
-      <Field id={id} label="Mover al día" error={state.error} className="min-w-[170px]">
-        <input id={id} type="date" name="newDate" defaultValue={date} className={inputClass} />
-      </Field>
-      {publishHours.length > 1 && (
-        <Field id={slotId_} label="Turno" className="min-w-[150px]">
-          <select id={slotId_} name="newSlotIndex" defaultValue="" className={selectClass}>
-            <option value="">El que esté libre</option>
-            {publishHours.map((hour, index) => (
-              <option key={hour} value={index}>
-                {hour}:00
-              </option>
-            ))}
-          </select>
+
+      <div className="flex flex-wrap items-start gap-3">
+        <Field id={dateFieldId} label="Mover al día" error={state.error} className="min-w-[170px]">
+          <input
+            id={dateFieldId}
+            type="date"
+            name="newDate"
+            defaultValue={state.swapWith?.date ?? date}
+            className={inputClass}
+          />
         </Field>
+        {publishHours.length > 1 && (
+          <Field id={turnFieldId} label="Turno" className="min-w-[150px]">
+            <select
+              id={turnFieldId}
+              name="newSlotIndex"
+              defaultValue={state.swapWith ? String(state.swapWith.slotIndex) : ""}
+              className={selectClass}
+            >
+              <option value="">El que esté libre</option>
+              {publishHours.map((hour, index) => (
+                <option key={hour} value={index}>
+                  {hour}:00
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <SubmitButton variant="secondary" size="md" pendingText="Moviendo…" className="mt-[1.4rem]">
+          Mover
+        </SubmitButton>
+      </div>
+
+      {/* Offered instead of a dead end when the target turn is taken by a
+          piece that hasn't gone out yet: the two trade places. */}
+      {state.swapWith && (
+        <div className="rounded-lg border border-ink-700 bg-ink-950 p-3">
+          <p className="text-xs text-neutral-400">
+            Puedes intercambiarlas: <span className="text-neutral-200">{state.swapWith.theme}</span> pasa a este
+            día y turno, y esta pieza toma su lugar.
+          </p>
+          <SubmitButton
+            name="swap"
+            value="1"
+            variant="primary"
+            size="sm"
+            pendingText="Intercambiando…"
+            className="mt-2"
+          >
+            Intercambiar las dos
+          </SubmitButton>
+        </div>
       )}
-      <SubmitButton variant="secondary" size="md" pendingText="Moviendo…" className="mt-[1.4rem]">
-        Mover
-      </SubmitButton>
     </form>
   );
 }
