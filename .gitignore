@@ -23,3 +23,6 @@ supabase/.temp/
 /alianza-lima-sullana/
 /front/
 packages/db/supabase/snippets/
+
+# Vercel CLI: guarda el id del proyecto/organización al enlazar.
+.vercel
