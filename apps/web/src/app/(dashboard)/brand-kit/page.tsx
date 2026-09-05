@@ -1,6 +1,12 @@
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { deleteMediaAssetAction, upsertBrandKitAction, upsertPhotoFrameAction, uploadMediaAssetsAction } from "@/lib/actions";
+import {
+  deleteMediaAssetAction,
+  updateMediaAssetTagsAction,
+  upsertBrandKitAction,
+  upsertPhotoFrameAction,
+  uploadMediaAssetsAction,
+} from "@/lib/actions";
 import { MediaDropzone } from "@/components/media-dropzone";
 import { SubmitButton } from "@/components/submit-button";
 import { TonePresets } from "@/components/tone-presets";
@@ -36,7 +42,7 @@ export default async function BrandKitPage() {
       .maybeSingle(),
     supabase
       .from("media_assets")
-      .select("id, url")
+      .select("id, url, tags, description, tag_source, tagged_at, tag_attempts, tag_error, last_used_at")
       .eq("tenant_id", ctx.tenantId)
       .eq("kind", "image")
       .order("created_at", { ascending: false }),
@@ -227,10 +233,11 @@ export default async function BrandKitPage() {
       <Card className="p-5">
         <CardHeader title="Banco de fotos" />
         <p className="mb-4 text-sm text-neutral-500">
-          Sube fotos reales de tu negocio — el Creative las usa como protagonista de tus posts (con
-          título, subtítulo y colores de marca encima, igual que ahora) en vez de generar una imagen
-          con IA. Van rotando: cada post usa la que lleva más tiempo sin salir, así que todas se
-          terminan usando.
+          Sube fotos reales de tu negocio — el Creative las usa de fondo en tus posts (con título,
+          subtítulo y colores de marca encima). Cada foto se describe una sola vez con IA y desde ahí
+          se elige por tema: un post sobre SUNAT busca una foto etiquetada con eso. Puedes corregir las
+          etiquetas de cualquier foto. Las fotos generadas con IA se alternan con estas según lo que se
+          configure para tu negocio.
         </p>
         <form action={uploadMediaAssetsAction} className="mb-5 flex flex-wrap items-end gap-3">
           <input type="hidden" name="tenantId" value={ctx.tenantId} />
@@ -251,27 +258,84 @@ export default async function BrandKitPage() {
         </form>
 
         {mediaAssets && mediaAssets.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-            {mediaAssets.map((asset) => (
-              <div
-                key={asset.id}
-                className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700"
-              >
-                <img src={asset.url} alt="" className="h-full w-full object-cover" />
-                <form action={deleteMediaAssetAction} className="absolute right-1 top-1">
-                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
-                  <input type="hidden" name="assetId" value={asset.id} />
-                  <button
-                    type="submit"
-                    title="Eliminar esta foto"
-                    className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink group-hover:opacity-100"
-                  >
-                    ×
-                  </button>
-                </form>
-              </div>
-            ))}
-          </div>
+          <>
+            <p className="mb-3 text-xs text-neutral-600">
+              {mediaAssets.length} fotos · {mediaAssets.filter((a) => !a.last_used_at).length} sin usar ·{" "}
+              {mediaAssets.filter((a) => a.tagged_at).length} etiquetadas
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {mediaAssets.map((asset) => {
+                const status = asset.tagged_at
+                  ? asset.last_used_at
+                    ? `Usada hace ${Math.max(0, Math.round((Date.now() - Date.parse(asset.last_used_at)) / 86_400_000))} días`
+                    : "Sin usar todavía"
+                  : asset.tag_attempts >= 3
+                    ? "No se pudo etiquetar sola — edítala a mano"
+                    : "Etiquetando…";
+                return (
+                  <div key={asset.id} className="rounded-lg border border-ink-700 bg-ink-900 p-2">
+                    <div className="group relative aspect-square overflow-hidden rounded-md">
+                      <img src={asset.url} alt={asset.description ?? ""} className="h-full w-full object-cover" />
+                      <form action={deleteMediaAssetAction} className="absolute right-1 top-1">
+                        <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <button
+                          type="submit"
+                          title="Eliminar esta foto"
+                          aria-label="Eliminar esta foto"
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs leading-none text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink group-hover:opacity-100"
+                        >
+                          ×
+                        </button>
+                      </form>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {asset.tags.slice(0, 4).map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-ink-700 px-2 py-0.5 text-[10px] text-neutral-400"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {asset.tags.length > 4 && (
+                        <span className="px-1 text-[10px] text-neutral-600">+{asset.tags.length - 4}</span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[10px] text-neutral-600">{status}</p>
+                    <details className="mt-1">
+                      <summary className="cursor-pointer text-[11px] text-pulso-accent hover:underline">
+                        Editar etiquetas
+                      </summary>
+                      <form action={updateMediaAssetTagsAction} className="mt-2 space-y-2">
+                        <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                        <input type="hidden" name="assetId" value={asset.id} />
+                        <input
+                          name="tags"
+                          defaultValue={asset.tags.join(", ")}
+                          placeholder="emprendedora, taller, sunat"
+                          className={`${inputClass} text-xs`}
+                        />
+                        <textarea
+                          name="description"
+                          rows={2}
+                          defaultValue={asset.description ?? ""}
+                          placeholder="Qué se ve en la foto"
+                          className={`${inputClass} text-xs`}
+                        />
+                        <SubmitButton
+                          pendingText="Guardando…"
+                          className="rounded-lg bg-ink-800 px-3 py-1 text-xs text-neutral-200 hover:bg-ink-700"
+                        >
+                          Guardar
+                        </SubmitButton>
+                      </form>
+                    </details>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </Card>
 

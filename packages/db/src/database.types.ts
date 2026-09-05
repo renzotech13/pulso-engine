@@ -566,25 +566,49 @@ export type Database = {
       media_assets: {
         Row: {
           created_at: string
+          description: string | null
+          has_people: boolean | null
           id: string
           kind: string
           last_used_at: string | null
+          orientation: string | null
+          tag_attempts: number
+          tag_error: string | null
+          tag_source: string | null
+          tagged_at: string | null
+          tags: string[]
           tenant_id: string
           url: string
         }
         Insert: {
           created_at?: string
+          description?: string | null
+          has_people?: boolean | null
           id?: string
           kind?: string
           last_used_at?: string | null
+          orientation?: string | null
+          tag_attempts?: number
+          tag_error?: string | null
+          tag_source?: string | null
+          tagged_at?: string | null
+          tags?: string[]
           tenant_id: string
           url: string
         }
         Update: {
           created_at?: string
+          description?: string | null
+          has_people?: boolean | null
           id?: string
           kind?: string
           last_used_at?: string | null
+          orientation?: string | null
+          tag_attempts?: number
+          tag_error?: string | null
+          tag_source?: string | null
+          tagged_at?: string | null
+          tags?: string[]
           tenant_id?: string
           url?: string
         }
@@ -979,6 +1003,8 @@ export type Database = {
       tenants: {
         Row: {
           created_at: string
+          gemini_daily_image_budget: number | null
+          gemini_share: number | null
           hitl_mode: string
           id: string
           max_weekly_carousels: number | null
@@ -993,6 +1019,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          gemini_daily_image_budget?: number | null
+          gemini_share?: number | null
           hitl_mode?: string
           id?: string
           max_weekly_carousels?: number | null
@@ -1007,6 +1035,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          gemini_daily_image_budget?: number | null
+          gemini_share?: number | null
           hitl_mode?: string
           id?: string
           max_weekly_carousels?: number | null

@@ -13,6 +13,7 @@ import { runPublishTick } from "./agents/publish-tick.js";
 import { runRenderTick } from "./agents/render-tick.js";
 import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
 import { fillNewsSlotForTenant } from "./agents/news-slot.js";
+import { runMediaTagTick } from "./agents/media-tag-tick.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
 
@@ -42,6 +43,10 @@ async function processCoreJob(job: Job): Promise<void> {
   }
   if (job.name === "news.tick") {
     await runNewsTick();
+    return;
+  }
+  if (job.name === "media-tag.tick") {
+    await runMediaTagTick();
     return;
   }
 
@@ -199,6 +204,13 @@ async function main(): Promise<void> {
     "render.tick",
     {},
     { repeat: { every: 5 * 60 * 1000 }, jobId: "render-tick" },
+  );
+  // Describes newly uploaded bank photos with Gemini vision, five at a time
+  // (see media-tag-tick.ts) — what lets the Creative pick a photo by theme.
+  await coreQueue.add(
+    "media-tag.tick",
+    {},
+    { repeat: { every: 10 * 60 * 1000 }, jobId: "media-tag-tick" },
   );
   // Always lands as 'pending' news_suggestions regardless of hitl_mode — see
   // news.ts. To see it run without waiting for tomorrow, call

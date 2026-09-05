@@ -5,6 +5,12 @@ import {
   pickProductPhoto,
   templateNameForSlotType,
   findBannedPhrase,
+  BANK_STRONG_MATCH,
+  BANK_WEAK_MATCH,
+  decidePhotoSource,
+  rankBankPhotos,
+  tokenize,
+  type BankPhotoLookup,
 } from "../src/agents/creative-helpers.js";
 
 describe("templateNameForSlotType", () => {
@@ -215,5 +221,99 @@ describe("findBannedPhrase", () => {
 
   it("treats whitespace-only banned entries as absent", () => {
     expect(findBannedPhrase({ caption: "anything" }, ["  ", ""])).toBeNull();
+  });
+});
+
+describe("tokenize", () => {
+  it("lowercases, strips diacritics and stopwords, drops numbers, stems to 5 chars, dedupes", () => {
+    expect(tokenize("La diferencia entre RUC 10 y RUC 20: formalización y Formalizar")).toEqual([
+      "difer",
+      "ruc",
+      "forma",
+    ]);
+  });
+});
+
+describe("rankBankPhotos", () => {
+  const now = new Date("2026-09-05T12:00:00Z");
+  const photo = (id: string, tags: string[], extra: Partial<BankPhotoLookup> = {}): BankPhotoLookup => ({
+    id,
+    url: `https://x/brand-assets/t/library-00000000-0000-0000-0000-000000000000-${id}.jpg`,
+    tags,
+    description: null,
+    has_people: true,
+    orientation: "landscape",
+    last_used_at: null,
+    ...extra,
+  });
+  const sunat = photo("sunat-doc", ["emprendedora", "documento", "sunat", "formalizacion", "oficina"]);
+  const bulb = photo("bulb-idea", ["foco", "idea", "brainstorming", "oficina"]);
+
+  it("ranks the SUNAT/formalización photo above the lightbulb one for a RUC theme, via synonyms", () => {
+    const ranked = rankBankPhotos([bulb, sunat], { texts: ["La diferencia entre RUC 10 y RUC 20"], now });
+    expect(ranked[0]?.asset.id).toBe("sunat-doc");
+    expect(ranked[0]!.score).toBeGreaterThan(ranked[1]!.score);
+    expect(ranked[0]!.matched).toContain("ruc→sunat");
+  });
+
+  it("penalizes a photo used in the last three days and honours excludeIds", () => {
+    const recent = photo("recent", ["sunat", "formalizacion"], { last_used_at: "2026-09-04T12:00:00Z" });
+    const fresh = photo("fresh", ["sunat", "formalizacion"]);
+    const ranked = rankBankPhotos([recent, fresh], { texts: ["sunat formalización"], now });
+    expect(ranked[0]?.asset.id).toBe("fresh");
+    expect(rankBankPhotos([recent, fresh], { texts: ["sunat"], now, excludeIds: ["fresh"] }).map((r) => r.asset.id)).toEqual(["recent"]);
+  });
+
+  it("prefers portrait photos for vertical formats and lands in the thresholds' range", () => {
+    const portrait = photo("p", ["sunat"], { orientation: "portrait" });
+    const landscape = photo("l", ["sunat"], { orientation: "landscape" });
+    const ranked = rankBankPhotos([landscape, portrait], { texts: ["sunat"], now, preferPortrait: true });
+    expect(ranked[0]?.asset.id).toBe("p");
+    expect(ranked[0]!.score).toBeGreaterThanOrEqual(BANK_STRONG_MATCH);
+    expect(rankBankPhotos([bulb], { texts: ["sunat"], now })[0]!.score).toBeLessThan(BANK_WEAK_MATCH);
+  });
+
+  it("matches words from the stock filename when a photo has no tags yet", () => {
+    const untagged = photo("businesswoman-thinking-office", []);
+    expect(rankBankPhotos([untagged], { texts: ["oficina businesswoman"], now })[0]!.matched).toContain("busin");
+  });
+
+  it("breaks ties deterministically: never used first, then by id", () => {
+    const a = photo("b-id", ["sunat"]);
+    const b = photo("a-id", ["sunat"]);
+    const used = photo("c-id", ["sunat"], { last_used_at: "2026-01-01T00:00:00Z" });
+    expect(rankBankPhotos([used, a, b], { texts: ["nothing-matches"], now }).map((r) => r.asset.id)).toEqual(["a-id", "b-id", "c-id"]);
+  });
+});
+
+describe("decidePhotoSource", () => {
+  const base = { geminiAvailable: true, recentSources: [] as const, geminiShare: 40 };
+
+  it("empty bank → gemini, or gradient without Gemini", () => {
+    expect(decidePhotoSource({ ...base, bestBankScore: null })).toBe("gemini");
+    expect(decidePhotoSource({ ...base, bestBankScore: null, geminiAvailable: false })).toBe("gradient");
+  });
+
+  it("legacy tenants (no share) and share 0 always take the bank", () => {
+    expect(decidePhotoSource({ ...base, bestBankScore: 0, geminiShare: null })).toBe("bank");
+    expect(decidePhotoSource({ ...base, bestBankScore: 0, geminiShare: 0 })).toBe("bank");
+  });
+
+  it("a strong match takes the bank unless the last three were already bank", () => {
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.5 })).toBe("bank");
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.5, recentSources: ["bank", "bank", "bank"] })).toBe("gemini");
+  });
+
+  it("a weak match goes to Gemini rather than an unrelated photo", () => {
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.05 })).toBe("gemini");
+  });
+
+  it("in between, streaks alternate and the share settles the rest", () => {
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["gemini", "gemini"] })).toBe("bank");
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["bank", "bank", "bank"] })).toBe("gemini");
+    // 1 of 5 recent were Gemini = 20% < 40% target → gemini
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["bank", "gemini", "bank", "bank", "bank"] })).toBe("gemini");
+    // 2 of 4 = 50% ≥ 40% → bank
+    expect(decidePhotoSource({ ...base, bestBankScore: 0.2, recentSources: ["gemini", "bank", "gemini", "bank"] })).toBe("bank");
   });
 });

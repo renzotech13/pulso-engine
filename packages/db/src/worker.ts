@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config as loadDotenv } from "dotenv";
 import { ConfigError, TenantIsolationError } from "@pulso/shared/errors";
 import type { Database } from "./database.types.js";
+import { limaToday } from "@pulso/shared/time";
 
 // This file always lives at <repo-root>/packages/db/src/worker.ts in the
 // workspace, so this resolves to the repo root regardless of which app
@@ -65,6 +66,7 @@ type PublicationRow = Database["public"]["Tables"]["publications"]["Row"];
 type PublicationInsert = Database["public"]["Tables"]["publications"]["Insert"];
 type PublicationUpdate = Database["public"]["Tables"]["publications"]["Update"];
 type MediaAssetRow = Database["public"]["Tables"]["media_assets"]["Row"];
+type MediaAssetUpdate = Database["public"]["Tables"]["media_assets"]["Update"];
 type BrandKitRow = Database["public"]["Tables"]["brand_kits"]["Row"];
 
 /**
@@ -140,6 +142,14 @@ export interface TenantScopedClient {
   /** Ordered oldest-first (nulls — never used — first), so the caller just needs the head of the list. */
   listMediaAssets(kind: "image" | "video"): Promise<MediaAssetRow[]>;
   markMediaAssetUsed(id: string): Promise<void>;
+  /**
+   * Newest first. Reads `brief.photoSource` (stamped by creative.ts) from
+   * the latest creatives so the bank-vs-Gemini rule can avoid streaks.
+   * Creatives from before that stamp existed simply don't count.
+   */
+  listRecentPhotoSources(limit: number): Promise<Array<{ source: string; assetId?: string }>>;
+  /** Successful Gemini image generations today (Lima day), from agent_calls. */
+  countGeminiImagesToday(): Promise<number>;
 }
 
 export function createTenantScopedClient(
@@ -519,13 +529,57 @@ export function createTenantScopedClient(
       }
     },
 
+    async listRecentPhotoSources(limit) {
+      const { data, error } = await client
+        .from("creatives")
+        .select("brief")
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list recent photo sources for tenant ${tenantId}`, error);
+      }
+      return (data ?? []).flatMap((row) => {
+        const brief = row.brief as { photoSource?: unknown; photoAssetId?: unknown } | null;
+        if (!brief || typeof brief.photoSource !== "string") return [];
+        return [
+          {
+            source: brief.photoSource,
+            ...(typeof brief.photoAssetId === "string" ? { assetId: brief.photoAssetId } : {}),
+          },
+        ];
+      });
+    },
+
+    async countGeminiImagesToday() {
+      // Lima day, not UTC — publish hours and calendar dates are Lima too.
+      const dayStart = new Date(`${limaToday()}T00:00:00-05:00`).toISOString();
+      const { count, error } = await client
+        .from("agent_calls")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .eq("agent_name", "gemini-image")
+        .eq("status", "success")
+        .gte("created_at", dayStart);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to count Gemini images for tenant ${tenantId}`, error);
+      }
+      return count ?? 0;
+    },
+
     async listMediaAssets(kind) {
+      // Secondary orders make a fresh bank (every last_used_at null) rotate
+      // deterministically instead of in whatever order Postgres feels like.
       const { data, error } = await client
         .from("media_assets")
         .select("*")
         .eq("tenant_id", tenantId)
         .eq("kind", kind)
-        .order("last_used_at", { ascending: true, nullsFirst: true });
+        .order("last_used_at", { ascending: true, nullsFirst: true })
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true });
 
       if (error) {
         throw new TenantIsolationError(`failed to list media_assets for tenant ${tenantId}`, error);
@@ -568,4 +622,34 @@ export async function getActivePrompt(
     throw new ConfigError(`no active prompt found for "${name}"`, error);
   }
   return data.template;
+}
+
+/**
+ * Photos the tagger tick still owes a description, across every tenant —
+ * oldest first, and never one that already burned its attempts.
+ */
+export async function listUntaggedMediaAssets(
+  client: ServiceRoleClient,
+  limit: number,
+): Promise<MediaAssetRow[]> {
+  const { data, error } = await client
+    .from("media_assets")
+    .select("*")
+    .eq("kind", "image")
+    .is("tagged_at", null)
+    .lt("tag_attempts", 3)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+
+  if (error) throw new TenantIsolationError("failed to list untagged media assets", error);
+  return data ?? [];
+}
+
+export async function updateMediaAssetTags(
+  client: ServiceRoleClient,
+  id: string,
+  patch: MediaAssetUpdate,
+): Promise<void> {
+  const { error } = await client.from("media_assets").update(patch).eq("id", id);
+  if (error) throw new TenantIsolationError(`failed to update media asset ${id}`, error);
 }

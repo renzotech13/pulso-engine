@@ -7,7 +7,7 @@ export default async function AdminLimitsPage() {
   const service = createServiceRoleClient();
   const { data: tenants } = await service
     .from("tenants")
-    .select("id, name, slug, token_limit_daily, token_limit_per_job, hitl_mode")
+    .select("id, name, slug, token_limit_daily, token_limit_per_job, hitl_mode, gemini_share, gemini_daily_image_budget")
     .order("name");
 
   return (
@@ -70,6 +70,25 @@ export default async function AdminLimitsPage() {
                       <option value="approve-creatives">approve-creatives (slot auto, creative manual)</option>
                       <option value="full-auto">full-auto (publica solo)</option>
                     </select>
+                    <input
+                      type="number"
+                      name="geminiShare"
+                      min={0}
+                      max={100}
+                      defaultValue={tenant.gemini_share ?? ""}
+                      placeholder="% IA"
+                      title="Porcentaje objetivo de posts con imagen generada por Gemini (vacío = solo banco de fotos, como siempre)"
+                      className={`w-24 ${inputClass}`}
+                    />
+                    <input
+                      type="number"
+                      name="geminiDailyImageBudget"
+                      min={0}
+                      defaultValue={tenant.gemini_daily_image_budget ?? ""}
+                      placeholder="IA/día"
+                      title="Máximo de imágenes Gemini exitosas por día (vacío = sin tope)"
+                      className={`w-24 ${inputClass}`}
+                    />
                     <button
                       type="submit"
                       className="rounded-lg bg-pulso-primary px-3 py-1.5 text-xs font-medium text-white transition-colors duration-300 ease-in-out hover:bg-pulso-accent"

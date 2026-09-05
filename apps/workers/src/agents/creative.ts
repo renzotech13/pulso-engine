@@ -7,27 +7,26 @@ import { AppError } from "@pulso/shared/errors";
 import { callAgentLlm } from "../agent-llm.js";
 import { executeAgentRun } from "@pulso/publish/base-agent";
 import {
+  BANK_STRONG_MATCH,
+  BANK_WEAK_MATCH,
   buildBriefForComponentRef,
   creativeTypeForTemplateType,
+  decidePhotoSource,
   findBannedPhrase,
   pickProductPhoto,
+  rankBankPhotos,
   templateNameForSlotType,
+  type BankPhotoLookup,
   type CreativeCopy,
+  type PhotoMeta,
+  type PhotoSource,
 } from "./creative-helpers.js";
-import { generateThemedImage } from "@pulso/shared/image-gen";
-
-/**
- * Two separate failure modes seen on real Mohrroce posts, both from the image
- * model trying to *illustrate the concept* instead of just photographing a
- * scene: a fake magazine cover with garbled Spanish body copy, and — when the
- * theme mentioned "los 4 sectores" — a labelled infographic with misspelled
- * English captions under each icon. Banning text alone wasn't enough, since
- * the model still reached for the diagram layout and then labelled it, so the
- * composition itself has to be ruled out too. Shared by every prompt that
- * generates a photo meant to sit *behind* our own text overlay.
- */
-const NO_TEXT_IN_IMAGE =
-  "Una sola escena fotográfica real, capturada con cámara. Prohibido: texto, letras, palabras, titulares o tipografía de cualquier idioma dentro de la imagen; portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados. Nada de composiciones que expliquen o enumeren conceptos: solo una fotografía única y natural.";
+import { generateThemedImageDetailed, type ImageAspectRatio } from "@pulso/shared/image-gen";
+import {
+  buildCarouselSlideImagePrompt,
+  buildNewsImagePrompt,
+  buildPostImagePrompt,
+} from "@pulso/shared/image-prompts";
 
 type PromotionRow = Database["public"]["Tables"]["promotions"]["Row"];
 type ProductRow = Database["public"]["Tables"]["products_services"]["Row"];
@@ -55,6 +54,9 @@ const creativeCopySchema = z
     productName: z.string().nullable().optional(),
     caption: z.string().nullable().optional(),
     videoEffects: videoEffectsSchema,
+    // Advisory scene words for the background photo — never required, never
+    // retried on: the ranking works from theme + headline without them.
+    imageKeywords: z.array(z.string()).nullable().optional(),
   })
   .transform((data) => ({
     headline: data.headline,
@@ -62,6 +64,7 @@ const creativeCopySchema = z
     priceLabel: data.priceLabel ?? undefined,
     productName: data.productName ?? undefined,
     caption: data.caption ?? undefined,
+    imageKeywords: (data.imageKeywords ?? []).map((k) => k.trim()).filter(Boolean).slice(0, 6),
     videoEffects: data.videoEffects
       ? {
           hideLogo: data.videoEffects.hideLogo ?? undefined,
@@ -228,7 +231,6 @@ export async function runCreativeAgentForSlot(
       const brandTrainingForCopy = brandTraining
         ? `Indicaciones de la marca (tenlas en cuenta siempre): ${brandTraining}`
         : "";
-      const brandTrainingForImage = brandTraining ? ` Indicaciones de la marca: ${brandTraining}.` : "";
 
       // Exact-date match only — the Planner doesn't record which ephemeris (if
       // any) actually inspired a given day's theme, so this is the one
@@ -324,127 +326,211 @@ export async function runCreativeAgentForSlot(
         return;
       }
 
-      let photoUrl = isCarousel ? undefined : pickProductPhoto(products, copy.productName);
-      let carouselPhotoUrls: Array<string | undefined> | undefined;
-
-      // A news-sourced piece is about a specific real-world story — the
-      // tenant's generic photo library (built for their own products/brand)
-      // has nothing relevant to show, so it's skipped in favor of an
-      // AI-generated image themed to the actual headline. Falls through to
-      // the library below only if Gemini isn't configured or fails.
+      // ── Photo ─────────────────────────────────────────────────────────
+      // The bank used to rotate blindly by last_used_at; now every photo
+      // carries tags (media-tag-tick.ts) and the pick is a keyword ranking
+      // in code, with bank-vs-Gemini decided by a deterministic rule under a
+      // daily Gemini budget. Every outcome is stamped on the brief and the
+      // decision log — nothing here depends on the local model.
+      const [recentPhotoSources, geminiUsedToday] = await Promise.all([
+        ctx.db.listRecentPhotoSources(5),
+        ctx.db.countGeminiImagesToday(),
+      ]);
+      const recentSources = recentPhotoSources.map((r) => r.source as PhotoSource);
+      const lastAssetId = recentPhotoSources.find((r) => r.assetId)?.assetId;
+      // `?? []` / `?? null`: on a database where migration 27 hasn't landed
+      // yet these columns are simply absent from select("*"), and the whole
+      // block then degrades to the legacy behaviour instead of crashing.
+      const bankAssets: BankPhotoLookup[] = mediaAssets.map((asset) => ({ ...asset, tags: asset.tags ?? [] }));
+      const geminiShare = tenant.gemini_share ?? null;
+      const geminiDailyBudget = tenant.gemini_daily_image_budget ?? null;
+      const now = new Date();
+      const rubro = tenant.rubro ?? "general";
       const isNewsSourced = Boolean(newsHeadline);
+      const aspect: ImageAspectRatio = isCarousel || slot.slot_type === "post" ? "1:1" : "9:16";
+      const preferPortrait = !isCarousel && slot.slot_type !== "post";
+
+      let geminiUsedThisRun = 0;
+      const geminiAvailable = () =>
+        Boolean(config.GEMINI_API_KEY) &&
+        (geminiDailyBudget === null ||
+          geminiUsedToday + geminiUsedThisRun < geminiDailyBudget);
+
+      // Every Gemini image call leaves an agent_calls row (agent_id null, like
+      // blocked LLM calls do) — that is what the daily budget counts and what
+      // makes rate limits and failures visible at all.
+      const generateAndUpload = async (prompt: string, suffix: string): Promise<string | undefined> => {
+        const result = await generateThemedImageDetailed(prompt, { aspectRatio: aspect });
+        await ctx.db.insertAgentCall({
+          agent_id: null,
+          agent_name: "gemini-image",
+          job_id: jobId ?? null,
+          correlation_id: correlationId,
+          status: result.ok ? "success" : "error",
+          latency_ms: result.latencyMs,
+          ...(result.ok ? {} : { error_message: result.error }),
+        });
+        if (!result.ok) return undefined;
+        geminiUsedThisRun++;
+        const assetPath = `${tenantId}/generated-${calendarSlotId}${suffix}-${Date.now()}.png`;
+        const { error: uploadError } = await service.storage
+          .from("creative-assets")
+          .upload(assetPath, result.buffer, { contentType: "image/png" });
+        if (uploadError) return undefined;
+        return service.storage.from("creative-assets").getPublicUrl(assetPath).data.publicUrl;
+      };
+
+      let photoUrl: string | undefined;
+      let carouselPhotoUrls: Array<string | undefined> | undefined;
+      let photoMeta: PhotoMeta = { photoSource: "gradient" };
+      let bankScore: number | undefined;
+      let photoReason = "Degradado: sin foto";
 
       if (isCarousel) {
-        // Every slide gets its own photo, themed to that slide's own text
-        // (not just the carousel's overall theme) — a shared cover photo
-        // reused across all slides isn't what was asked for; each one
-        // should visually match what it says. Sequential, not parallel: the
-        // Gemini image endpoint has hit real per-minute rate limits before
-        // (see image-gen.ts), and a carousel is generated once in the
-        // background, not on a user-facing request path, so the extra time
-        // is a non-issue.
-        const remainingMediaAssets = [...mediaAssets];
-        carouselPhotoUrls = [];
-        for (const [i, slideText] of (copy.slides ?? []).entries()) {
-          let slidePhotoUrl: string | undefined;
+        // Cover and closing slide are always generated for the theme; a
+        // middle slide takes a real bank photo when one clearly matches its
+        // own text (tenant opted in via gemini_share) — real people inside
+        // the carousel and one Gemini call fewer. Sequential, not parallel:
+        // the image endpoint has hit real per-minute rate limits before.
+        const slides = copy.slides ?? [];
+        const usedInCarousel: string[] = [];
+        const urls: Array<string | undefined> = [];
+        const sources: PhotoSource[] = [];
+        const assetIds: Array<string | undefined> = [];
 
-          if (config.GEMINI_API_KEY) {
-            const prompt = [
-              `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant.rubro ?? "general"}".`,
-              `Tema general del carrusel: ${slot.theme}.`,
-              // Deliberately NOT quoted as «este slide dice "..."» — con esa
-              // formulación el modelo entendía que la frase debía aparecer
-              // escrita y la dibujaba dentro de la foto, mal escrita (se vio
-              // en un carrusel real: "La burocracia no tiene ur pé frenarte").
-              // Acá la frase es solo contexto de qué ilustrar.
-              `Concepto a ilustrar visualmente, sin escribirlo: ${slideText}`,
-              `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
-            ].join(" ");
+        for (const [i, slideText] of slides.entries()) {
+          const isMiddle = i > 0 && i < slides.length - 1;
+          const best = rankBankPhotos(bankAssets, { texts: [slot.theme, slideText], now, excludeIds: usedInCarousel })[0];
+          let url: string | undefined;
+          let source: PhotoSource = "gradient";
+          let assetId: string | undefined;
 
-            const imageBuffer = await generateThemedImage(prompt);
-            if (imageBuffer) {
-              const assetPath = `${tenantId}/generated-${calendarSlotId}-slide${i}-${Date.now()}.png`;
-              const { error: uploadError } = await service.storage
-                .from("creative-assets")
-                .upload(assetPath, imageBuffer, { contentType: "image/png" });
-              if (!uploadError) {
-                const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
-                slidePhotoUrl = publicUrlData.publicUrl;
-              }
-            }
+          if (isMiddle && geminiShare !== null && best && best.score >= BANK_STRONG_MATCH) {
+            url = best.asset.url;
+            source = "bank";
+            assetId = best.asset.id;
           }
-
-          // Gemini unavailable/failed for this slide — an unused library
-          // photo still beats a text-only gradient for that one slide.
-          if (!slidePhotoUrl) {
-            const fallbackMediaAsset = remainingMediaAssets.shift();
-            if (fallbackMediaAsset) {
-              slidePhotoUrl = fallbackMediaAsset.url;
-              await ctx.db.markMediaAssetUsed(fallbackMediaAsset.id);
-            }
+          if (!url && geminiAvailable()) {
+            url = await generateAndUpload(
+              buildCarouselSlideImagePrompt({ rubro, theme: slot.theme, slideText, brandTraining }),
+              `-slide${i}`,
+            );
+            if (url) source = "gemini";
           }
-
-          carouselPhotoUrls.push(slidePhotoUrl);
+          if (!url && best && best.score >= BANK_WEAK_MATCH) {
+            url = best.asset.url;
+            source = "bank";
+            assetId = best.asset.id;
+          }
+          if (source === "bank" && assetId) {
+            usedInCarousel.push(assetId);
+            await ctx.db.markMediaAssetUsed(assetId);
+          }
+          urls.push(url);
+          sources.push(source);
+          assetIds.push(assetId);
         }
-      }
 
-      // No specific catalog product matched — prefer the tenant's own
-      // uploaded photo library over an AI-generated image, since a real
-      // photo the tenant chose beats a synthetic one whenever one's
-      // available. listMediaAssets already orders oldest/never-used first,
-      // so this naturally cycles through every uploaded photo before any
-      // gets reused.
-      const pickedMediaAsset = !photoUrl && !isNewsSourced && !isCarousel ? mediaAssets[0] : undefined;
-      if (pickedMediaAsset) {
-        photoUrl = pickedMediaAsset.url;
-        await ctx.db.markMediaAssetUsed(pickedMediaAsset.id);
-      }
+        carouselPhotoUrls = urls;
+        const count = (kind: PhotoSource) => sources.filter((sourceKind) => sourceKind === kind).length;
+        photoMeta = {
+          photoSource: count("gemini") > 0 ? "gemini" : count("bank") > 0 ? "bank" : "gradient",
+          photoSources: sources,
+          photoAssetIds: assetIds,
+        };
+        photoReason = `Carrusel: ${count("gemini")} Gemini, ${count("bank")} banco, ${count("gradient")} degradado`;
+      } else {
+        const productPhoto = pickProductPhoto(products, copy.productName);
+        const keywords = copy.imageKeywords ?? [];
+        const excludeIds = lastAssetId ? [lastAssetId] : [];
 
-      // Still no photo — try an AI-generated one instead of just falling
-      // back to the brand gradient. Inactive whenever GEMINI_API_KEY isn't
-      // configured (generateThemedImage itself no-ops), so tenants who
-      // never set one and never uploaded to their photo library see
-      // exactly today's behavior.
-      if (!photoUrl && !isCarousel && config.GEMINI_API_KEY) {
-        const styleHint = accentEphemeris
-          ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
-          : "";
-        const prompt = isNewsSourced
-          ? [
-              `Fotografía profesional y editorial para una publicación de noticias sobre: "${newsHeadline}".`,
-              `Enfoque para este negocio (${tenant.rubro ?? "general"}): ${slot.theme}.`,
-              `Estilo fotoperiodístico, realista, sin logos. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
-            ].join(" ")
-          : [
-              `Fotografía profesional de marketing para un negocio de tipo "${tenant.rubro ?? "general"}".`,
-              `Tema: ${slot.theme}.`,
-              styleHint,
-              `Estilo limpio y corporativo. ${NO_TEXT_IN_IMAGE}${brandTrainingForImage}`,
-            ]
-              .filter(Boolean)
-              .join(" ");
-
-        const imageBuffer = await generateThemedImage(prompt);
-        if (imageBuffer) {
-          const assetPath = `${tenantId}/generated-${calendarSlotId}-${Date.now()}.png`;
-          const { error: uploadError } = await service.storage
-            .from("creative-assets")
-            .upload(assetPath, imageBuffer, { contentType: "image/png" });
-
-          if (!uploadError) {
-            const { data: publicUrlData } = service.storage.from("creative-assets").getPublicUrl(assetPath);
-            photoUrl = publicUrlData.publicUrl;
+        if (productPhoto) {
+          photoUrl = productPhoto;
+          photoMeta = { photoSource: "product" };
+          photoReason = `Foto del catálogo (${copy.productName})`;
+        } else if (isNewsSourced) {
+          // A real headline is too specific for a generic bank: Gemini first,
+          // the ranked bank only as a fallback — and only if it actually
+          // relates, never "any photo is better than none".
+          const best = rankBankPhotos(bankAssets, {
+            texts: [newsHeadline, slot.theme, ...keywords],
+            now,
+            excludeIds,
+            preferPortrait,
+          })[0];
+          if (geminiAvailable()) {
+            photoUrl = await generateAndUpload(
+              buildNewsImagePrompt({ rubro, theme: slot.theme, headline: newsHeadline ?? slot.theme, brandTraining }),
+              "",
+            );
           }
-        }
-      }
+          if (photoUrl) {
+            photoMeta = { photoSource: "gemini" };
+            photoReason = "Gemini: pieza de noticias";
+          } else if (best && best.score >= BANK_WEAK_MATCH) {
+            photoUrl = best.asset.url;
+            bankScore = best.score;
+            await ctx.db.markMediaAssetUsed(best.asset.id);
+            photoMeta = { photoSource: "bank", photoAssetId: best.asset.id };
+            photoReason = `Banco como respaldo de noticias (score ${best.score.toFixed(2)}: ${best.matched.join(", ")})`;
+          } else {
+            photoReason = "Degradado: Gemini no disponible o falló y el banco no tiene nada relacionado con la noticia";
+          }
+        } else {
+          const best = rankBankPhotos(bankAssets, {
+            texts: [slot.theme, ...keywords, copy.headline, copy.subheadline],
+            now,
+            excludeIds,
+            preferPortrait,
+          })[0];
+          const decision = decidePhotoSource({
+            bestBankScore: best?.score ?? null,
+            geminiAvailable: geminiAvailable(),
+            recentSources,
+            geminiShare: geminiShare,
+          });
 
-      // Gemini wasn't configured or failed — a library photo (even if
-      // generic) still beats the plain gradient fallback.
-      if (!photoUrl && !isCarousel && isNewsSourced) {
-        const fallbackMediaAsset = mediaAssets[0];
-        if (fallbackMediaAsset) {
-          photoUrl = fallbackMediaAsset.url;
-          await ctx.db.markMediaAssetUsed(fallbackMediaAsset.id);
+          const useBank = async (reason: string) => {
+            if (!best) return false;
+            photoUrl = best.asset.url;
+            bankScore = best.score;
+            await ctx.db.markMediaAssetUsed(best.asset.id);
+            photoMeta = { photoSource: "bank", photoAssetId: best.asset.id };
+            photoReason = `${reason} (score ${best.score.toFixed(2)}: ${best.matched.join(", ") || "rotación"})`;
+            return true;
+          };
+
+          if (decision === "bank") {
+            await useBank("Foto del banco");
+          } else if (decision === "gemini") {
+            const ephemerisHint = accentEphemeris
+              ? `Usa colores rojo y blanco (${accentEphemeris.name}), estilo patrio peruano.`
+              : undefined;
+            photoUrl = await generateAndUpload(
+              buildPostImagePrompt({
+                rubro,
+                theme: slot.theme,
+                headline: copy.headline,
+                keywords,
+                ephemerisHint,
+                brandTraining,
+              }),
+              "",
+            );
+            if (photoUrl) {
+              photoMeta = { photoSource: "gemini" };
+              photoReason =
+                best && best.score < BANK_WEAK_MATCH
+                  ? `Gemini: sin foto relevante en el banco (mejor score ${best.score.toFixed(2)})`
+                  : "Gemini: reparto banco/IA";
+            } else if (best && best.score >= BANK_WEAK_MATCH) {
+              await useBank("Foto del banco porque Gemini falló");
+            } else {
+              photoReason = "Degradado: Gemini falló y el banco no tiene nada relacionado";
+            }
+          } else {
+            photoReason = "Degradado: banco vacío y sin Gemini";
+          }
         }
       }
 
@@ -454,6 +540,7 @@ export async function runCreativeAgentForSlot(
         photoUrl,
         colorOverride,
         carouselPhotoUrls,
+        photoMeta,
       );
 
       // template.type only distinguishes static/video (creativeTypeForTemplateType)
@@ -477,8 +564,15 @@ export async function runCreativeAgentForSlot(
       await ctx.db.insertDecisionLog({
         agent: "creative",
         observed: { calendar_slot_id: calendarSlotId, slot_type: slot.slot_type, theme: slot.theme },
-        decision: { creative_id: creative.id, template: templateName },
-        rationale: "Copy generado por el LLM local a partir de productos/promociones activos.",
+        decision: {
+          creative_id: creative.id,
+          template: templateName,
+          photo_source: photoMeta.photoSource,
+          ...(photoMeta.photoAssetId ? { photo_asset_id: photoMeta.photoAssetId } : {}),
+          ...(bankScore !== undefined ? { bank_score: Number(bankScore.toFixed(3)) } : {}),
+          gemini_calls: geminiUsedThisRun,
+        },
+        rationale: `Copy generado por el LLM local a partir de productos/promociones activos. ${photoReason}.`,
         correlation_id: correlationId,
       });
 

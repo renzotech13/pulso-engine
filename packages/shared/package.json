@@ -10,7 +10,9 @@
     "./ids": "./src/ids.ts",
     "./llm": "./src/llm.ts",
     "./image-gen": "./src/image-gen.ts",
-    "./time": "./src/time.ts"
+    "./time": "./src/time.ts",
+    "./image-describe": "./src/image-describe.ts",
+    "./image-prompts": "./src/image-prompts.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

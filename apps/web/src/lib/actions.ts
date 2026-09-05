@@ -3,7 +3,9 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { generateThemedImage } from "@pulso/shared/image-gen";
+import { generateThemedImageDetailed } from "@pulso/shared/image-gen";
+import { buildCarouselSlideImagePrompt } from "@pulso/shared/image-prompts";
+import { normalizeTags } from "@pulso/shared/image-describe";
 import { runPublishAgentForCreative } from "@pulso/publish/agent";
 import { newCorrelationId } from "@pulso/shared/ids";
 import { createServiceRoleClient } from "./supabase/service";
@@ -601,6 +603,39 @@ export async function deleteMediaAssetAction(formData: FormData): Promise<void> 
 }
 
 /**
+ * Owner-corrected tags for one bank photo. Marks the row `manual` so the
+ * tagging tick never overwrites a human's wording, and normalizes the same
+ * way Gemini's tags are (lowercase, no accents) so the ranker treats both
+ * alike.
+ */
+export async function updateMediaAssetTagsAction(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const assetId = String(formData.get("assetId") ?? "");
+  if (!tenantId || !assetId) return;
+
+  const tags = normalizeTags(String(formData.get("tags") ?? "").split(/[,\n]/));
+  const description = String(formData.get("description") ?? "").trim() || null;
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  const { error } = await supabase
+    .from("media_assets")
+    .update({
+      tags,
+      description,
+      tag_source: "manual",
+      tagged_at: new Date().toISOString(),
+      tag_error: null,
+    })
+    .eq("id", assetId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/brand-kit");
+}
+
+/**
  * Uploads one or more real photos, composites them under the tenant's own
  * "photo-frame" template (configured in Brand Kit), and creates the
  * calendar slot + creative directly — no Planner/LLM involved, this is a
@@ -877,24 +912,31 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
   ]);
 
   // Same tenant-authored guidance creative.ts folds into every image prompt
-  // (see apps/workers/src/agents/creative.ts) — kept in sync by hand since
-  // this action builds its own prompt rather than reusing that one.
+  // — built by the one shared prompt module now, so the two can't drift.
   const brandVoiceParts = [brandKit?.tone_description, brandKit?.voice_training].filter(
     (part): part is string => Boolean(part?.trim()),
   );
-  const brandTrainingForImage =
-    brandVoiceParts.length > 0 ? ` Indicaciones de la marca: ${brandVoiceParts.join("\n")}.` : "";
+  const prompt = buildCarouselSlideImagePrompt({
+    rubro: tenant?.rubro ?? "general",
+    theme: slot?.theme ?? "",
+    slideText,
+    ...(brandVoiceParts.length > 0 ? { brandTraining: brandVoiceParts.join("\n") } : {}),
+  });
 
-  const prompt = [
-    `Fotografía temática para UN slide de un carrusel de Instagram/Facebook, para un negocio de tipo "${tenant?.rubro ?? "general"}".`,
-    `Tema general del carrusel: ${slot?.theme ?? ""}.`,
-    // Ver el comentario equivalente en creative.ts: citar la frase como «este
-    // slide dice "..."» hacía que el modelo la dibujara dentro de la foto.
-    `Concepto a ilustrar visualmente, sin escribirlo: ${slideText}`,
-    `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos. Una sola escena fotográfica real, capturada con cámara. Prohibido: texto, letras, palabras, titulares o tipografía de cualquier idioma dentro de la imagen; portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados.${brandTrainingForImage}`,
-  ].join(" ");
-
-  const imageBuffer = await generateThemedImage(prompt);
+  const result = await generateThemedImageDetailed(prompt, { aspectRatio: "1:1" });
+  // Same audit row the worker writes, so the tenant's daily Gemini budget
+  // counts dashboard regenerations too.
+  await service.from("agent_calls").insert({
+    tenant_id: tenantId,
+    agent_id: null,
+    agent_name: "gemini-image",
+    job_id: null,
+    correlation_id: crypto.randomUUID(),
+    status: result.ok ? "success" : "error",
+    latency_ms: result.latencyMs,
+    ...(result.ok ? {} : { error_message: result.error }),
+  });
+  const imageBuffer = result.ok ? result.buffer : null;
   if (!imageBuffer) {
     throw new Error("Gemini no devolvió una imagen — revisa GEMINI_API_KEY o el límite de uso.");
   }
@@ -1215,6 +1257,10 @@ export async function updateTenantLimitsAction(formData: FormData): Promise<void
   const dailyRaw = String(formData.get("tokenLimitDaily") ?? "").trim();
   const perJobRaw = String(formData.get("tokenLimitPerJob") ?? "").trim();
   const hitlMode = String(formData.get("hitlMode") ?? "").trim();
+  // Empty = NULL: no Gemini share means the legacy bank-first behaviour, no
+  // budget means unlimited — both exactly what every existing tenant has.
+  const geminiShareRaw = String(formData.get("geminiShare") ?? "").trim();
+  const geminiBudgetRaw = String(formData.get("geminiDailyImageBudget") ?? "").trim();
 
   const service = createServiceRoleClient();
   const { error } = await service
@@ -1223,6 +1269,8 @@ export async function updateTenantLimitsAction(formData: FormData): Promise<void
       token_limit_daily: dailyRaw ? Number(dailyRaw) : null,
       token_limit_per_job: perJobRaw ? Number(perJobRaw) : null,
       ...(hitlMode ? { hitl_mode: hitlMode } : {}),
+      gemini_share: geminiShareRaw ? Number(geminiShareRaw) : null,
+      gemini_daily_image_budget: geminiBudgetRaw ? Number(geminiBudgetRaw) : null,
     })
     .eq("id", tenantId);
 
