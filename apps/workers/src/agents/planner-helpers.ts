@@ -143,3 +143,18 @@ export function applyWeeklyCarouselCap<T extends { date: string; slot_type: stri
     return slot;
   });
 }
+
+/**
+ * Same never-trust-the-model posture as applyWeeklyCarouselCap: while
+ * tenants.reels_paused is on ("hasta nuevo aviso" — open reel bugs being
+ * fixed), no new slot the Planner proposes should be a reel, prompt hint or
+ * not. Existing already-approved reel slots are handled separately, at
+ * generation time in creative.ts, since they were placed before the pause.
+ */
+export function applyReelsPause<T extends { slot_type: string }>(
+  proposedSlots: readonly T[],
+  reelsPaused: boolean,
+): T[] {
+  if (!reelsPaused) return [...proposedSlots];
+  return proposedSlots.map((slot) => (slot.slot_type === "reel" ? { ...slot, slot_type: "post" } : slot));
+}

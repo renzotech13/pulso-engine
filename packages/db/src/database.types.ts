@@ -1010,6 +1010,7 @@ export type Database = {
           max_weekly_carousels: number | null
           name: string
           publish_hours: number[]
+          reels_paused: boolean
           rubro: string | null
           slug: string
           status: string
@@ -1026,6 +1027,7 @@ export type Database = {
           max_weekly_carousels?: number | null
           name: string
           publish_hours?: number[]
+          reels_paused?: boolean
           rubro?: string | null
           slug: string
           status?: string
@@ -1042,6 +1044,7 @@ export type Database = {
           max_weekly_carousels?: number | null
           name?: string
           publish_hours?: number[]
+          reels_paused?: boolean
           rubro?: string | null
           slug?: string
           status?: string

@@ -7,6 +7,7 @@ import { createLogger } from "@pulso/shared/logger";
 import { callAgentLlm } from "../agent-llm.js";
 import { executeAgentRun } from "@pulso/publish/base-agent";
 import {
+  applyReelsPause,
   applyWeeklyCarouselCap,
   computeOpenDates,
   formatDate,
@@ -173,11 +174,12 @@ export async function runPlannerForTenant(
     // open-dates check below. `existingSlots` seeds the count so a second
     // planner run this week doesn't stack more carousels on top of ones a
     // previous run (or a human) already placed.
-    const cappedSlots = applyWeeklyCarouselCap(
+    const carouselCappedSlots = applyWeeklyCarouselCap(
       proposal.slots,
       existingSlots.filter((s) => s.slot_index === 0),
       tenant.max_weekly_carousels ?? undefined,
     );
+    const cappedSlots = applyReelsPause(carouselCappedSlots, tenant.reels_paused);
 
     for (const slot of cappedSlots) {
       if (!openDatesSet.has(slot.date)) {

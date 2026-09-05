@@ -113,6 +113,8 @@ export interface TenantScopedClient {
     nowHour: number,
   ): Promise<Array<{ creativeId: string; calendarSlotId: string }>>;
   getContentCalendarSlotById(id: string): Promise<ContentCalendarRow | null>;
+  /** Used when tenants.reels_paused reassigns an already-approved 'reel' slot to 'post' instead of leaving it stuck. */
+  updateCalendarSlotType(calendarSlotId: string, slotType: ContentCalendarRow["slot_type"]): Promise<void>;
   setCalendarSlotCreative(calendarSlotId: string, creativeId: string): Promise<void>;
   /**
    * Marks a calendar SLOT (not the current creative) as published, once,
@@ -318,6 +320,21 @@ export function createTenantScopedClient(
         throw new TenantIsolationError(`failed to get content_calendar slot ${id} for tenant ${tenantId}`, error);
       }
       return data;
+    },
+
+    async updateCalendarSlotType(calendarSlotId, slotType) {
+      const { error } = await client
+        .from("content_calendar")
+        .update({ slot_type: slotType })
+        .eq("id", calendarSlotId)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(
+          `failed to update calendar slot ${calendarSlotId} type for tenant ${tenantId}`,
+          error,
+        );
+      }
     },
 
     async setCalendarSlotCreative(calendarSlotId, creativeId) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyReelsPause,
   applyWeeklyCarouselCap,
   computeOpenDates,
   resolveEphemeridesInWindow,
@@ -137,5 +138,23 @@ describe("applyWeeklyCarouselCap", () => {
     const proposed = [post("2026-09-01")];
     const result = applyWeeklyCarouselCap(proposed, [carousel("2026-08-31")], 0);
     expect(result[0]!.slot_type).toBe("post");
+  });
+});
+
+describe("applyReelsPause", () => {
+  const slots = [{ slot_type: "reel" }, { slot_type: "post" }, { slot_type: "carousel" }, { slot_type: "reel" }];
+
+  it("passes everything through untouched while the pause is off", () => {
+    expect(applyReelsPause(slots, false)).toEqual(slots);
+  });
+
+  it("turns every proposed reel into a post while the pause is on", () => {
+    expect(applyReelsPause(slots, true).map((s) => s.slot_type)).toEqual(["post", "post", "carousel", "post"]);
+  });
+
+  it("does not mutate the proposals it was given", () => {
+    const input = [{ slot_type: "reel" }];
+    applyReelsPause(input, true);
+    expect(input[0]!.slot_type).toBe("reel");
   });
 });
