@@ -45,14 +45,17 @@ export async function fillNewsSlotForTenant(
       const existing = await ctx.db.listContentCalendar(date, date);
       if (existing.some((slot) => slot.slot_index === 1)) return;
 
-      // Freshest first: today's news beats one from three days ago, but the
-      // older ones stay candidates — so a day without relevant headlines
-      // pulls from the backlog instead of leaving the slot empty.
+      // MOST RELEVANT first, freshness only as the tiebreak. Ordering by
+      // recency alone meant a tangential story published an hour ago beat
+      // one squarely about the tenant's trade published yesterday. Older
+      // suggestions stay candidates, so a day with no new headlines pulls
+      // from the backlog instead of leaving the slot empty.
       const { data: suggestion } = await service
         .from("news_suggestions")
-        .select("id, headline, angle")
+        .select("id, headline, angle, relevance")
         .eq("tenant_id", tenantId)
         .eq("status", "pending")
+        .order("relevance", { ascending: false, nullsFirst: false })
         .order("published_at", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false })
         .limit(1)
@@ -104,9 +107,11 @@ export async function fillNewsSlotForTenant(
 
       await ctx.db.insertDecisionLog({
         agent: "news",
-        observed: { date, headline: suggestion.headline },
+        observed: { date, headline: suggestion.headline, relevance: suggestion.relevance },
         decision: { slot_index: 1, publish_hour: newsHour, theme: suggestion.angle },
-        rationale: `Se llenó el slot de actualidad del ${date} con la sugerencia pendiente más reciente.`,
+        rationale: `Se llenó el slot de actualidad del ${date} con la sugerencia pendiente más relevante para el rubro${
+          suggestion.relevance ? ` (relevancia ${suggestion.relevance}/5)` : ""
+        }.`,
         correlation_id: correlationId,
       });
     },

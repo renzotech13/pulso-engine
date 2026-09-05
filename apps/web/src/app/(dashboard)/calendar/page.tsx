@@ -85,6 +85,16 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   // A day can hold more than one slot now that a tenant can publish several
   // times a day (see `tenants.publish_hours`), so the date alone no longer
   // identifies a publication.
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("publish_hours")
+    .eq("id", ctx.tenantId)
+    .maybeSingle();
+  // The turns this business publishes in, e.g. [9, 18]. An empty turn is
+  // shown too: a day that only has its morning piece should look half-empty,
+  // not finished.
+  const publishHours = tenant?.publish_hours ?? [];
+
   const slotsByDate = new Map<string, NonNullable<typeof slots>>();
   for (const slot of slots ?? []) {
     const daySlots = slotsByDate.get(slot.date);
@@ -256,6 +266,22 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                           </p>
                         );
                       })}
+                    {/* Turns with nothing in them yet, so a half-planned day
+                        reads as half-planned instead of done. */}
+                    {cell.inMonth &&
+                      cell.date >= today &&
+                      publishHours.map((hour, index) =>
+                        daySlots.some((daySlot) => daySlot.slot_index === index) ? null : (
+                          <p
+                            key={`free-${index}`}
+                            className="flex min-w-0 items-center gap-1 text-xs leading-tight text-neutral-700"
+                          >
+                            <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-neutral-700" />
+                            <span className="shrink-0">{hour}h</span>
+                            <span className="truncate">libre</span>
+                          </p>
+                        ),
+                      )}
                     {/* The thumbnail only fits when the day has a single slot;
                         with two, the themes already fill the cell. */}
                     {soleCreative && soleCreative.asset_urls.length > 0 && cell.inMonth && (

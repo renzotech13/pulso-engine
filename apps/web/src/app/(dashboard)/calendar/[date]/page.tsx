@@ -241,7 +241,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: daySlots }, { data: photoFrame }, { data: studentShowcase }] = await Promise.all([
+  const [{ data: daySlots }, { data: photoFrame }, { data: studentShowcase }, { data: tenant }] = await Promise.all([
     supabase
       .from("content_calendar")
       .select("*")
@@ -260,11 +260,36 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
       .eq("tenant_id", ctx.tenantId)
       .eq("component_ref", "student-showcase")
       .maybeSingle(),
+    supabase.from("tenants").select("publish_hours").eq("id", ctx.tenantId).maybeSingle(),
   ]);
 
+  // The turns this business publishes in, e.g. [9, 18] — used to label the
+  // slot switcher and to offer a target turn when moving a piece.
+  const publishHours = tenant?.publish_hours ?? [];
+
   const slots = daySlots ?? [];
-  const slot = slots.find((s) => s.slot_index === requestedSlotIndex) ?? slots[0] ?? null;
-  const slotIndex = slot?.slot_index ?? requestedSlotIndex;
+  // Turns are driven by the tenant's schedule, with any extra slot that
+  // exists beyond it (a manually created one) appended, so nothing is
+  // hidden. An empty turn is still a turn you can open.
+  const turnIndexes = [
+    ...new Set([...publishHours.map((_, index) => index), ...slots.map((s) => s.slot_index)]),
+  ].sort((a, b) => a - b);
+  const turns = turnIndexes.map((index) => {
+    const filled = slots.find((s) => s.slot_index === index);
+    const hour = filled?.publish_hour ?? publishHours[index];
+    return {
+      index,
+      filled: Boolean(filled),
+      label: hour === undefined || hour === null ? `Publicación ${index + 1}` : formatHour(hour),
+    };
+  });
+  // Resolve the turn first, then the piece in it — so an empty turn shows as
+  // empty, and a day whose only piece sits in a later turn opens on that
+  // piece instead of on a blank page.
+  const slotIndex = turnIndexes.includes(requestedSlotIndex)
+    ? requestedSlotIndex
+    : (slots[0]?.slot_index ?? requestedSlotIndex);
+  const slot = slots.find((s) => s.slot_index === slotIndex) ?? null;
 
   // Days the Planner hasn't touched have no slot yet — that's fine here
   // (unlike the old behavior), since "Publicar con marco" can create one.
@@ -307,16 +332,16 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
         title={title}
         description={slot?.theme ?? "Sin contenido planificado"}
         actions={
-          slots.length > 1 ? (
+          // Every turn the business publishes in, not just the ones that
+          // already have a piece — otherwise an empty afternoon is invisible
+          // and there is no way to open it and fill it.
+          turns.length > 1 ? (
             <Segmented
-              ariaLabel="Publicación del día"
-              items={slots.map((daySlot) => ({
-                href: `/calendar/${date}?month=${backMonth}&view=${backView}&slot=${daySlot.slot_index}${backFilterQuery}`,
-                label:
-                  daySlot.publish_hour === null
-                    ? `Publicación ${daySlot.slot_index + 1}`
-                    : formatHour(daySlot.publish_hour),
-                active: daySlot.slot_index === slotIndex,
+              ariaLabel="Turno del día"
+              items={turns.map((turn) => ({
+                href: `/calendar/${date}?month=${backMonth}&view=${backView}&slot=${turn.index}${backFilterQuery}`,
+                label: turn.filled ? turn.label : `${turn.label} · libre`,
+                active: turn.index === slotIndex,
               }))}
             />
           ) : undefined
@@ -498,7 +523,12 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 </div>
 
                 <div className="border-t border-ink-700 pt-4">
-                  <MoveDateForm tenantId={ctx.tenantId} slotId={slot.id} date={date} />
+                  <MoveDateForm
+                    tenantId={ctx.tenantId}
+                    slotId={slot.id}
+                    date={date}
+                    publishHours={publishHours}
+                  />
                 </div>
               </div>
             </Card>

@@ -43,6 +43,7 @@ describe("mapRelevantPicks", () => {
         sourceName: "Gestión",
         summary: "Un resumen breve",
         angle: "Ángulo para el segundo",
+        relevance: null,
         publishedAt: null,
       },
     ]);
@@ -74,5 +75,19 @@ describe("dedupeHeadlines", () => {
     expect(result).toHaveLength(2);
     expect(result[0]?.title).toBe("Primera versión");
     expect(result[1]?.title).toBe("Distinta");
+  });
+});
+
+describe("mapRelevantPicks — relevance", () => {
+  const headlines = [
+    { title: "Uno", link: "https://example.com/1", source: "Gestión", summary: "", publishedAt: null },
+  ];
+
+  it("carries the model's 1-5 relevance through to the draft", () => {
+    expect(mapRelevantPicks(headlines, [{ index: 1, angle: "a", relevance: 5 }])[0]!.relevance).toBe(5);
+  });
+
+  it("stores null when the model omitted it, so the pick still gets saved", () => {
+    expect(mapRelevantPicks(headlines, [{ index: 1, angle: "a" }])[0]!.relevance).toBeNull();
   });
 });

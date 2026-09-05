@@ -123,6 +123,8 @@ export async function moveCalendarSlotDateAction(
   const tenantId = String(formData.get("tenantId") ?? "");
   const slotId = String(formData.get("slotId") ?? "");
   const newDate = String(formData.get("newDate") ?? "");
+  // "" = whichever turn is free on that day; "0"/"1"/… = that turn exactly.
+  const requestedSlot = String(formData.get("newSlotIndex") ?? "").trim();
   if (!tenantId || !slotId || !newDate) return { error: "Falta la fecha." };
 
   const supabase = await createSupabaseServerClient();
@@ -130,22 +132,67 @@ export async function moveCalendarSlotDateAction(
 
   const { data: slot } = await supabase
     .from("content_calendar")
-    .select("date, tenant_id")
+    .select("date, slot_index, tenant_id")
     .eq("id", slotId)
     .maybeSingle();
   if (!slot || slot.tenant_id !== tenantId) return { error: "Este día ya no existe." };
-  if (slot.date === newDate) return { error: null };
 
-  const { error } = await supabase.from("content_calendar").update({ date: newDate }).eq("id", slotId);
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("publish_hours")
+    .eq("id", tenantId)
+    .maybeSingle();
+  const publishHours = tenant?.publish_hours ?? [];
+  const turnsPerDay = Math.max(publishHours.length, 1);
+
+  // Moving used to keep the slot's own index, so a morning post could only
+  // ever land on a day whose morning was free — otherwise the unique
+  // (tenant_id, date, slot_index) index rejected it and the owner just saw
+  // "ya hay contenido planificado". Now the target turn is chosen: the one
+  // asked for, or the first free one that day.
+  const { data: taken } = await supabase
+    .from("content_calendar")
+    .select("id, slot_index")
+    .eq("tenant_id", tenantId)
+    .eq("date", newDate);
+  const takenIndexes = new Set((taken ?? []).filter((row) => row.id !== slotId).map((row) => row.slot_index));
+
+  let targetIndex: number;
+  if (requestedSlot !== "") {
+    targetIndex = Number(requestedSlot);
+    if (takenIndexes.has(targetIndex)) {
+      const turnName = publishHours[targetIndex] === undefined ? "turno" : `turno de las ${publishHours[targetIndex]}:00`;
+      return { error: `El ${turnName} del ${newDate} ya está ocupado. Elige el otro turno u otro día.` };
+    }
+  } else {
+    const free = Array.from({ length: turnsPerDay }, (_, i) => i).find((i) => !takenIndexes.has(i));
+    if (free === undefined) {
+      return { error: `El ${newDate} ya tiene sus ${turnsPerDay} publicaciones. Elige otro día.` };
+    }
+    targetIndex = free;
+  }
+
+  if (slot.date === newDate && slot.slot_index === targetIndex) return { error: null };
+
+  const { error } = await supabase
+    .from("content_calendar")
+    .update({
+      date: newDate,
+      slot_index: targetIndex,
+      // The hour belongs to the turn, not to the piece: a post moved into
+      // the afternoon turn has to go out in the afternoon.
+      ...(publishHours[targetIndex] === undefined ? {} : { publish_hour: publishHours[targetIndex] }),
+    })
+    .eq("id", slotId);
   if (error) {
     if (error.code === "23505") {
-      return { error: `Ya hay contenido planificado para el ${newDate}. Elige otro día.` };
+      return { error: `Ese turno del ${newDate} acaba de ocuparse. Vuelve a intentar.` };
     }
     return { error: error.message };
   }
 
   revalidatePath("/calendar");
-  redirect(`/calendar/${newDate}`);
+  redirect(`/calendar/${newDate}?slot=${targetIndex}`);
 }
 
 async function approveCreativeActionImpl(formData: FormData): Promise<void> {

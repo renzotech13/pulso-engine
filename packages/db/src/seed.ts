@@ -199,10 +199,16 @@ Rubro del negocio: {{RUBRO}}
 Titulares de hoy:
 {{HEADLINES}}
 
-Para cada titular que sea genuinamente relevante y aprovechable para este negocio, indica su número y un ángulo de contenido concreto: una idea específica de cómo este negocio podría usar esa noticia en una publicación (no una relación forzada ni genérica). Es mejor devolver pocos titulares o ninguno que inventar relevancia donde no la hay.
+Para cada titular que sea genuinamente relevante y aprovechable para este negocio, indica su número, un ángulo de contenido concreto (una idea específica de cómo este negocio podría usar esa noticia en una publicación, no una relación forzada ni genérica) y qué tan relevante es para el rubro en una escala de 1 a 5:
+5 = habla directamente del rubro y afecta a sus clientes ya mismo (una norma nueva, un plazo, una fiscalización).
+4 = del rubro, pero sin urgencia inmediata.
+3 = del entorno de sus clientes (economía, negocios) y se puede aterrizar al rubro con naturalidad.
+2 = relación indirecta; solo si no hay nada mejor.
+1 = casi forzada.
+Es mejor devolver pocos titulares o ninguno que inventar relevancia donde no la hay.
 
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
-{"relevant": [{"index": 1, "angle": "string breve y concreto"}]}
+{"relevant": [{"index": 1, "angle": "string breve y concreto", "relevance": 4}]}
 
 Si ningún titular es relevante, responde {"relevant": []}.`;
 

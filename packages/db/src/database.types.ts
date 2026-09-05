@@ -661,6 +661,7 @@ export type Database = {
           headline: string
           id: string
           published_at: string | null
+          relevance: number | null
           source_name: string | null
           source_url: string
           status: string
@@ -673,6 +674,7 @@ export type Database = {
           headline: string
           id?: string
           published_at?: string | null
+          relevance?: number | null
           source_name?: string | null
           source_url: string
           status?: string
@@ -685,6 +687,7 @@ export type Database = {
           headline?: string
           id?: string
           published_at?: string | null
+          relevance?: number | null
           source_name?: string | null
           source_url?: string
           status?: string

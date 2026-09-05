@@ -28,6 +28,12 @@ export function formatHeadlinesForPrompt(headlines: readonly NewsHeadline[]): st
 export interface RelevantPick {
   index: number;
   angle: string;
+  /**
+   * 1-5, how useful this story is for the tenant's trade. Local models send
+   * an explicit null as readily as they omit the key, so both are accepted
+   * and both mean "unscored".
+   */
+  relevance?: number | null | undefined;
 }
 
 export interface NewsSuggestionDraft {
@@ -37,6 +43,7 @@ export interface NewsSuggestionDraft {
   summary: string | null;
   angle: string;
   publishedAt: string | null;
+  relevance: number | null;
 }
 
 /**
@@ -59,6 +66,7 @@ export function mapRelevantPicks(
       summary: headline.summary || null,
       angle: pick.angle,
       publishedAt: headline.publishedAt,
+      relevance: pick.relevance ?? null,
     });
   }
   return drafts;

@@ -63,6 +63,9 @@ const relevanceSchema = z.object({
     z.object({
       index: z.number().int().min(1),
       angle: z.string().min(1),
+      // Nullable as well as optional: local models routinely send an
+      // explicit null for a field they were told to fill.
+      relevance: z.number().int().min(1).max(5).nullable().optional(),
     }),
   ),
 });
@@ -176,6 +179,7 @@ export async function runNewsAgentForTenant(
               source_name: draft.sourceName,
               summary: draft.summary,
               angle: draft.angle,
+              relevance: draft.relevance,
               published_at: draft.publishedAt,
             },
             { onConflict: "tenant_id,source_url", ignoreDuplicates: true },
