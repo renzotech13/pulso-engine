@@ -41,8 +41,12 @@ const tagged = assets.filter((a) => a.tagged_at).length;
 console.log(`${tenant.name}: ${assets.length} fotos en el banco (${tagged} etiquetadas) · gemini_share=${tenant.gemini_share ?? "null"} · budget=${tenant.gemini_daily_image_budget ?? "null"}`);
 console.log(`umbrales: fuerte ≥ ${BANK_STRONG_MATCH}, débil < ${BANK_WEAK_MATCH}\n`);
 
-const recentSources = recent.map((r) => r.source as PhotoSource);
+// The window slides as the month plays out: each day's decision becomes the
+// most recent entry for the next one. Evaluating every day against today's
+// frozen window made the whole month look like a single choice repeated.
+const recentSources: PhotoSource[] = recent.map((r) => r.source as PhotoSource);
 const now = new Date();
+const tally = { bank: 0, gemini: 0, gradient: 0 };
 
 for (const slot of slots.filter((s) => s.slot_index === 0)) {
   const ranked = rankBankPhotos(assets, { texts: [slot.theme], now, preferPortrait: slot.slot_type !== "post" });
@@ -52,10 +56,18 @@ for (const slot of slots.filter((s) => s.slot_index === 0)) {
     recentSources,
     geminiShare: tenant.gemini_share,
   });
+  tally[decision]++;
+  recentSources.unshift(decision as PhotoSource);
+  recentSources.length = Math.min(recentSources.length, 5);
   console.log(`${slot.date} [${slot.slot_type}] → ${decision.toUpperCase()}  ·  ${slot.theme}`);
   for (const r of ranked.slice(0, 3)) {
     const name = decodeURIComponent(r.asset.url.split("/").pop() ?? "").replace(/^library-[0-9a-f-]{36}-/, "");
     console.log(`     ${r.score.toFixed(2)}  ${name.slice(0, 60)}  [${r.matched.join(", ")}]`);
   }
 }
+const total = tally.bank + tally.gemini + tally.gradient;
+console.log(
+  `\nreparto simulado: banco ${tally.bank}, Gemini ${tally.gemini}, degradado ${tally.gradient}` +
+    (total > 0 ? ` → ${Math.round((tally.gemini / total) * 100)}% generado (objetivo ${tenant.gemini_share ?? "—"}%)` : ""),
+);
 process.exit(0);

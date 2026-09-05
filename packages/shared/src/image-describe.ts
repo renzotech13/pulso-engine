@@ -3,7 +3,15 @@
 // process.env.GEMINI_API_KEY directly for the same reason image-gen.ts does,
 // and keeps no relative imports so apps/web can bundle it if it ever needs to.
 
-const GEMINI_VISION_MODEL = "gemini-2.5-flash";
+// An ALIAS, not a pinned version: gemini-2.5-flash was pinned here and
+// Google retired it for new keys mid-flight, which burned every photo's
+// retry budget before anyone noticed. The alias tracks whatever the current
+// flash is, so tagging keeps working across those rotations. Measured
+// against the flash-lite tiers on real bank photos it was also the only one
+// that reliably produced the rubro-topic tags this whole design depends on
+// ("sunat", "impuestos") instead of only visible-object ones; it is ~3x
+// slower, which is irrelevant for a once-per-photo job.
+const GEMINI_VISION_MODEL = "gemini-flash-latest";
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta";
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
 const MAX_TAGS = 24;
