@@ -14,8 +14,13 @@ function adminEmails(): string[] {
     .filter(Boolean);
 }
 
+/** Non-redirecting check — for showing the operator entry in the owner's nav. */
+export function isAdminEmail(email: string | null | undefined): boolean {
+  return Boolean(email) && adminEmails().includes(email!.toLowerCase());
+}
+
 /**
- * Redirects to /login (no session) or /agents (logged in but not an admin).
+ * Redirects to /login (no session) or /calendar (logged in but not an admin).
  * Every /admin page/layout must call this before touching cross-tenant data.
  */
 export async function requireAdmin(): Promise<{ email: string }> {
@@ -26,8 +31,8 @@ export async function requireAdmin(): Promise<{ email: string }> {
 
   if (!user?.email) redirect("/login");
 
-  if (!adminEmails().includes(user.email.toLowerCase())) {
-    redirect("/agents");
+  if (!isAdminEmail(user.email)) {
+    redirect("/calendar");
   }
 
   return { email: user.email };

@@ -3,6 +3,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The operator views moved under /admin; the owner's landing is /calendar.
+  async redirects() {
+    return [
+      { source: "/agents", destination: "/calendar", permanent: false },
+      { source: "/events", destination: "/calendar", permanent: false },
+    ];
+  },
   // Without this, Next.js infers the workspace root from the nearest
   // lockfile and picks up the unrelated one in the user's home directory.
   outputFileTracingRoot: path.resolve(import.meta.dirname, "../.."),

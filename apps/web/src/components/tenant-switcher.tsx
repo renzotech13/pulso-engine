@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { switchTenantAction } from "@/lib/actions";
 import type { TenantSummary } from "@/lib/tenant-context";
+import { selectClass } from "@/components/ui/field";
 
 export function TenantSwitcher({
   memberships,
@@ -18,12 +19,13 @@ export function TenantSwitcher({
   }
 
   return (
-    <form action={switchTenantAction} className="mt-2">
+    <form action={switchTenantAction}>
       <select
         name="tenantId"
         defaultValue={activeTenantId}
         onChange={handleChange}
-        className="rounded-lg border border-ink-700 bg-ink-900 px-2 py-1.5 text-xs text-neutral-200 focus:border-pulso-accent focus:outline-none"
+        aria-label="Cambiar de negocio"
+        className={`${selectClass} w-auto py-1.5 text-xs`}
       >
         {memberships.map((m) => (
           <option key={m.tenantId} value={m.tenantId}>

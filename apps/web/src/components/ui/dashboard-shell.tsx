@@ -5,6 +5,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import { signOutAction } from "@/lib/actions";
 import { TenantSwitcher } from "@/components/tenant-switcher";
 import type { TenantSummary } from "@/lib/tenant-context";
+import { buttonClass } from "./button";
 import { SidebarNav, type NavItem } from "./sidebar-nav";
 
 export function DashboardShell({
@@ -12,13 +13,17 @@ export function DashboardShell({
   tenant,
   rightLabel,
   navItems,
+  secondaryNavItems,
+  secondaryNavLabel,
   children,
 }: {
   productLabel: string;
   /** Omit for cross-tenant surfaces (e.g. the internal admin panel) that don't act within a single tenant. */
-  tenant?: { name: string; memberships: TenantSummary[]; activeTenantId: string };
-  rightLabel?: string;
+  tenant?: { name: string; memberships: TenantSummary[]; activeTenantId: string } | undefined;
+  rightLabel?: string | undefined;
   navItems: NavItem[];
+  secondaryNavItems?: NavItem[] | undefined;
+  secondaryNavLabel?: string | undefined;
   children: ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -42,7 +47,7 @@ export function DashboardShell({
           {tenant && (
             <>
               <div className="hidden text-right sm:block">
-                <p className="text-[10px] uppercase tracking-wide text-neutral-500">Tenant activo</p>
+                <p className="text-[10px] uppercase tracking-wide text-neutral-500">Negocio</p>
                 <p className="font-display text-sm text-neutral-200">{tenant.name}</p>
               </div>
               <TenantSwitcher memberships={tenant.memberships} activeTenantId={tenant.activeTenantId} />
@@ -52,11 +57,8 @@ export function DashboardShell({
             <p className="hidden text-xs uppercase tracking-wide text-neutral-500 sm:block">{rightLabel}</p>
           )}
           <form action={signOutAction}>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 rounded-lg border border-ink-700 px-3 py-1.5 text-xs text-neutral-400 transition-colors duration-300 ease-in-out hover:border-pulso-accent/60 hover:text-neutral-100"
-            >
-              <LogOut size={14} />
+            <button type="submit" className={buttonClass("secondary", "sm")}>
+              <LogOut size={14} aria-hidden="true" />
               Salir
             </button>
           </form>
@@ -69,7 +71,12 @@ export function DashboardShell({
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <SidebarNav items={navItems} onNavigate={() => setMobileOpen(false)} />
+          <SidebarNav
+            items={navItems}
+            secondaryItems={secondaryNavItems}
+            secondaryLabel={secondaryNavLabel}
+            onNavigate={() => setMobileOpen(false)}
+          />
         </aside>
 
         {mobileOpen && (
@@ -80,7 +87,7 @@ export function DashboardShell({
           />
         )}
 
-        <main className="min-w-0 flex-1 p-6 lg:p-8">{children}</main>
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

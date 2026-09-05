@@ -1,6 +1,7 @@
 "use server";
 
 import { cookies } from "next/headers";
+import { clearFlash, withFeedback } from "./flash";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { generateThemedImageDetailed } from "@pulso/shared/image-gen";
@@ -13,7 +14,7 @@ import { createSupabaseServerClient } from "./supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "./tenant-context";
 import { requireAdmin } from "./admin";
 
-export async function createTenantAction(formData: FormData): Promise<void> {
+async function createTenantActionImpl(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
   const slug = String(formData.get("slug") ?? "").trim();
   const rubro = String(formData.get("rubro") ?? "").trim();
@@ -32,16 +33,16 @@ export async function createTenantAction(formData: FormData): Promise<void> {
 
   const cookieStore = await cookies();
   cookieStore.set(ACTIVE_TENANT_COOKIE, data.id, { httpOnly: true, sameSite: "lax", path: "/" });
-  redirect("/agents");
+  redirect("/calendar");
 }
 
-export async function switchTenantAction(formData: FormData): Promise<void> {
+async function switchTenantActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
   const cookieStore = await cookies();
   cookieStore.set(ACTIVE_TENANT_COOKIE, tenantId, { httpOnly: true, sameSite: "lax", path: "/" });
-  redirect("/agents");
+  redirect("/calendar");
 }
 
 export async function signOutAction(): Promise<void> {
@@ -50,7 +51,7 @@ export async function signOutAction(): Promise<void> {
   redirect("/login");
 }
 
-export async function updateCalendarSlotAction(formData: FormData): Promise<void> {
+async function updateCalendarSlotActionImpl(formData: FormData): Promise<void> {
   const slotId = String(formData.get("slotId") ?? "");
   if (!slotId) return;
 
@@ -147,7 +148,7 @@ export async function moveCalendarSlotDateAction(
   redirect(`/calendar/${newDate}`);
 }
 
-export async function approveCreativeAction(formData: FormData): Promise<void> {
+async function approveCreativeActionImpl(formData: FormData): Promise<void> {
   const creativeId = String(formData.get("creativeId") ?? "");
   if (!creativeId) return;
 
@@ -168,7 +169,7 @@ export async function approveCreativeAction(formData: FormData): Promise<void> {
  * runPublishAgentForCreative's own per-platform idempotency check means a
  * platform already published here just gets skipped, never double-posted.
  */
-export async function requestPublishAction(formData: FormData): Promise<void> {
+async function requestPublishActionImpl(formData: FormData): Promise<void> {
   const creativeId = String(formData.get("creativeId") ?? "");
   if (!creativeId) return;
 
@@ -194,7 +195,7 @@ export async function requestPublishAction(formData: FormData): Promise<void> {
  * Toggles per calendar day, not per creative, since the point is to hold a
  * whole day regardless of which creative ends up attached to it.
  */
-export async function toggleHoldPublishAction(formData: FormData): Promise<void> {
+async function toggleHoldPublishActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const slotId = String(formData.get("slotId") ?? "");
   const date = String(formData.get("date") ?? "");
@@ -221,7 +222,7 @@ export async function toggleHoldPublishAction(formData: FormData): Promise<void>
  * idempotency check only skips when a creative already exists, so removing
  * it first is what actually makes "regenerate" produce a fresh one.
  */
-export async function regenerateCreativeAction(formData: FormData): Promise<void> {
+async function regenerateCreativeActionImpl(formData: FormData): Promise<void> {
   const creativeId = String(formData.get("creativeId") ?? "");
   const calendarSlotId = String(formData.get("calendarSlotId") ?? "");
   if (!creativeId || !calendarSlotId) return;
@@ -270,7 +271,7 @@ export async function regenerateCreativeAction(formData: FormData): Promise<void
  * clearing the internal record wouldn't undo the real post, it would just
  * make the dashboard lie about what's live.
  */
-export async function deleteCreativeAction(formData: FormData): Promise<void> {
+async function deleteCreativeActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
@@ -322,7 +323,7 @@ export async function deleteCreativeAction(formData: FormData): Promise<void> {
   revalidatePath("/calendar");
 }
 
-export async function requestCalendarRegenerationAction(formData: FormData): Promise<void> {
+async function requestCalendarRegenerationActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
@@ -361,7 +362,7 @@ async function uploadProductMedia(
   return urls;
 }
 
-export async function createProductAction(formData: FormData): Promise<void> {
+async function createProductActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   if (!tenantId || !name) return;
@@ -391,7 +392,7 @@ export async function createProductAction(formData: FormData): Promise<void> {
   revalidatePath("/catalog");
 }
 
-export async function upsertBrandKitAction(formData: FormData): Promise<void> {
+async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
@@ -487,7 +488,7 @@ const PHOTO_FRAME_ASPECT_RATIOS: Record<string, { width: number; height: number 
  * reaching for the service role and hand-rolling the membership check RLS
  * already does everywhere else.
  */
-export async function upsertPhotoFrameAction(formData: FormData): Promise<void> {
+async function upsertPhotoFrameActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
@@ -544,7 +545,7 @@ export async function upsertPhotoFrameAction(formData: FormData): Promise<void> 
  * AI-generated image. Plain authenticated insert (media_assets has its own
  * owner/admin RLS policy), unlike the photo-frame creative action below.
  */
-export async function uploadMediaAssetsAction(formData: FormData): Promise<void> {
+async function uploadMediaAssetsActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
@@ -570,7 +571,7 @@ export async function uploadMediaAssetsAction(formData: FormData): Promise<void>
   revalidatePath("/brand-kit");
 }
 
-export async function deleteMediaAssetAction(formData: FormData): Promise<void> {
+async function deleteMediaAssetActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const assetId = String(formData.get("assetId") ?? "");
   if (!tenantId || !assetId) return;
@@ -608,7 +609,7 @@ export async function deleteMediaAssetAction(formData: FormData): Promise<void> 
  * way Gemini's tags are (lowercase, no accents) so the ranker treats both
  * alike.
  */
-export async function updateMediaAssetTagsAction(formData: FormData): Promise<void> {
+async function updateMediaAssetTagsActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const assetId = String(formData.get("assetId") ?? "");
   if (!tenantId || !assetId) return;
@@ -716,7 +717,7 @@ function triggerPhotoFrameRender(creativeId: string): void {
  * which always starts a new one). Used to split a large batch across
  * several uploads without losing what was already added.
  */
-export async function addPhotosToCreativeAction(formData: FormData): Promise<void> {
+async function addPhotosToCreativeActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
@@ -760,7 +761,7 @@ export async function addPhotosToCreativeAction(formData: FormData): Promise<voi
  * un-features it from the day, if it was) rather than leaving an empty
  * publication behind.
  */
-export async function removePhotoFromCreativeAction(formData: FormData): Promise<void> {
+async function removePhotoFromCreativeActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
@@ -880,7 +881,7 @@ async function clearCarouselRender(
  * slide's own text — for fixing one bad slide (cropped, mistimed, Gemini
  * baked in garbled text, ...) without touching the other slides or the copy.
  */
-export async function regenerateCarouselSlideAction(formData: FormData): Promise<void> {
+async function regenerateCarouselSlideActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   // A day can hold several slots (see `tenants.publish_hours`), so date +
@@ -969,7 +970,7 @@ export async function regenerateCarouselSlideAction(formData: FormData): Promise
  * lives at brief.caption regardless of type, and editing it never touches
  * any rendered asset, so there's no re-render to trigger.
  */
-export async function updateCreativeCaptionAction(formData: FormData): Promise<void> {
+async function updateCreativeCaptionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
@@ -1002,7 +1003,7 @@ export async function updateCreativeCaptionAction(formData: FormData): Promise<v
  * for when the tenant has their own photo they'd rather use than anything
  * AI-generated or from the media library.
  */
-export async function replaceCarouselSlidePhotoAction(formData: FormData): Promise<void> {
+async function replaceCarouselSlidePhotoActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
@@ -1044,7 +1045,7 @@ export async function replaceCarouselSlidePhotoAction(formData: FormData): Promi
  * slot didn't already have one; otherwise it just joins the day's creative
  * list alongside the others.
  */
-export async function createPhotoFrameCreativeAction(formData: FormData): Promise<void> {
+async function createPhotoFrameCreativeActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const slotIndex = Number(formData.get("slotIndex") ?? "0");
@@ -1149,7 +1150,7 @@ async function uploadStudentShowcasePhotos(
  * natural order (work first, certificate, then portrait) covers the real
  * cases so far — revisit if a piece genuinely needs a different order.
  */
-export async function createStudentShowcaseCreativeAction(formData: FormData): Promise<void> {
+async function createStudentShowcaseCreativeActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const slotIndex = Number(formData.get("slotIndex") ?? "0");
@@ -1248,7 +1249,7 @@ export async function createStudentShowcaseCreativeAction(formData: FormData): P
  * this page's layout calls requireAdmin() — a non-admin could otherwise
  * hit this action directly. Must re-check here too.
  */
-export async function updateTenantLimitsAction(formData: FormData): Promise<void> {
+async function updateTenantLimitsActionImpl(formData: FormData): Promise<void> {
   await requireAdmin();
 
   const tenantId = String(formData.get("tenantId") ?? "");
@@ -1278,7 +1279,7 @@ export async function updateTenantLimitsAction(formData: FormData): Promise<void
   revalidatePath("/admin/limits");
 }
 
-export async function createPromotionAction(formData: FormData): Promise<void> {
+async function createPromotionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const discountType = String(formData.get("discountType") ?? "");
@@ -1335,7 +1336,7 @@ async function verifyInstagramAccount(igUserId: string, accessToken: string): Pr
  * resave reuses whatever's already stored instead of overwriting it with
  * an empty string.
  */
-export async function upsertSocialConnectionAction(formData: FormData): Promise<void> {
+async function upsertSocialConnectionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const pageId = String(formData.get("pageId") ?? "").trim();
   if (!tenantId || !pageId) return;
@@ -1391,7 +1392,7 @@ export async function upsertSocialConnectionAction(formData: FormData): Promise<
 }
 
 /** Re-runs verification against the already-stored token — no form fields needed beyond tenantId. */
-export async function retestSocialConnectionAction(formData: FormData): Promise<void> {
+async function retestSocialConnectionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   if (!tenantId) return;
 
@@ -1553,7 +1554,7 @@ export async function useNewsSuggestionAction(
   return { error: null };
 }
 
-export async function dismissNewsSuggestionAction(formData: FormData): Promise<void> {
+async function dismissNewsSuggestionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const suggestionId = String(formData.get("suggestionId") ?? "");
   if (!tenantId || !suggestionId) return;
@@ -1569,3 +1570,43 @@ export async function dismissNewsSuggestionAction(formData: FormData): Promise<v
 
   revalidatePath("/news");
 }
+
+// ─── Feedback wrappers ────────────────────────────────────────────────────────
+// Each void action above is exported through withFeedback: success leaves a
+// one-shot message in the flash cookie (shown by FlashToast in the layout),
+// a thrown error leaves the error there instead of becoming Next's generic
+// crash page. Actions bound to useActionState (moveCalendarSlotDateAction,
+// useNewsSuggestionAction) return their state inline and are not wrapped.
+
+/** Called by FlashToast once it has shown the message, so a refresh doesn't repeat it. */
+export async function dismissFlashAction(): Promise<void> {
+  await clearFlash();
+}
+
+export const createTenantAction = withFeedback(null, createTenantActionImpl);
+export const switchTenantAction = withFeedback(null, switchTenantActionImpl);
+export const updateCalendarSlotAction = withFeedback("Cambios guardados.", updateCalendarSlotActionImpl);
+export const approveCreativeAction = withFeedback("Pieza aprobada.", approveCreativeActionImpl);
+export const requestPublishAction = withFeedback("Publicación en camino. Revisa el estado en unos minutos.", requestPublishActionImpl);
+export const toggleHoldPublishAction = withFeedback("Listo.", toggleHoldPublishActionImpl);
+export const regenerateCreativeAction = withFeedback("Regenerando la pieza; suele tardar 1-3 minutos.", regenerateCreativeActionImpl);
+export const deleteCreativeAction = withFeedback("Pieza eliminada.", deleteCreativeActionImpl);
+export const requestCalendarRegenerationAction = withFeedback("El planificador está armando el mes; vuelve en 1-2 minutos.", requestCalendarRegenerationActionImpl);
+export const createProductAction = withFeedback("Producto agregado.", createProductActionImpl);
+export const upsertBrandKitAction = withFeedback("Marca guardada.", upsertBrandKitActionImpl);
+export const upsertPhotoFrameAction = withFeedback("Marco guardado.", upsertPhotoFrameActionImpl);
+export const uploadMediaAssetsAction = withFeedback("Fotos agregadas al banco.", uploadMediaAssetsActionImpl);
+export const deleteMediaAssetAction = withFeedback("Foto eliminada.", deleteMediaAssetActionImpl);
+export const updateMediaAssetTagsAction = withFeedback("Etiquetas guardadas.", updateMediaAssetTagsActionImpl);
+export const addPhotosToCreativeAction = withFeedback("Fotos agregadas.", addPhotosToCreativeActionImpl);
+export const removePhotoFromCreativeAction = withFeedback("Foto quitada.", removePhotoFromCreativeActionImpl);
+export const regenerateCarouselSlideAction = withFeedback("Slide regenerado.", regenerateCarouselSlideActionImpl);
+export const updateCreativeCaptionAction = withFeedback("Caption guardado.", updateCreativeCaptionActionImpl);
+export const replaceCarouselSlidePhotoAction = withFeedback("Foto del slide reemplazada.", replaceCarouselSlidePhotoActionImpl);
+export const createPhotoFrameCreativeAction = withFeedback("Publicación creada.", createPhotoFrameCreativeActionImpl);
+export const createStudentShowcaseCreativeAction = withFeedback("Publicación creada.", createStudentShowcaseCreativeActionImpl);
+export const updateTenantLimitsAction = withFeedback("Límites guardados.", updateTenantLimitsActionImpl);
+export const createPromotionAction = withFeedback("Promoción creada.", createPromotionActionImpl);
+export const upsertSocialConnectionAction = withFeedback("Conexión guardada y verificada.", upsertSocialConnectionActionImpl);
+export const retestSocialConnectionAction = withFeedback("Conexión verificada.", retestSocialConnectionActionImpl);
+export const dismissNewsSuggestionAction = withFeedback("Idea descartada.", dismissNewsSuggestionActionImpl);

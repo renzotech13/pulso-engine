@@ -3,10 +3,14 @@
 @tailwind utilities;
 
 @layer components {
-  /* The repeated "box" card pattern: a subtle vertical gradient (barely
-     lighter toward the bottom) plus a big soft ambient shadow instead of a
-     hard-edged flat card. Every card-like surface in the app uses this. */
+  /* The ONE card surface. It used to be a borderless gradient while most
+     panels were hand-rolled `rounded-xl border bg-ink-900` divs on the same
+     pages — two competing surfaces. Now every card-like thing is this. */
   .card-surface {
-    @apply rounded-lg bg-gradient-to-b from-ink-950 via-ink-950 to-ink-800 shadow-[0_0_32px_rgba(0,0,0,0.22)];
+    @apply rounded-xl border border-ink-700 bg-ink-900 shadow-[0_8px_24px_rgba(0,0,0,0.25)];
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded-md bg-ink-800;
   }
 }

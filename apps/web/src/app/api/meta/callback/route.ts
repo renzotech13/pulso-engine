@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { META_OAUTH_REDIRECT_URI } from "@/lib/meta-oauth";
+import { FLASH_COOKIE } from "@/lib/flash";
 
 const META_GRAPH_API_VERSION = "v21.0";
 const META_APP_ID = process.env.META_APP_ID ?? "1550590863219497";
@@ -72,11 +73,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = url.searchParams.get("code");
   const oauthError = url.searchParams.get("error_description") ?? url.searchParams.get("error");
 
-  const back = (query: string): NextResponse => NextResponse.redirect(`${url.origin}/connections?${query}`);
+  // The outcome travels in the same one-shot flash cookie every server
+  // action uses (shown by FlashToast) — the old ?meta_connected / ?meta_error
+  // query flags kept re-showing the message on every refresh.
+  const back = (flash: { tone: "success" | "error"; message: string }): NextResponse => {
+    const response = NextResponse.redirect(`${url.origin}/connections`);
+    response.cookies.set(FLASH_COOKIE, JSON.stringify(flash), { path: "/", maxAge: 30, sameSite: "lax" });
+    return response;
+  };
+  const fail = (message: string) => back({ tone: "error", message: `Error de Meta: ${message}` });
 
-  if (oauthError) return back(`meta_error=${encodeURIComponent(oauthError)}`);
-  if (!code) return back("meta_error=falta%20el%20código%20de%20Meta");
-  if (!META_APP_SECRET) return back("meta_error=META_APP_SECRET%20no%20está%20configurado");
+  if (oauthError) return fail(oauthError);
+  if (!code) return fail("falta el código de Meta");
+  if (!META_APP_SECRET) return fail("META_APP_SECRET no está configurado");
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -88,7 +97,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // social_connections (owner/admin only) is the real authorization gate —
   // this is only a sanity check that the session's active tenant matches.
   const tenantId = url.searchParams.get("state");
-  if (!tenantId) return back("meta_error=falta%20el%20tenant");
+  if (!tenantId) return fail("falta el tenant");
 
   try {
     const shortLivedToken = await exchangeCodeForUserToken(code);
@@ -96,12 +105,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const pages = await fetchManagedPages(longLivedUserToken);
 
     if (pages.length === 0) {
-      return back(
-        "meta_error=" +
-          encodeURIComponent(
-            "tu cuenta de Facebook no administra ninguna página, o PulsoEngine no tiene acceso a ella",
-          ),
-      );
+      return fail("tu cuenta de Facebook no administra ninguna página, o PulsoEngine no tiene acceso a ella");
     }
 
     const { data: existing } = await supabase
@@ -133,10 +137,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     if (upsertError) throw new Error(upsertError.message);
 
     const otherPages = pages.filter((p) => p.id !== page.id).map((p) => p.name);
-    const hint = otherPages.length > 0 ? `&meta_other_pages=${encodeURIComponent(otherPages.join(", "))}` : "";
-    return back(`meta_connected=1${hint}`);
+    return back({
+      tone: "success",
+      message:
+        otherPages.length > 0
+          ? `Página conectada correctamente. También administras: ${otherPages.join(", ")} — para usar otra, pégala a mano.`
+          : "Página conectada correctamente.",
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return back(`meta_error=${encodeURIComponent(message)}`);
+    return fail(err instanceof Error ? err.message : String(err));
   }
 }
