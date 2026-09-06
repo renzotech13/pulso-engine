@@ -135,7 +135,7 @@ export default async function BrandKitPage() {
           <Field
             id="voiceTraining"
             label="Entrenamiento"
-            hint="Indicaciones libres que todo agente tiene en cuenta al escribir copy o generar imágenes: detalles del negocio, temas puntuales, cosas que evitar. Se suma al tono de voz, no lo reemplaza. También dirige las fotos generadas: escenas, colores, qué evitar."
+            hint="Indicaciones libres que todo agente tiene en cuenta al escribir el copy (titular, subtítulo, caption): detalles del negocio, temas puntuales, CTAs, firmas, cosas que evitar. Se suma al tono de voz, no lo reemplaza. No dirige las fotos generadas — para eso usa Dirección de arte, abajo."
             className="sm:col-span-2"
           >
             <textarea
@@ -144,6 +144,22 @@ export default async function BrandKitPage() {
               rows={8}
               placeholder="Ej: nunca menciones a la competencia. Somos expertos en trámites de importación, no solo logística. Evita la palabra 'sinergia'. El Puerto de Chancay ya no es novedad para nuestros clientes desde julio 2026..."
               defaultValue={brandKit?.voice_training ?? ""}
+              className={textareaClass}
+            />
+          </Field>
+
+          <Field
+            id="artDirection"
+            label="Dirección de arte"
+            hint="Solo lo fotográfico: tipo de escena, personas, lugar, tratamiento de color, qué evitar. No pongas tipografía, textos, titulares ni CTAs — eso va en Entrenamiento y nunca se dibuja: si lo pones acá, el modelo intentará dibujarlo (así salió el primer post con la firma del dueño y un botón de WhatsApp pintados en la foto)."
+            className="sm:col-span-2"
+          >
+            <textarea
+              id="artDirection"
+              name="artDirection"
+              rows={5}
+              placeholder="Ej: fotografía documental realista de emprendedores peruanos en su contexto de trabajo (taller, tienda, oficina pequeña), luz natural, escala de grises o virado camel. Evitar: imaginería de casino o apuesta, stock corporativo genérico, logos de terceros."
+              defaultValue={brandKit?.art_direction ?? ""}
               className={textareaClass}
             />
           </Field>

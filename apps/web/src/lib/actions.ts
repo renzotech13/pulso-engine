@@ -526,6 +526,10 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
   const colorSecondary = HEX_COLOR_RE.test(colorSecondaryRaw) ? colorSecondaryRaw : undefined;
   const toneDescription = String(formData.get("toneDescription") ?? "").trim() || null;
   const voiceTraining = String(formData.get("voiceTraining") ?? "").trim() || null;
+  // Separate from voice_training on purpose: it's the only brand text image
+  // prompts ever see. voice_training reaching them got a real post published
+  // with the brand's CTA and signature painted into the photo.
+  const artDirection = String(formData.get("artDirection") ?? "").trim() || null;
   const websiteUrl = String(formData.get("websiteUrl") ?? "").trim() || null;
   // One phrase per line in the textarea; blank lines are just spacing.
   const bannedPhrases = String(formData.get("bannedPhrases") ?? "")
@@ -547,6 +551,7 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
     color_secondary?: string;
     tone_description: string | null;
     voice_training: string | null;
+    art_direction: string | null;
     website_url: string | null;
     banned_phrases: string[];
     logo_url?: string;
@@ -558,6 +563,7 @@ async function upsertBrandKitActionImpl(formData: FormData): Promise<void> {
     ...(colorSecondary ? { color_secondary: colorSecondary } : {}),
     tone_description: toneDescription,
     voice_training: voiceTraining,
+    art_direction: artDirection,
     website_url: websiteUrl,
     banned_phrases: bannedPhrases,
   };
