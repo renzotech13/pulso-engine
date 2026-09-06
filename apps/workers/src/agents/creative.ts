@@ -22,6 +22,7 @@ import {
   type PhotoSource,
 } from "./creative-helpers.js";
 import { generateThemedImageDetailed, type ImageAspectRatio } from "@pulso/shared/image-gen";
+import { imageHasText } from "@pulso/shared/image-describe";
 import {
   buildCarouselSlideImagePrompt,
   buildNewsImagePrompt,
@@ -250,6 +251,12 @@ export async function runCreativeAgentForSlot(
       const brandTrainingForCopy = brandTraining
         ? `Indicaciones de la marca (tenlas en cuenta siempre): ${brandTraining}`
         : "";
+      // Images get ONLY the art direction. The copywriting voice (CTAs, the
+      // brand sign-off, "Soy Angel Zegarra…") was reaching the image model
+      // as 11.000 characters of instructions-to-write, and it painted those
+      // very phrases into a real published post. Falls back to the old
+      // behaviour for a tenant that hasn't filled art_direction in.
+      const artDirection = brandKit?.art_direction?.trim() || brandTraining;
 
       // Exact-date match only — the Planner doesn't record which ephemeris (if
       // any) actually inspired a given day's theme, so this is the one
@@ -378,25 +385,50 @@ export async function runCreativeAgentForSlot(
       // Every Gemini image call leaves an agent_calls row (agent_id null, like
       // blocked LLM calls do) — that is what the daily budget counts and what
       // makes rate limits and failures visible at all.
+      // Two attempts, because "no text" is the rule Gemini actually breaks:
+      // a real post went out with the brand's own CTA painted into the photo
+      // and misspelled. The wording alone is not a guarantee, so the picture
+      // is inspected before it is accepted — same posture as the
+      // banned-phrase guard on the copy. A check that itself errors means
+      // "unknown" and the image is kept: losing it to an API hiccup would be
+      // worse than the occasional slip.
+      const IMAGE_ATTEMPTS = 2;
       const generateAndUpload = async (prompt: string, suffix: string): Promise<string | undefined> => {
-        const result = await generateThemedImageDetailed(prompt, { aspectRatio: aspect });
-        await ctx.db.insertAgentCall({
-          agent_id: null,
-          agent_name: "gemini-image",
-          job_id: jobId ?? null,
-          correlation_id: correlationId,
-          status: result.ok ? "success" : "error",
-          latency_ms: result.latencyMs,
-          ...(result.ok ? {} : { error_message: result.error }),
-        });
-        if (!result.ok) return undefined;
-        geminiUsedThisRun++;
-        const assetPath = `${tenantId}/generated-${calendarSlotId}${suffix}-${Date.now()}.png`;
-        const { error: uploadError } = await service.storage
-          .from("creative-assets")
-          .upload(assetPath, result.buffer, { contentType: "image/png" });
-        if (uploadError) return undefined;
-        return service.storage.from("creative-assets").getPublicUrl(assetPath).data.publicUrl;
+        for (let attempt = 0; attempt < IMAGE_ATTEMPTS; attempt++) {
+          if (!geminiAvailable()) return undefined;
+          const result = await generateThemedImageDetailed(prompt, { aspectRatio: aspect });
+          await ctx.db.insertAgentCall({
+            agent_id: null,
+            agent_name: "gemini-image",
+            job_id: jobId ?? null,
+            correlation_id: correlationId,
+            status: result.ok ? "success" : "error",
+            latency_ms: result.latencyMs,
+            ...(result.ok ? {} : { error_message: result.error }),
+          });
+          if (!result.ok) return undefined;
+          geminiUsedThisRun++;
+
+          const check = await imageHasText(result.buffer);
+          if (check.ok && check.hasText) {
+            await ctx.db.insertDecisionLog({
+              agent: "creative",
+              observed: { calendar_slot_id: calendarSlotId, attempt: attempt + 1, sample: check.sample },
+              decision: { action: "image_rejected_has_text" },
+              rationale: `Gemini dibujó texto en la imagen ("${check.sample}"), se descarta y se reintenta.`,
+              correlation_id: correlationId,
+            });
+            continue;
+          }
+
+          const assetPath = `${tenantId}/generated-${calendarSlotId}${suffix}-${Date.now()}.png`;
+          const { error: uploadError } = await service.storage
+            .from("creative-assets")
+            .upload(assetPath, result.buffer, { contentType: "image/png" });
+          if (uploadError) return undefined;
+          return service.storage.from("creative-assets").getPublicUrl(assetPath).data.publicUrl;
+        }
+        return undefined;
       };
 
       let photoUrl: string | undefined;
@@ -436,7 +468,7 @@ export async function runCreativeAgentForSlot(
           }
           if (!url && geminiAvailable()) {
             url = await generateAndUpload(
-              buildCarouselSlideImagePrompt({ rubro, theme: slot.theme, slideText, brandTraining }),
+              buildCarouselSlideImagePrompt({ rubro, theme: slot.theme, slideText, artDirection }),
               `-slide${i}`,
             );
             if (url) source = "gemini";
@@ -485,7 +517,7 @@ export async function runCreativeAgentForSlot(
           })[0];
           if (geminiAvailable()) {
             photoUrl = await generateAndUpload(
-              buildNewsImagePrompt({ rubro, theme: slot.theme, headline: newsHeadline ?? slot.theme, brandTraining }),
+              buildNewsImagePrompt({ rubro, theme: slot.theme, headline: newsHeadline ?? slot.theme, artDirection }),
               "",
             );
           }
@@ -539,7 +571,7 @@ export async function runCreativeAgentForSlot(
                 headline: copy.headline,
                 keywords,
                 ephemerisHint,
-                brandTraining,
+                artDirection,
               }),
               "",
             );

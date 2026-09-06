@@ -147,3 +147,60 @@ export async function describeBankPhoto(input: { imageUrl: string; rubro: string
     return { ok: false, error: `vision request error: ${err instanceof Error ? err.message : String(err)}`, retryable: true, latencyMs: latency() };
   }
 }
+
+const NO_TEXT_CHECK_PROMPT =
+  'Mira esta imagen. ¿Tiene texto visible dibujado dentro (letras, palabras, titulares, carteles, botones con texto, marcas de agua, logos con letras)? Responde JSON: {"hasText": true|false, "sample": "las primeras palabras que se leen, o cadena vacía"}. Un texto borroso o cortado de fondo (un letrero lejano en una calle) NO cuenta; solo cuenta el texto legible o claramente intencional.';
+
+const NO_TEXT_SCHEMA = {
+  type: "OBJECT",
+  properties: { hasText: { type: "BOOLEAN" }, sample: { type: "STRING" } },
+  required: ["hasText", "sample"],
+};
+
+export type TextCheckResult =
+  | { ok: true; hasText: boolean; sample: string }
+  | { ok: false; error: string };
+
+/**
+ * Asks the vision model whether a generated image has text baked into it.
+ *
+ * The image prompts forbid text in the strongest terms and Gemini ignored
+ * them anyway — a real post went out with the brand's own CTA and signature
+ * painted into the picture, misspelled ("AMHENZA OPERATIVA"). Prompt wording
+ * is not a guarantee, so the picture gets checked before it can be used,
+ * the same way generated copy gets checked against the banned-phrase list.
+ *
+ * A failed check returns `{ ok: false }` and callers should treat that as
+ * "unknown", not "has text": losing the image over an API hiccup would be
+ * worse than the occasional slip.
+ */
+export async function imageHasText(image: Buffer, mimeType = "image/png"): Promise<TextCheckResult> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return { ok: false, error: "GEMINI_API_KEY not set" };
+
+  try {
+    const response = await fetch(`${GEMINI_API_BASE}/models/${GEMINI_VISION_MODEL}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          { parts: [{ inlineData: { mimeType, data: image.toString("base64") } }, { text: NO_TEXT_CHECK_PROMPT }] },
+        ],
+        generationConfig: { responseMimeType: "application/json", responseSchema: NO_TEXT_SCHEMA, temperature: 0 },
+      }),
+    });
+    const data = (await response.json()) as GeminiTextResponse;
+    if (!response.ok || data.error) return { ok: false, error: data.error?.message ?? `HTTP ${response.status}` };
+
+    const text = data.candidates?.[0]?.content?.parts?.find((p) => p.text)?.text;
+    if (!text) return { ok: false, error: "no text part in vision response" };
+    const parsed = JSON.parse(text) as { hasText?: unknown; sample?: unknown };
+    return {
+      ok: true,
+      hasText: Boolean(parsed.hasText),
+      sample: typeof parsed.sample === "string" ? parsed.sample.slice(0, 120) : "",
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}

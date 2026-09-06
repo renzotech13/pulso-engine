@@ -11,9 +11,9 @@ describe("buildPostImagePrompt", () => {
     const prompt = buildPostImagePrompt({
       rubro: "estudio_contable",
       theme: "RUC 10 vs RUC 20",
-      brandTraining: "azul marino y camel, emprendedores reales",
+      artDirection: "azul marino y camel, emprendedores reales",
     });
-    expect(prompt.indexOf("Indicaciones de la marca")).toBeLessThan(prompt.indexOf("Composición:"));
+    expect(prompt.indexOf("Dirección de arte")).toBeLessThan(prompt.indexOf("Composición:"));
     expect(prompt).not.toContain("Estilo limpio y corporativo");
     expect(prompt.endsWith(NO_TEXT_IN_IMAGE)).toBe(true);
   });
@@ -38,13 +38,28 @@ describe("buildPostImagePrompt", () => {
 
 describe("buildNewsImagePrompt / buildCarouselSlideImagePrompt", () => {
   it("keeps the no-text rule last, after the brand block", () => {
-    const news = buildNewsImagePrompt({ rubro: "estudio_contable", theme: "t", headline: "SUNAT pide pruebas", brandTraining: "marca" });
-    const slide = buildCarouselSlideImagePrompt({ rubro: "estudio_contable", theme: "t", slideText: "Paso 1", brandTraining: "marca" });
+    const news = buildNewsImagePrompt({ rubro: "estudio_contable", theme: "t", headline: "SUNAT pide pruebas", artDirection: "marca" });
+    const slide = buildCarouselSlideImagePrompt({ rubro: "estudio_contable", theme: "t", slideText: "Paso 1", artDirection: "marca" });
     for (const prompt of [news, slide]) {
       expect(prompt.endsWith(NO_TEXT_IN_IMAGE)).toBe(true);
-      expect(prompt.indexOf("Indicaciones de la marca")).toBeLessThan(prompt.indexOf(NO_TEXT_IN_IMAGE));
+      expect(prompt.indexOf("Dirección de arte")).toBeLessThan(prompt.indexOf(NO_TEXT_IN_IMAGE));
     }
     expect(news).toContain('"SUNAT pide pruebas"');
     expect(slide).toContain("sin escribirlo: Paso 1");
+  });
+});
+
+describe("no-text rule", () => {
+  it("is the last thing the model reads and states the ban unconditionally", () => {
+    const prompt = buildPostImagePrompt({ rubro: "estudio_contable", theme: "t", artDirection: "azul marino" });
+    expect(prompt.endsWith(NO_TEXT_IN_IMAGE)).toBe(true);
+    expect(NO_TEXT_IN_IMAGE).toContain("NI UNA SOLA LETRA");
+  });
+
+  it("caps the art direction so the ban can't be buried under a wall of brand text", () => {
+    const huge = "paleta azul. ".repeat(500);
+    const prompt = buildPostImagePrompt({ rubro: "x", theme: "t", artDirection: huge });
+    expect(prompt.length).toBeLessThan(2500);
+    expect(prompt.endsWith(NO_TEXT_IN_IMAGE)).toBe(true);
   });
 });

@@ -19,11 +19,18 @@
  * generates a photo meant to sit *behind* our own text overlay.
  */
 export const NO_TEXT_IN_IMAGE =
-  "Una sola escena fotográfica real, capturada con cámara. Prohibido: texto, letras, palabras, titulares o tipografía de cualquier idioma dentro de la imagen; portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados. Nada de composiciones que expliquen o enumeren conceptos: solo una fotografía única y natural.";
+  "REGLA ABSOLUTA: la imagen no puede contener NI UNA SOLA LETRA. Cero texto, palabras, titulares, frases, firmas, nombres, botones, carteles, etiquetas, marcas de agua o logos con letras, en ningún idioma. Si algo en las instrucciones de arriba parece una frase para escribir, NO se escribe: es solo contexto de qué fotografiar. Una sola escena fotográfica real, capturada con cámara. Prohibido además: portadas de revista, periódicos o artículos simulados; infografías, diagramas, collages, cuadrículas, paneles divididos, maquetas 3D, iconos, pictogramas o elementos etiquetados. Nada de composiciones que expliquen o enumeren conceptos: solo una fotografía única y natural, sin texto.";
 
-function brandBlock(brandTraining: string | undefined): string {
-  const text = brandTraining?.trim();
-  return text ? ` Indicaciones de la marca (mandan sobre cualquier estilo por defecto): ${text}.` : "";
+// Hard cap on what reaches an image model. The full brand training is a
+// COPYWRITING manual (CTAs, signatures, brand sign-offs); handing 11.000
+// characters of it to Gemini got those very phrases painted into a real
+// published post, misspelled. Only art direction belongs here, and even
+// that is trimmed so the no-text rule can't get buried again.
+const MAX_ART_DIRECTION_CHARS = 1200;
+
+function brandBlock(artDirection: string | undefined): string {
+  const text = artDirection?.trim().slice(0, MAX_ART_DIRECTION_CHARS);
+  return text ? ` Dirección de arte de la marca (solo aspecto visual): ${text}.` : "";
 }
 
 function joinParts(parts: Array<string | undefined | false>): string {
@@ -38,13 +45,14 @@ export interface PostImagePromptInput {
   /** 3-6 loose scene words the copywriter suggested (people, place, objects). */
   keywords?: readonly string[] | undefined;
   ephemerisHint?: string | undefined;
-  brandTraining?: string | undefined;
+  /** ONLY art direction — never the copywriting voice. See brandBlock. */
+  artDirection?: string | undefined;
 }
 
 export function buildPostImagePrompt(input: PostImagePromptInput): string {
   const keywords = (input.keywords ?? []).map((k) => k.trim()).filter(Boolean);
   return joinParts([
-    `Fotografía real de marketing para un negocio de tipo "${input.rubro}".${brandBlock(input.brandTraining)}`,
+    `Fotografía real de marketing para un negocio de tipo "${input.rubro}".${brandBlock(input.artDirection)}`,
     `Tema de la publicación: ${input.theme}.`,
     input.headline?.trim() && `Concepto a ilustrar visualmente, sin escribirlo: ${input.headline.trim()}.`,
     keywords.length > 0 && `Escena sugerida: ${keywords.join(", ")}.`,
@@ -57,14 +65,15 @@ export interface NewsImagePromptInput {
   rubro: string;
   theme: string;
   headline: string;
-  brandTraining?: string | undefined;
+  /** ONLY art direction — never the copywriting voice. See brandBlock. */
+  artDirection?: string | undefined;
 }
 
 export function buildNewsImagePrompt(input: NewsImagePromptInput): string {
   return joinParts([
     `Fotografía profesional y editorial para una publicación de noticias sobre: "${input.headline}".`,
     `Enfoque para este negocio (${input.rubro}): ${input.theme}.`,
-    `Estilo fotoperiodístico, realista, sin logos.${brandBlock(input.brandTraining)}`,
+    `Estilo fotoperiodístico, realista, sin logos.${brandBlock(input.artDirection)}`,
     NO_TEXT_IN_IMAGE,
   ]);
 }
@@ -73,7 +82,8 @@ export interface CarouselSlideImagePromptInput {
   rubro: string;
   theme: string;
   slideText: string;
-  brandTraining?: string | undefined;
+  /** ONLY art direction — never the copywriting voice. See brandBlock. */
+  artDirection?: string | undefined;
 }
 
 export function buildCarouselSlideImagePrompt(input: CarouselSlideImagePromptInput): string {
@@ -85,7 +95,7 @@ export function buildCarouselSlideImagePrompt(input: CarouselSlideImagePromptInp
     // inside the photo, misspelled (seen on a real carousel). Here the
     // phrase is only context for what to illustrate.
     `Concepto a ilustrar visualmente, sin escribirlo: ${input.slideText}`,
-    `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos.${brandBlock(input.brandTraining)}`,
+    `La imagen debe transmitir esa idea de forma puramente visual, ocupando el 100% del encuadre de borde a borde, sin zonas vacías, planas ni espacios en blanco reservados (el overlay de texto se agrega después por separado, en post-producción). Sin logos.${brandBlock(input.artDirection)}`,
     NO_TEXT_IN_IMAGE,
   ]);
 }

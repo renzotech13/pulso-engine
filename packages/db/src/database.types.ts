@@ -214,6 +214,7 @@ export type Database = {
       }
       brand_kits: {
         Row: {
+          art_direction: string | null
           banned_phrases: string[]
           brief_document_name: string | null
           brief_document_url: string | null
@@ -230,6 +231,7 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          art_direction?: string | null
           banned_phrases?: string[]
           brief_document_name?: string | null
           brief_document_url?: string | null
@@ -246,6 +248,7 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          art_direction?: string | null
           banned_phrases?: string[]
           brief_document_name?: string | null
           brief_document_url?: string | null

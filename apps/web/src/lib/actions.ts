@@ -1035,7 +1035,7 @@ async function regenerateCarouselSlideActionImpl(formData: FormData): Promise<vo
       .eq("slot_index", slotIndex)
       .maybeSingle(),
     supabase.from("tenants").select("rubro").eq("id", tenantId).single(),
-    supabase.from("brand_kits").select("tone_description, voice_training").eq("tenant_id", tenantId).maybeSingle(),
+    supabase.from("brand_kits").select("tone_description, voice_training, art_direction").eq("tenant_id", tenantId).maybeSingle(),
   ]);
 
   // Same tenant-authored guidance creative.ts folds into every image prompt
@@ -1043,11 +1043,14 @@ async function regenerateCarouselSlideActionImpl(formData: FormData): Promise<vo
   const brandVoiceParts = [brandKit?.tone_description, brandKit?.voice_training].filter(
     (part): part is string => Boolean(part?.trim()),
   );
+  // Art direction only — see the comment in @pulso/shared/image-prompts: the
+  // copywriting voice reaching an image model got painted into a real post.
+  const artDirection = brandKit?.art_direction?.trim() || (brandVoiceParts.length > 0 ? brandVoiceParts.join("\n") : "");
   const prompt = buildCarouselSlideImagePrompt({
     rubro: tenant?.rubro ?? "general",
     theme: slot?.theme ?? "",
     slideText,
-    ...(brandVoiceParts.length > 0 ? { brandTraining: brandVoiceParts.join("\n") } : {}),
+    ...(artDirection ? { artDirection } : {}),
   });
 
   const result = await generateThemedImageDetailed(prompt, { aspectRatio: "1:1" });
