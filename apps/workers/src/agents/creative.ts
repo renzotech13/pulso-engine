@@ -505,16 +505,13 @@ export async function runCreativeAgentForSlot(
           photoMeta = { photoSource: "product" };
           photoReason = `Foto del catálogo (${copy.productName})`;
         } else if (isNewsSourced) {
-          // A real headline is too specific for a generic bank: Gemini first,
-          // the ranked bank only as a fallback — and only if it actually
-          // relates, never "any photo is better than none".
-          const best = rankBankPhotos(bankAssets, {
-            texts: [newsHeadline, slot.theme],
-            hints: keywords,
-            now,
-            excludeIds,
-            preferPortrait,
-          })[0];
+          // News pieces are GENERATED, never taken from the bank. A story is
+          // about one specific event — the Niño weather phenomenon, a change
+          // to the PCGE — and a stock photo of an office is at best
+          // unrelated to it. The bank fallback used to fire whenever Gemini
+          // slipped and put a barely-related photo (score 0.14) on a piece
+          // about accounting-standard changes; a plain gradient is more
+          // honest than a photo that has nothing to do with the news.
           if (geminiAvailable()) {
             photoUrl = await generateAndUpload(
               buildNewsImagePrompt({ rubro, theme: slot.theme, headline: newsHeadline ?? slot.theme, artDirection }),
@@ -524,14 +521,8 @@ export async function runCreativeAgentForSlot(
           if (photoUrl) {
             photoMeta = { photoSource: "gemini" };
             photoReason = "Gemini: pieza de noticias";
-          } else if (best && best.score >= BANK_WEAK_MATCH) {
-            photoUrl = best.asset.url;
-            bankScore = best.score;
-            await ctx.db.markMediaAssetUsed(best.asset.id);
-            photoMeta = { photoSource: "bank", photoAssetId: best.asset.id };
-            photoReason = `Banco como respaldo de noticias (score ${best.score.toFixed(2)}: ${best.matched.join(", ")})`;
           } else {
-            photoReason = "Degradado: Gemini no disponible o falló y el banco no tiene nada relacionado con la noticia";
+            photoReason = "Degradado: pieza de noticias sin imagen generada (el banco no se usa para noticias)";
           }
         } else {
           const best = rankBankPhotos(bankAssets, {
