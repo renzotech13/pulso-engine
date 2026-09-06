@@ -30,7 +30,14 @@ const MAX_ART_DIRECTION_CHARS = 1200;
 
 function brandBlock(artDirection: string | undefined): string {
   const text = artDirection?.trim().slice(0, MAX_ART_DIRECTION_CHARS);
-  return text ? ` Dirección de arte de la marca (solo aspecto visual): ${text}.` : "";
+  if (!text) return "";
+  // Tenants write their art direction for the FINISHED piece — headline in
+  // the upper third, condensed caps, a logo motif in the corner. Handed to
+  // an image model as-is, it builds the whole post mock-up, headline and
+  // all (seen for real: a fabricated "EMPRENTAD DE EMPRENDICIAS" title over
+  // a CTA button). What is being asked for here is only the photograph that
+  // goes UNDER that layout, so the layout half is explicitly ruled out.
+  return ` Dirección de arte de la marca — aplica SOLO lo fotográfico (tipo de escena, personas, lugar, tratamiento de color, qué evitar). Ignora por completo cualquier indicación de maquetación: tipografías, titulares, posición del texto, botones, logos, marcos, cintas o motivos gráficos; nada de eso se dibuja, se compone después: ${text}.`;
 }
 
 function joinParts(parts: Array<string | undefined | false>): string {
