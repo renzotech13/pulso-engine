@@ -47,6 +47,16 @@ export interface CreativeCopy {
  * is resolved separately (pickProductPhoto) — it's not something the LLM
  * writes, just something it points at via productName.
  */
+// The headline often already ends in "?" or "!" (a real one: "¿Tu
+// contabilidad te da dolores de cabeza?"); joining it to the subheadline
+// with an em dash was baked into THIS function, not something the LLM
+// wrote — no prompt guard could have caught it. Only add a period when the
+// headline doesn't already end a sentence, so it never reads as "cabeza?.".
+function joinAsSentences(first: string | undefined, second: string): string {
+  const head = first ?? "";
+  return /[.!?]$/.test(head.trim()) ? `${head} ${second}` : `${head}. ${second}`;
+}
+
 export interface ColorOverride {
   colorPrimary: string;
   colorSecondary: string;
@@ -85,7 +95,7 @@ export function buildBriefForComponentRef(
   photoMeta?: PhotoMeta,
 ): Record<string, unknown> {
   if (componentRef === "story-promo") {
-    const message = copy.subheadline ? `${copy.headline} — ${copy.subheadline}` : copy.headline;
+    const message = copy.subheadline ? joinAsSentences(copy.headline, copy.subheadline) : copy.headline;
     const brief: Record<string, unknown> = { message };
     if (photoUrl) brief.photoUrl = photoUrl;
     if (copy.caption) brief.caption = copy.caption;
@@ -487,4 +497,22 @@ export function decidePhotoSource(input: PhotoSourceDecisionInput): "bank" | "ge
 
   const geminiPct = recent.length > 0 ? (recent.filter((s) => s === "gemini").length / recent.length) * 100 : 0;
   return geminiPct < input.geminiShare ? "gemini" : "bank";
+}
+
+const EM_DASH = "—"; // —
+
+/**
+ * Every tenant's copy prompt already says "never use the em dash — it's the
+ * clearest tell that a text was AI-written", but a local model following a
+ * style instruction is not the same as it being true. Same posture as
+ * findBannedPhrase: checked in code, not just asked for in the prompt.
+ */
+export function findEmDash(copy: Record<string, unknown>): { field: string } | null {
+  for (const [field, value] of Object.entries(copy)) {
+    const texts = typeof value === "string" ? [value] : Array.isArray(value) ? value : [];
+    for (const text of texts) {
+      if (typeof text === "string" && text.includes(EM_DASH)) return { field };
+    }
+  }
+  return null;
 }

@@ -13,6 +13,7 @@ import {
   creativeTypeForTemplateType,
   decidePhotoSource,
   findBannedPhrase,
+  findEmDash,
   pickProductPhoto,
   rankBankPhotos,
   templateNameForSlotType,
@@ -91,14 +92,24 @@ const carouselCopySchema = z
 // the offending phrase and field. Stating the ban in the prompt alone was
 // already tried — the brand kit said "never 'sin sustos'" twice and a real
 // piece came back with it anyway.
-function withBannedPhraseGuard<S extends z.ZodTypeAny>(schema: S, bannedPhrases: readonly string[]) {
-  if (bannedPhrases.length === 0) return schema;
+function withCopyGuards<S extends z.ZodTypeAny>(schema: S, bannedPhrases: readonly string[]) {
   return schema.superRefine((copy, ctx) => {
-    const hit = findBannedPhrase(copy as Record<string, unknown>, bannedPhrases);
-    if (hit) {
+    const record = copy as Record<string, unknown>;
+    const banned = findBannedPhrase(record, bannedPhrases);
+    if (banned) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: `el campo "${hit.field}" contiene la frase prohibida "${hit.phrase}" — reescríbelo sin usarla ni ninguna variante`,
+        message: `el campo "${banned.field}" contiene la frase prohibida "${banned.phrase}" — reescríbelo sin usarla ni ninguna variante`,
+      });
+      return; // one issue per attempt keeps the retry prompt focused
+    }
+    // Universal, not tenant-specific: every copy prompt already asks for
+    // this, so it applies regardless of banned_phrases being empty.
+    const dash = findEmDash(record);
+    if (dash) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `el campo "${dash.field}" usa la raya "—" (em dash), que está prohibida en todo el contenido — reescríbelo separando las ideas con punto seguido o coma`,
       });
     }
   });
@@ -316,7 +327,7 @@ export async function runCreativeAgentForSlot(
               ...(jobId ? { jobId } : {}),
               correlationId,
               prompt,
-              schema: withBannedPhraseGuard(carouselCopySchema, bannedPhrases),
+              schema: withCopyGuards(carouselCopySchema, bannedPhrases),
               options: { maxRetries: COPY_MAX_RETRIES },
             })
           : await callAgentLlm({
@@ -325,7 +336,7 @@ export async function runCreativeAgentForSlot(
               ...(jobId ? { jobId } : {}),
               correlationId,
               prompt,
-              schema: withBannedPhraseGuard(creativeCopySchema, bannedPhrases),
+              schema: withCopyGuards(creativeCopySchema, bannedPhrases),
               options: { maxRetries: COPY_MAX_RETRIES },
             });
       } catch (err) {

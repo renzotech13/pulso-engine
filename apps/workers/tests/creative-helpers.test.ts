@@ -5,6 +5,7 @@ import {
   pickProductPhoto,
   templateNameForSlotType,
   findBannedPhrase,
+  findEmDash,
   BANK_STRONG_MATCH,
   BANK_WEAK_MATCH,
   decidePhotoSource,
@@ -57,7 +58,7 @@ describe("buildBriefForComponentRef", () => {
       headline: "20% en masajes",
       subheadline: "Por Fiestas Patrias",
     });
-    expect(brief).toEqual({ message: "20% en masajes — Por Fiestas Patrias" });
+    expect(brief).toEqual({ message: "20% en masajes. Por Fiestas Patrias" });
   });
 
   it("uses just the headline as the message when there's no subheadline", () => {
@@ -405,5 +406,39 @@ describe("decidePhotoSource — Gemini unavailable", () => {
 
   it("still gives a legacy tenant (no share configured) its plain rotation", () => {
     expect(decidePhotoSource({ bestBankScore: 0, geminiAvailable: false, recentSources, geminiShare: null })).toBe("bank");
+  });
+});
+
+describe("findEmDash", () => {
+  it("finds an em dash in a string field and names the field", () => {
+    expect(findEmDash({ headline: "Sin raya", caption: "Antes — después" })).toEqual({ field: "caption" });
+  });
+
+  it("finds it inside an array field (carousel slides)", () => {
+    expect(findEmDash({ slides: ["uno", "dos — tres"] })).toEqual({ field: "slides" });
+  });
+
+  it("returns null when there is none, and ignores a plain hyphen", () => {
+    expect(findEmDash({ headline: "co-fundador, 24-7, punto-com" })).toBeNull();
+  });
+});
+
+describe("buildBriefForComponentRef — story-promo message", () => {
+  it("joins headline and subheadline without an em dash", () => {
+    const brief = buildBriefForComponentRef("story-promo", {
+      headline: "¿Tu contabilidad te da dolores de cabeza?",
+      subheadline: "Deja de adivinar si estás al día con SUNAT.",
+    });
+    expect(brief.message).toBe(
+      "¿Tu contabilidad te da dolores de cabeza? Deja de adivinar si estás al día con SUNAT.",
+    );
+  });
+
+  it("adds a period when the headline has no closing punctuation of its own", () => {
+    const brief = buildBriefForComponentRef("story-promo", {
+      headline: "Tu contabilidad al día",
+      subheadline: "sin sorpresas",
+    });
+    expect(brief.message).toBe("Tu contabilidad al día. sin sorpresas");
   });
 });
