@@ -1,7 +1,7 @@
 // Turns a generated article into a real .html page for the tenant's own site.
 //
 // The design problem: the page has to look like it always belonged to that
-// site, but Pulso serves many tenants and cannot hold a hand-written template
+// site, but Amplifica Studio serves many tenants and cannot hold a hand-written template
 // per client. So nothing here is designed. The header, the footer and the
 // <link> tags for fonts and CSS are LIFTED from a page the client already has
 // (site_targets.shell_page), which means the blog follows the site's own
@@ -97,74 +97,74 @@ export function extractShell(sourceHtml: string): SiteShell {
 export const EMPTY_SHELL: SiteShell = { headExtras: "", header: "", footer: "", bodyClass: "" };
 
 /**
- * The one stylesheet Pulso owns, written once next to the articles. Every
+ * The one stylesheet Amplifica Studio owns, written once next to the articles. Every
  * colour and font goes through a variable WITH a fallback: it borrows the
  * client's tokens where they exist and stands on its own where they don't.
  */
-export const BLOG_STYLESHEET = `/* Generado por Pulso Engine. Se sobrescribe: no editar a mano.
+export const BLOG_STYLESHEET = `/* Generado por Amplifica Studio. Se sobrescribe: no editar a mano.
    Usa los tokens del sitio (--brown, --gold, --serif...) cuando existen, y
    valores neutros de respaldo cuando no. */
 
-.pulso-article{padding-top:clamp(96px,13vw,132px);padding-bottom:clamp(50px,6vw,80px);}
-.pulso-article a{color:var(--gold-deep,#8a6410);text-decoration:underline;text-underline-offset:2px;}
-.pulso-article a:hover{color:var(--brown,#3f2a1c);}
+.amp-article{padding-top:clamp(96px,13vw,132px);padding-bottom:clamp(50px,6vw,80px);}
+.amp-article a{color:var(--gold-deep,#8a6410);text-decoration:underline;text-underline-offset:2px;}
+.amp-article a:hover{color:var(--brown,#3f2a1c);}
 
-.pulso-article-head{width:min(760px,90vw);margin:0 auto clamp(30px,4vw,44px);}
-.pulso-back{
+.amp-article-head{width:min(760px,90vw);margin:0 auto clamp(30px,4vw,44px);}
+.amp-back{
   display:inline-flex;align-items:center;gap:8px;text-decoration:none;
   font-size:12px;letter-spacing:.1em;text-transform:uppercase;
   color:var(--gold-deep,#8a6410);margin-bottom:clamp(18px,2.6vw,28px);
 }
-.pulso-article-head h1{
+.amp-article-head h1{
   font-family:var(--serif,Georgia,serif);color:var(--brown,#3f2a1c);
   font-size:clamp(1.7rem,4vw,2.7rem);line-height:1.2;letter-spacing:.01em;margin:0;
 }
-.pulso-date{margin-top:12px;font-size:12.5px;font-style:italic;color:rgba(92,58,35,.62);}
+.amp-date{margin-top:12px;font-size:12.5px;font-style:italic;color:rgba(92,58,35,.62);}
 
-.pulso-hero{width:min(1040px,92vw);margin:0 auto clamp(30px,4vw,44px);}
-.pulso-hero img{width:100%;height:auto;display:block;border-radius:2px;}
+.amp-hero{width:min(1040px,92vw);margin:0 auto clamp(30px,4vw,44px);}
+.amp-hero img{width:100%;height:auto;display:block;border-radius:2px;}
 
-.pulso-body{width:min(760px,90vw);margin:0 auto;}
-.pulso-body h2{
+.amp-body{width:min(760px,90vw);margin:0 auto;}
+.amp-body h2{
   font-family:var(--serif,Georgia,serif);color:var(--brown,#3f2a1c);
   font-size:clamp(1.15rem,2vw,1.45rem);line-height:1.35;
   margin:clamp(34px,4vw,46px) 0 14px;
 }
-.pulso-body h3{
+.amp-body h3{
   font-family:var(--sans,system-ui,sans-serif);color:var(--gold-deep,#8a6410);
   font-weight:500;font-size:13px;letter-spacing:.04em;margin:22px 0 8px;
 }
-.pulso-body p,.pulso-body li{
+.amp-body p,.amp-body li{
   color:var(--ink,#4a4a4a);font-size:15px;line-height:1.85;font-weight:300;
 }
-.pulso-body p + p{margin-top:14px;}
-.pulso-body ul,.pulso-body ol{margin:14px 0 0;padding-left:22px;}
-.pulso-body li + li{margin-top:6px;}
-.pulso-body li::marker{color:var(--gold-deep,#8a6410);}
-.pulso-body strong{font-weight:500;color:var(--brown,#3f2a1c);}
+.amp-body p + p{margin-top:14px;}
+.amp-body ul,.amp-body ol{margin:14px 0 0;padding-left:22px;}
+.amp-body li + li{margin-top:6px;}
+.amp-body li::marker{color:var(--gold-deep,#8a6410);}
+.amp-body strong{font-weight:500;color:var(--brown,#3f2a1c);}
 
 /* Índice del blog */
-.pulso-index{padding-top:clamp(96px,13vw,132px);padding-bottom:clamp(50px,6vw,80px);}
-.pulso-index-head{width:min(1040px,92vw);margin:0 auto clamp(34px,4.4vw,54px);}
-.pulso-index-head h1{
+.amp-index{padding-top:clamp(96px,13vw,132px);padding-bottom:clamp(50px,6vw,80px);}
+.amp-index-head{width:min(1040px,92vw);margin:0 auto clamp(34px,4.4vw,54px);}
+.amp-index-head h1{
   font-family:var(--serif,Georgia,serif);color:var(--brown,#3f2a1c);
   text-transform:uppercase;letter-spacing:.045em;
   font-size:clamp(1.7rem,4vw,2.7rem);line-height:1.15;margin:0;
 }
-.pulso-cards{
+.amp-cards{
   width:min(1040px,92vw);margin:0 auto;display:grid;gap:clamp(20px,3vw,34px);
   grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
 }
-.pulso-card{display:block;text-decoration:none;}
-.pulso-card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;margin-bottom:14px;}
-.pulso-card h2{
+.amp-card{display:block;text-decoration:none;}
+.amp-card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;margin-bottom:14px;}
+.amp-card h2{
   font-family:var(--serif,Georgia,serif);color:var(--brown,#3f2a1c);
   font-size:1.1rem;line-height:1.35;margin:0 0 8px;
 }
-.pulso-card p{color:var(--ink,#4a4a4a);font-size:13.5px;line-height:1.7;font-weight:300;margin:0;}
-.pulso-card time{display:block;margin-top:10px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep,#8a6410);}
-.pulso-card:hover h2{color:var(--gold-deep,#8a6410);}
-.pulso-empty{width:min(760px,90vw);margin:0 auto;color:var(--ink,#4a4a4a);font-weight:300;}
+.amp-card p{color:var(--ink,#4a4a4a);font-size:13.5px;line-height:1.7;font-weight:300;margin:0;}
+.amp-card time{display:block;margin-top:10px;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-deep,#8a6410);}
+.amp-card:hover h2{color:var(--gold-deep,#8a6410);}
+.amp-empty{width:min(760px,90vw);margin:0 auto;color:var(--ink,#4a4a4a);font-weight:300;}
 `;
 
 /** blog.css sits alongside the articles, wherever the tenant's blog lives. */
@@ -244,18 +244,18 @@ export function renderArticlePage(input: ArticlePageInput, shell: SiteShell): st
     ...(input.canonicalUrl ? { mainEntityOfPage: input.canonicalUrl } : {}),
   };
 
-  const main = `<main class="pulso-article">
-  <div class="pulso-article-head">
-    <a class="pulso-back" href="${escapeHtml(input.blogPath)}">&larr; Volver al blog</a>
+  const main = `<main class="amp-article">
+  <div class="amp-article-head">
+    <a class="amp-back" href="${escapeHtml(input.blogPath)}">&larr; Volver al blog</a>
     <h1>${escapeHtml(input.title)}</h1>
-    ${date ? `<p class="pulso-date"><time datetime="${escapeHtml(input.publishedAt!.slice(0, 10))}">${date}</time></p>` : ""}
+    ${date ? `<p class="amp-date"><time datetime="${escapeHtml(input.publishedAt!.slice(0, 10))}">${date}</time></p>` : ""}
   </div>
   ${
     input.heroImageUrl
-      ? `<figure class="pulso-hero"><img src="${escapeHtml(input.heroImageUrl)}" alt="${escapeHtml(input.title)}" loading="eager"></figure>`
+      ? `<figure class="amp-hero"><img src="${escapeHtml(input.heroImageUrl)}" alt="${escapeHtml(input.title)}" loading="eager"></figure>`
       : ""
   }
-  <article class="pulso-body">
+  <article class="amp-body">
 ${input.bodyHtml}
   </article>
 </main>`;
@@ -283,21 +283,21 @@ export function renderBlogIndex(
   const cards = input.entries
     .map((entry) => {
       const date = entry.publishedAt ? formatSpanishDate(entry.publishedAt) : "";
-      return `    <a class="pulso-card" href="${escapeHtml(`${base}/${entry.slug}`)}">
+      return `    <a class="amp-card" href="${escapeHtml(`${base}/${entry.slug}`)}">
 ${entry.heroImageUrl ? `      <img src="${escapeHtml(entry.heroImageUrl)}" alt="${escapeHtml(entry.title)}" loading="lazy">\n` : ""}      <h2>${escapeHtml(entry.title)}</h2>
       <p>${escapeHtml(entry.metaDescription)}</p>
 ${date ? `      <time datetime="${escapeHtml(entry.publishedAt!.slice(0, 10))}">${date}</time>\n` : ""}    </a>`;
     })
     .join("\n");
 
-  const main = `<main class="pulso-index">
-  <div class="pulso-index-head">
+  const main = `<main class="amp-index">
+  <div class="amp-index-head">
     <h1>Blog</h1>
   </div>
 ${
   input.entries.length > 0
-    ? `  <div class="pulso-cards">\n${cards}\n  </div>`
-    : `  <p class="pulso-empty">Todavía no hay artículos publicados.</p>`
+    ? `  <div class="amp-cards">\n${cards}\n  </div>`
+    : `  <p class="amp-empty">Todavía no hay artículos publicados.</p>`
 }
 </main>`;
 

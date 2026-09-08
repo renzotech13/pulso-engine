@@ -42,7 +42,7 @@ export default async function AdminLimitsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[880px] text-sm">
               <thead>
-                <tr className="border-b border-ink-700 text-left text-xs uppercase tracking-wide text-neutral-500">
+                <tr className="border-b border-line text-left eyebrow text-fg-3">
                   {COLUMNS.map((col) => (
                     <th key={col} scope="col" className="px-4 py-3 font-medium">
                       {col}
@@ -61,10 +61,10 @@ export default async function AdminLimitsPage() {
                   // stays inside the form for useFormStatus.
                   const formId = `limits-${tenant.id}`;
                   return (
-                    <tr key={tenant.id} className="border-b border-ink-700/60 last:border-b-0 hover:bg-ink-800/40">
+                    <tr key={tenant.id} className="border-b border-line last:border-b-0 hover:bg-surface-2/40">
                       <td className="px-4 py-3 align-middle">
-                        <p className="font-medium text-neutral-100">{tenant.name}</p>
-                        <p className="text-xs text-neutral-500">{tenant.slug}</p>
+                        <p className="font-medium text-fg">{tenant.name}</p>
+                        <p className="text-xs text-fg-3">{tenant.slug}</p>
                       </td>
                       <td className="px-2 py-3 align-middle">
                         <input
@@ -141,7 +141,7 @@ export default async function AdminLimitsPage() {
                           defaultChecked={tenant.reels_paused}
                           title="Pausa la generación de reels — el sistema publica un post en su lugar. No afecta posts, carruseles ni historias."
                           aria-label={`Pausar reels de ${tenant.name}`}
-                          className="h-4 w-4 accent-status-pink"
+                          className="h-4 w-4 accent-danger"
                         />
                       </td>
                       <td className="px-4 py-3 text-right align-middle">

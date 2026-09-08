@@ -23,16 +23,16 @@ export default async function OnboardingPage() {
   ]);
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-ink p-4">
       {/* This page lives outside the dashboard layout, so it mounts its own toast:
           createTenantAction flashes its errors (e.g. a slug already taken). */}
       <FlashToast initial={flash} />
       <Card padding="none" className="w-full max-w-sm p-8">
         <form action={createTenantAction} className="space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
-            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Crea tu negocio</h1>
-            <p className="text-sm text-neutral-400">Este será tu primer negocio en Pulso Engine.</p>
+            <p className="eyebrow text-accent-ink">Amplifica Studio</p>
+            <h1 className="font-display text-2xl tracking-tight text-fg">Crea tu negocio</h1>
+            <p className="text-sm text-fg-2">Este será tu primer negocio en Amplifica Studio.</p>
           </div>
 
           <div className="space-y-4">

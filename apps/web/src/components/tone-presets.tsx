@@ -86,7 +86,7 @@ export function ColorField({ name, label, defaultValue }: ColorFieldProps) {
     <Field id={id} label={label} hint="Formato #RRGGBB">
       <div className="flex items-center gap-2">
         <span
-          className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-ink-700 shadow-inner"
+          className="relative h-10 w-10 shrink-0 overflow-hidden rounded-btn border border-line shadow-inner"
           style={{ backgroundColor: valid }}
         >
           <input

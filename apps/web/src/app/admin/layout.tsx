@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const [{ email }, flash] = await Promise.all([requireAdmin(), readFlash()]);
 
   return (
-    <DashboardShell productLabel="Pulso Engine — Panel interno" rightLabel={email} navItems={NAV_ITEMS}>
+    <DashboardShell productLabel="Amplifica Studio — Panel interno" rightLabel={email} navItems={NAV_ITEMS}>
       {children}
       <FlashToast initial={flash} />
     </DashboardShell>

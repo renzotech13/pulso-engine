@@ -93,7 +93,7 @@ export function EventsStream({ tenantId }: { tenantId: string }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[520px] text-sm">
         <thead>
-          <tr className="border-b border-ink-700 text-left text-xs uppercase tracking-wide text-neutral-500">
+          <tr className="border-b border-line text-left eyebrow text-fg-3">
             {HEADERS.map((h) => (
               <th key={h} scope="col" className="pb-2 pr-4 font-medium">
                 {h}
@@ -105,16 +105,16 @@ export function EventsStream({ tenantId }: { tenantId: string }) {
           {events.map((event) => {
             const status = eventStatus(event.status);
             return (
-              <tr key={event.id} className="border-b border-ink-700/60 last:border-b-0">
+              <tr key={event.id} className="border-b border-line last:border-b-0">
                 <td className="py-2 pr-4">
-                  <p className="text-neutral-100">{label(EVENT_TYPE, event.type)}</p>
-                  {EVENT_TYPE[event.type] && <p className="text-xs text-neutral-600">{event.type}</p>}
+                  <p className="text-fg">{label(EVENT_TYPE, event.type)}</p>
+                  {EVENT_TYPE[event.type] && <p className="text-xs text-fg-3">{event.type}</p>}
                 </td>
                 <td className="py-2 pr-4">
                   <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                 </td>
-                <td className="py-2 pr-4 tabular-nums text-neutral-300">{event.attempts}</td>
-                <td className="py-2 pr-4 whitespace-nowrap text-neutral-300">{formatDateTime(event.created_at)}</td>
+                <td className="py-2 pr-4 tabular-nums text-fg-2">{event.attempts}</td>
+                <td className="py-2 pr-4 whitespace-nowrap text-fg-2">{formatDateTime(event.created_at)}</td>
               </tr>
             );
           })}

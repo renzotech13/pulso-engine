@@ -35,9 +35,9 @@ export function SidebarNav({
         href={item.href}
         aria-current={active ? "page" : undefined}
         {...(onNavigate ? { onClick: onNavigate } : {})}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
+        className={`flex items-center gap-3 rounded-btn px-3 py-2.5 text-sm font-medium transition-colors duration-200 ${
           // A real highlight, not the page background (which read as a hole).
-          active ? "bg-pulso-primary/15 text-pulso-accent" : "text-neutral-400 hover:bg-ink-950 hover:text-neutral-100"
+          active ? "bg-accent/15 text-accent-ink" : "text-fg-2 hover:bg-ink hover:text-fg"
         }`}
       >
         {item.icon}
@@ -50,9 +50,9 @@ export function SidebarNav({
     <nav className="space-y-1">
       {items.map(renderItem)}
       {secondaryItems && secondaryItems.length > 0 && (
-        <div className="mt-4 border-t border-ink-700 pt-4">
+        <div className="mt-4 border-t border-line pt-4">
           {secondaryLabel && (
-            <p className="mb-1 px-3 text-[10px] uppercase tracking-[0.2em] text-neutral-600">{secondaryLabel}</p>
+            <p className="mb-1 px-3 eyebrow text-fg-3">{secondaryLabel}</p>
           )}
           {secondaryItems.map(renderItem)}
         </div>

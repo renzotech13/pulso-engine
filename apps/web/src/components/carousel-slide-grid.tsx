@@ -62,7 +62,7 @@ export function CarouselSlideGrid({
         {urls.map((url, i) => (
           <div
             key={url}
-            className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700 transition-colors duration-200 hover:border-pulso-accent/60"
+            className="group relative aspect-square overflow-hidden rounded-btn border border-line transition-colors duration-200 hover:border-accent/60"
           >
             <button
               type="button"
@@ -72,7 +72,7 @@ export function CarouselSlideGrid({
             >
               <img src={url} alt={`Slide ${i + 1}`} className="h-full w-full object-cover" />
             </button>
-            <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <span className="pointer-events-none absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-fg">
               {i + 1}
             </span>
             <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 bg-black/75 py-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100">
@@ -153,9 +153,9 @@ export function CarouselSlideGrid({
             <img
               src={urls[openIndex]}
               alt={`Slide ${openIndex + 1}`}
-              className="max-h-[80vh] max-w-full rounded-lg object-contain"
+              className="max-h-[80vh] max-w-full rounded-btn object-contain"
             />
-            <figcaption className="flex items-center gap-4 text-sm text-neutral-400">
+            <figcaption className="flex items-center gap-4 text-sm text-fg-2">
               <span>
                 Slide {openIndex + 1} de {urls.length}
               </span>

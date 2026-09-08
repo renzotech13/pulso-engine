@@ -35,12 +35,12 @@ function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
       {steps.map((step, i) => (
         <li key={step.label}>
           <div className="mb-1 flex items-baseline justify-between text-xs">
-            <span className="text-neutral-400">{step.label}</span>
-            <span className="font-display text-base text-neutral-100">{step.value}</span>
+            <span className="text-fg-2">{step.label}</span>
+            <span className="font-display text-base text-fg">{step.value}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-ink-800">
+          <div className="h-2 overflow-hidden rounded-full bg-surface-2">
             <div
-              className="h-full rounded-full bg-pulso-primary transition-[width]"
+              className="h-full rounded-full bg-accent transition-[width]"
               style={{ width: `${Math.round((step.value / max) * 100)}%`, opacity: 1 - i * 0.18 }}
             />
           </div>
@@ -53,8 +53,8 @@ function Funnel({ steps }: { steps: { label: string; value: number }[] }) {
 function MotorTile({ motor }: { motor: StatsSnapshot["motor"] }) {
   const reference = motor.lastSuccessAt ?? motor.lastRunAt;
   return (
-    <div className="rounded-lg border border-ink-700 bg-ink-950 p-4">
-      <p className="text-[11px] uppercase tracking-wide text-neutral-500">Motor</p>
+    <div className="rounded-btn border border-line bg-ink p-4">
+      <p className="eyebrow text-fg-3">Motor</p>
       <div className="mt-2">
         {motor.healthy ? (
           <StatusBadge tone="green">Activo</StatusBadge>
@@ -62,7 +62,7 @@ function MotorTile({ motor }: { motor: StatsSnapshot["motor"] }) {
           <StatusBadge tone="orange">Sin actividad</StatusBadge>
         )}
       </div>
-      <p className="mt-2 text-sm text-neutral-300">
+      <p className="mt-2 text-sm text-fg-2">
         {motor.healthy && reference
           ? `Última corrida ${formatRelative(reference)}`
           : reference
@@ -75,16 +75,16 @@ function MotorTile({ motor }: { motor: StatsSnapshot["motor"] }) {
 
 function ConnectionTile({ connection, isViewer }: { connection: StatsSnapshot["connection"]; isViewer: boolean }) {
   return (
-    <div className="rounded-lg border border-ink-700 bg-ink-950 p-4">
-      <p className="text-[11px] uppercase tracking-wide text-neutral-500">Conexión Meta</p>
+    <div className="rounded-btn border border-line bg-ink p-4">
+      <p className="eyebrow text-fg-3">Conexión Meta</p>
       {isViewer || !connection ? (
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-fg-3">
           {isViewer ? (
             "Solo visible para administradores"
           ) : (
             <>
               Sin conectar ·{" "}
-              <Link href="/connections" className="text-pulso-accent hover:underline">
+              <Link href="/connections" className="text-accent-ink hover:underline">
                 Conectar página
               </Link>
             </>
@@ -99,14 +99,14 @@ function ConnectionTile({ connection, isViewer }: { connection: StatsSnapshot["c
               <StatusBadge tone="pink">Inválida</StatusBadge>
             )}
           </div>
-          <p className="mt-2 text-sm text-neutral-300">
+          <p className="mt-2 text-sm text-fg-2">
             {connection.pageName ?? "Página sin nombre"} · Instagram: {connection.instagramUsername ? "sí" : "no"}
           </p>
-          <p className="mt-1 text-xs text-neutral-500">
+          <p className="mt-1 text-xs text-fg-3">
             {connection.lastVerifiedAt ? `Verificada ${formatRelative(connection.lastVerifiedAt)}` : "Sin verificar todavía"}
           </p>
           {connection.status !== "active" && connection.lastError && (
-            <p className="mt-1 text-xs text-status-pink">{connection.lastError}</p>
+            <p className="mt-1 text-xs text-danger">{connection.lastError}</p>
           )}
         </>
       )}
@@ -255,7 +255,7 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
           {formatData.length > 0 ? (
             <HorizontalBarChart data={formatData} valueName="Piezas" />
           ) : (
-            <p className="text-sm text-neutral-500">Sin piezas planificadas en el periodo.</p>
+            <p className="text-sm text-fg-3">Sin piezas planificadas en el periodo.</p>
           )}
         </Card>
         <Card>
@@ -263,9 +263,9 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
           {originData.length > 0 ? (
             <HorizontalBarChart data={originData} valueName="Piezas" />
           ) : (
-            <p className="text-sm text-neutral-500">Sin piezas planificadas en el periodo.</p>
+            <p className="text-sm text-fg-3">Sin piezas planificadas en el periodo.</p>
           )}
-          {photoSummary && <p className="mt-3 text-xs text-neutral-500">Fotos · {photoSummary}</p>}
+          {photoSummary && <p className="mt-3 text-xs text-fg-3">Fotos · {photoSummary}</p>}
         </Card>
         <Card>
           <CardHeader title="Embudo del periodo" description="De la idea a la publicación" />
@@ -301,23 +301,23 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
               ]}
             />
             <div>
-              <p className="mb-2 text-[11px] uppercase tracking-wide text-neutral-500">Fuentes más frecuentes</p>
+              <p className="mb-2 eyebrow text-fg-3">Fuentes más frecuentes</p>
               {stats.news.topSources.length > 0 ? (
                 <ol className="space-y-1.5">
                   {stats.news.topSources.map((s) => (
                     <li key={s.name} className="flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate text-neutral-300">{s.name}</span>
-                      <span className="shrink-0 font-display text-neutral-100">{s.count}</span>
+                      <span className="truncate text-fg-2">{s.name}</span>
+                      <span className="shrink-0 font-display text-fg">{s.count}</span>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <p className="text-sm text-neutral-500">Sin fuentes en el periodo.</p>
+                <p className="text-sm text-fg-3">Sin fuentes en el periodo.</p>
               )}
             </div>
           </div>
         ) : (
-          <p className="text-sm text-neutral-500">Sin noticias en el periodo.</p>
+          <p className="text-sm text-fg-3">Sin noticias en el periodo.</p>
         )}
       </Card>
 
@@ -326,10 +326,10 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
       {stats.topPublishErrors.length > 0 && (
         <Card>
           <CardHeader title="Errores de publicación" description="Los mensajes más repetidos del periodo" />
-          <ul className="divide-y divide-ink-700">
+          <ul className="divide-y divide-line">
             {stats.topPublishErrors.map((e) => (
               <li key={e.message} className="flex items-start justify-between gap-4 py-2 text-sm">
-                <span className="break-words text-neutral-300">{e.message}</span>
+                <span className="break-words text-fg-2">{e.message}</span>
                 <StatusBadge tone="pink" className="shrink-0">
                   {e.count} {e.count === 1 ? "vez" : "veces"}
                 </StatusBadge>

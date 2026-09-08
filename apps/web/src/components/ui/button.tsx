@@ -5,14 +5,18 @@ import { Loader2 } from "lucide-react";
 // in four sizes, a dozen ghosts, and emerald/pink/red one-offs, while this
 // primitive sat unused. The variants below cover every real use, and
 // `buttonClass` exists for the places that must stay a <Link> or an <a>.
+// Sobre CUALQUIER relleno de color va `text-accent-fg`, nunca `text-fg`: el
+// crema sobre naranja da 2.94:1 y sobre el rojo de error 3.25:1, los dos por
+// debajo de AA. Con el texto oscuro suben a 6.35:1 y 5.73:1. El botón de
+// peligro venía en blanco sobre rosa desde antes de este rediseño.
 const VARIANT_CLASS = {
-  primary: "bg-pulso-primary text-white hover:bg-pulso-accent",
-  secondary: "border border-ink-700 text-neutral-200 hover:border-pulso-accent/60 hover:text-neutral-100",
-  subtle: "bg-ink-800 text-neutral-200 hover:bg-ink-700",
-  success: "bg-status-green text-ink-950 hover:bg-status-green/85",
-  danger: "bg-status-pink text-white hover:bg-status-pink/85",
-  dangerGhost: "border border-ink-700 text-neutral-300 hover:border-status-pink/60 hover:text-status-pink",
-  link: "text-pulso-accent hover:underline",
+  primary: "bg-accent text-accent-fg hover:bg-accent-hover",
+  secondary: "border border-line-2 text-fg hover:border-fg-3 hover:bg-surface",
+  subtle: "bg-surface-2 text-fg-2 hover:text-fg hover:bg-surface",
+  success: "bg-success text-accent-fg hover:opacity-90",
+  danger: "bg-danger text-accent-fg hover:opacity-90",
+  dangerGhost: "border border-line-2 text-fg-2 hover:border-danger hover:text-danger",
+  link: "text-accent-ink hover:underline",
 } as const;
 
 const SIZE_CLASS = {
@@ -24,7 +28,9 @@ export type ButtonVariant = keyof typeof VARIANT_CLASS;
 export type ButtonSize = keyof typeof SIZE_CLASS;
 
 const BASE_CLASS =
-  "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60 disabled:cursor-not-allowed disabled:opacity-60";
+  // El foco lo pinta el `:focus-visible` global (globals.css), como en el
+  // sitio, en vez de un anillo repetido componente por componente.
+  "inline-flex items-center justify-center gap-1.5 rounded-btn font-bold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-40";
 
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", extra = ""): string {
   const sizing = variant === "link" ? "" : SIZE_CLASS[size];

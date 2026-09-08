@@ -2,15 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* El foco visible lo pone el sistema una sola vez, como en el sitio, en
+     lugar de que cada componente lleve su propia clase de anillo. */
+  :focus-visible {
+    outline: 2px solid theme("colors.accent");
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+
+  ::selection {
+    background: theme("colors.accent");
+    color: theme("colors.accent-fg");
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+}
+
 @layer components {
   /* The ONE card surface. It used to be a borderless gradient while most
      panels were hand-rolled `rounded-xl border bg-ink-900` divs on the same
      pages — two competing surfaces. Now every card-like thing is this. */
   .card-surface {
-    @apply rounded-xl border border-ink-700 bg-ink-900 shadow-[0_8px_24px_rgba(0,0,0,0.25)];
+    @apply rounded-card border border-line bg-surface;
   }
 
   .skeleton {
-    @apply animate-pulse rounded-md bg-ink-800;
+    @apply animate-pulse rounded-md bg-surface-2;
+  }
+
+  /* Las etiquetas de sección: mono, mayúsculas, tracking abierto. Es la
+     firma tipográfica de Brasa y aparecía copiada a mano en cada pantalla
+     como `font-display text-xs uppercase tracking-[0.2em]`. No fija color a
+     propósito: cada uso trae el suyo (apagado, acento o error) y una
+     utilidad de color acá pelearía con esa clase. */
+  .eyebrow {
+    @apply font-mono text-label uppercase;
+  }
+}
+
+@layer utilities {
+  /* Números que se alinean en columna: tablas, contadores, métricas. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* El eje de ancho de Archivo, lo que comprime un titular sin estirarlo. */
+  .fs-tight {
+    font-stretch: 88%;
   }
 }

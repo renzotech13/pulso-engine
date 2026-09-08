@@ -1,4 +1,4 @@
-# Pulso Engine
+# Amplifica Studio
 
 SaaS multi-tenant de agentes autónomos de marketing para negocios locales (spas, restaurantes, tiendas, gimnasios, mueblerías, joyerías). El sistema planifica, crea, publica, pauta y optimiza contenido y anuncios en loop continuo, alimentándose de métricas reales del sitio web, CRM y WhatsApp del negocio.
 

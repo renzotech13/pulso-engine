@@ -29,32 +29,32 @@ export function DashboardShell({
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-ink-950">
-      <header className="flex h-[72px] items-center justify-between border-b border-ink-700 bg-gradient-to-r from-ink-800 to-ink-950 px-4 lg:px-6">
+    <div className="min-h-screen bg-ink">
+      <header className="flex h-[72px] items-center justify-between border-b border-line bg-gradient-to-r from-surface-2 to-ink px-4 lg:px-6">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
-            className="text-neutral-400 transition-colors hover:text-neutral-100 lg:hidden"
+            className="text-fg-2 transition-colors hover:text-fg lg:hidden"
             aria-label="Abrir menú"
           >
             {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          <span className="font-display text-lg tracking-wide text-neutral-100">{productLabel}</span>
+          <span className="font-display text-lg tracking-tight text-fg">{productLabel}</span>
         </div>
 
         <div className="flex items-center gap-4">
           {tenant && (
             <>
               <div className="hidden text-right sm:block">
-                <p className="text-[10px] uppercase tracking-wide text-neutral-500">Negocio</p>
-                <p className="font-display text-sm text-neutral-200">{tenant.name}</p>
+                <p className="eyebrow text-fg-3">Negocio</p>
+                <p className="font-display text-sm text-fg">{tenant.name}</p>
               </div>
               <TenantSwitcher memberships={tenant.memberships} activeTenantId={tenant.activeTenantId} />
             </>
           )}
           {!tenant && rightLabel && (
-            <p className="hidden text-xs uppercase tracking-wide text-neutral-500 sm:block">{rightLabel}</p>
+            <p className="hidden eyebrow text-fg-3 sm:block">{rightLabel}</p>
           )}
           <form action={signOutAction}>
             <button type="submit" className={buttonClass("secondary", "sm")}>
@@ -67,7 +67,7 @@ export function DashboardShell({
 
       <div className="flex">
         <aside
-          className={`fixed inset-y-0 left-0 top-[72px] z-20 w-64 border-r border-ink-700 bg-gradient-to-b from-ink-800 to-ink-950 p-4 transition-transform duration-300 ease-in-out lg:static lg:top-0 lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 top-[72px] z-20 w-64 border-r border-line bg-gradient-to-b from-surface-2 to-ink p-4 transition-transform duration-300 ease-in-out lg:static lg:top-0 lg:translate-x-0 ${
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >

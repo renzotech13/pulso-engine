@@ -33,13 +33,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-ink p-4">
       <Card padding="none" className="w-full max-w-sm p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
-            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Ingresa a tu cuenta</h1>
-            <p className="text-sm text-neutral-400">Usa el correo y la contraseña de tu negocio.</p>
+            <p className="eyebrow text-accent-ink">Amplifica Studio</p>
+            <h1 className="font-display text-2xl tracking-tight text-fg">Ingresa a tu cuenta</h1>
+            <p className="text-sm text-fg-2">Usa el correo y la contraseña de tu negocio.</p>
           </div>
 
           <div className="space-y-4">
@@ -72,7 +72,7 @@ export default function LoginPage() {
           </div>
 
           {status === "error" && (
-            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+            <p role="alert" className="rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           )}
@@ -81,7 +81,7 @@ export default function LoginPage() {
             Ingresar
           </Button>
 
-          <div className="flex items-center justify-between text-xs text-neutral-500">
+          <div className="flex items-center justify-between text-xs text-fg-3">
             <Link href="/forgot-password" className={buttonClass("link", "sm", "text-xs")}>
               ¿Olvidaste tu contraseña?
             </Link>

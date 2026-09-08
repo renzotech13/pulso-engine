@@ -73,42 +73,42 @@ export default async function ConnectionsPage() {
 
           <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500">Página</dt>
-              <dd className="mt-0.5 text-neutral-200">{connection.page_name ?? connection.page_id}</dd>
+              <dt className="eyebrow text-fg-3">Página</dt>
+              <dd className="mt-0.5 text-fg">{connection.page_name ?? connection.page_id}</dd>
             </div>
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500">Instagram</dt>
-              <dd className="mt-0.5 text-neutral-200">
+              <dt className="eyebrow text-fg-3">Instagram</dt>
+              <dd className="mt-0.5 text-fg">
                 {connection.instagram_username ? (
                   `@${connection.instagram_username}`
                 ) : (
-                  <span className="text-neutral-600">Sin cuenta vinculada</span>
+                  <span className="text-fg-3">Sin cuenta vinculada</span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-medium uppercase tracking-wide text-neutral-500">Verificada</dt>
-              <dd className="mt-0.5 text-neutral-200">
+              <dt className="eyebrow text-fg-3">Verificada</dt>
+              <dd className="mt-0.5 text-fg">
                 {connection.last_verified_at ? (
                   <span title={formatDateTime(connection.last_verified_at)}>
                     {formatRelative(connection.last_verified_at)}
                   </span>
                 ) : (
-                  <span className="text-neutral-600">Nunca</span>
+                  <span className="text-fg-3">Nunca</span>
                 )}
               </dd>
             </div>
           </dl>
 
           {!isActive && connection.last_error && (
-            <p className="mt-4 text-sm text-status-pink">{connection.last_error}</p>
+            <p className="mt-4 text-sm text-danger">{connection.last_error}</p>
           )}
         </Card>
       ) : (
         <EmptyState
           icon={<Plug size={28} />}
           title="Todavía no hay una página conectada"
-          description="Conecta tu página de Facebook para que Pulso pueda publicar por ti. Si solo tienes permiso de lectura, pídele a un administrador del negocio que lo haga."
+          description="Conecta tu página de Facebook para que Amplifica pueda publicar por ti. Si solo tienes permiso de lectura, pídele a un administrador del negocio que lo haga."
           action={
             <a href={connectUrl} className={buttonClass("primary", "sm")}>
               Conectar con Facebook
@@ -119,18 +119,18 @@ export default async function ConnectionsPage() {
 
       <Card padding="sm">
         <details>
-          <summary className="cursor-pointer text-sm font-medium text-neutral-300 transition-colors hover:text-neutral-100">
+          <summary className="cursor-pointer text-sm font-medium text-fg-2 transition-colors hover:text-fg">
             Conectar a mano con un token (avanzado)
           </summary>
-          <p className="mt-3 text-sm text-neutral-400">
-            Solo si el botón de arriba no funciona: agrega la app de Pulso Engine como tester/admin
+          <p className="mt-3 text-sm text-fg-2">
+            Solo si el botón de arriba no funciona: agrega la app de Amplifica Studio como tester/admin
             de la página en Meta for Developers, genera un Page Access Token vía Graph API Explorer,
             y pégalo abajo.
           </p>
 
           <form
             action={upsertSocialConnectionAction}
-            className="mt-4 grid grid-cols-1 gap-4 border-t border-ink-700 pt-4 sm:grid-cols-2"
+            className="mt-4 grid grid-cols-1 gap-4 border-t border-line pt-4 sm:grid-cols-2"
           >
             <input type="hidden" name="tenantId" value={ctx.tenantId} />
 

@@ -43,13 +43,13 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-ink p-4">
       <Card padding="none" className="w-full max-w-sm p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
-            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Elige una nueva contraseña</h1>
-            <p className="text-sm text-neutral-400">Al guardarla entrarás directo a tu calendario.</p>
+            <p className="eyebrow text-accent-ink">Amplifica Studio</p>
+            <h1 className="font-display text-2xl tracking-tight text-fg">Elige una nueva contraseña</h1>
+            <p className="text-sm text-fg-2">Al guardarla entrarás directo a tu calendario.</p>
           </div>
 
           <div className="space-y-4">
@@ -84,7 +84,7 @@ export default function ResetPasswordPage() {
           </div>
 
           {status === "error" && (
-            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+            <p role="alert" className="rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           )}
@@ -93,7 +93,7 @@ export default function ResetPasswordPage() {
             Guardar contraseña
           </Button>
 
-          <p className="text-center text-xs text-neutral-500">
+          <p className="text-center text-xs text-fg-3">
             <Link href="/forgot-password" className={buttonClass("link", "sm", "text-xs")}>
               Pedir un enlace nuevo
             </Link>

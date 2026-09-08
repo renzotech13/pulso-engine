@@ -18,14 +18,29 @@ import {
   YAxis,
 } from "recharts";
 
+// Recharts pinta atributos SVG, así que acá los tokens tienen que ser
+// literales y no clases de Tailwind. Son los mismos valores de Brasa que
+// tailwind.config, repetidos por esa limitación: si cambia la paleta, este
+// objeto se cambia con ella.
+//
+// Las seis series están medidas contra el fondo #0a0a0b y todas pasan AA
+// (de 6.36:1 la más baja a 11.09:1 la más alta), porque una serie de un
+// gráfico se lee como texto: si no se distingue, el dato no existe.
 export const CHART_COLORS = {
-  grid: "#2f3136",
-  tooltipBg: "#1d1e22",
-  tick: "#898989",
-  label: "#ebebeb",
-  primary: "#6256a9",
-  accent: "#04aec6",
-  series: ["#6256a9", "#04aec6", "#f09238", "#89e07d", "#ff2d78", "#c9c9c9"],
+  grid: "#232122", // línea de rejilla: presente sin competir con el dato
+  tooltipBg: "#151315", // surface
+  tick: "#8a827c", // fg-3
+  label: "#faf8f6", // fg
+  primary: "#ff5a2b", // accent — la serie principal es el color de marca
+  accent: "#ffb020", // amber — la pareja del acento, igual que en el sitio
+  series: [
+    "#ff5a2b", // accent   6.36:1
+    "#ffb020", // amber   10.82:1
+    "#60a5fa", // info     7.78:1
+    "#3ddc84", // success 11.09:1
+    "#ff3b6b", // danger   5.74:1
+    "#c084fc", // violeta  7.49:1
+  ],
 } as const;
 
 export interface ChartSeries {

@@ -66,9 +66,9 @@ export function MoveDateForm({
       {/* Offered instead of a dead end when the target turn is taken by a
           piece that hasn't gone out yet: the two trade places. */}
       {state.swapWith && (
-        <div className="rounded-lg border border-ink-700 bg-ink-950 p-3">
-          <p className="text-xs text-neutral-400">
-            Puedes intercambiarlas: <span className="text-neutral-200">{state.swapWith.theme}</span> pasa a este
+        <div className="rounded-btn border border-line bg-ink p-3">
+          <p className="text-xs text-fg-2">
+            Puedes intercambiarlas: <span className="text-fg">{state.swapWith.theme}</span> pasa a este
             día y turno, y esta pieza toma su lugar.
           </p>
           <SubmitButton

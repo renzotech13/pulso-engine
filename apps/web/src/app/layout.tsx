@@ -1,29 +1,40 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Montserrat, Oswald } from "next/font/google";
+import { Archivo, IBM_Plex_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
-const sansFont = Montserrat({
+// Las tres tipografías del sitio de Amplifica, con los mismos roles:
+// Archivo para títulos, Manrope para el cuerpo, Plex Mono para etiquetas y
+// datos. El eje de ancho de Archivo es la razón por la que se eligió allá.
+const displayFont = Archivo({
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-sans",
+  axes: ["wdth"],
+  variable: "--font-archivo",
 });
 
-const displayFont = Oswald({
+const sansFont = Manrope({
   subsets: ["latin"],
-  weight: ["200", "300", "500", "700"],
-  variable: "--font-display",
+  variable: "--font-manrope",
+});
+
+const monoFont = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-plex-mono",
 });
 
 export const metadata: Metadata = {
-  title: "Pulso Engine",
+  title: "Amplifica Studio",
   description: "Agentes de marketing en loop para negocios locales",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es" className={`${sansFont.variable} ${displayFont.variable}`}>
-      <body className="bg-ink-950 font-sans text-neutral-100 antialiased">{children}</body>
+    <html
+      lang="es"
+      className={`${sansFont.variable} ${displayFont.variable} ${monoFont.variable}`}
+    >
+      <body className="bg-ink font-sans text-fg antialiased">{children}</body>
     </html>
   );
 }

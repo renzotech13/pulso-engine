@@ -125,7 +125,7 @@ function ThumbnailGrid({ urls, creativeId, tenantId, date, canDelete }: Thumbnai
       {urls.map((url, i) => (
         <div
           key={url}
-          className="group relative aspect-square overflow-hidden rounded-lg border border-ink-700 transition-colors duration-200 hover:border-pulso-accent/60"
+          className="group relative aspect-square overflow-hidden rounded-btn border border-line transition-colors duration-200 hover:border-accent/60"
         >
           <a href={url} target="_blank" rel="noreferrer" download title={`Descargar foto ${i + 1}`} className="block h-full w-full">
             <img src={url} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
@@ -165,7 +165,7 @@ function PublicationBadges({ publications }: { publications: CreativePublication
             {label(PLATFORM, pub.platform)} · {label(PUB_STATUS, pub.status)}
           </StatusBadge>
           {pub.status === "failed" && pub.error_message && (
-            <span className="text-xs text-status-pink">{pub.error_message}</span>
+            <span className="text-xs text-danger">{pub.error_message}</span>
           )}
         </li>
       ))}
@@ -197,8 +197,8 @@ function BriefRows({ brief }: { brief: unknown }) {
         <dl className="space-y-2">
           {rows.map(([key, value]) => (
             <div key={key}>
-              <dt className="text-[11px] uppercase tracking-wide text-neutral-500">{label(BRIEF_KEYS, key)}</dt>
-              <dd className="text-sm text-neutral-200">{value}</dd>
+              <dt className="eyebrow text-fg-3">{label(BRIEF_KEYS, key)}</dt>
+              <dd className="text-sm text-fg">{value}</dd>
             </div>
           ))}
         </dl>
@@ -206,11 +206,11 @@ function BriefRows({ brief }: { brief: unknown }) {
       {photoUrl && (
         <div className="flex items-center gap-3">
           <a href={photoUrl} target="_blank" rel="noreferrer" title="Abrir la foto original" className="shrink-0">
-            <img src={photoUrl} alt="" className="h-12 w-12 rounded-lg border border-ink-700 object-cover" />
+            <img src={photoUrl} alt="" className="h-12 w-12 rounded-btn border border-line object-cover" />
           </a>
           <div>
-            <p className="text-[11px] uppercase tracking-wide text-neutral-500">Foto</p>
-            {photoSource && <p className="text-xs text-neutral-400">{photoSource}</p>}
+            <p className="eyebrow text-fg-3">Foto</p>
+            {photoSource && <p className="text-xs text-fg-2">{photoSource}</p>}
           </div>
         </div>
       )}
@@ -392,8 +392,8 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
             )}
 
             {creative && creative.asset_urls && creative.asset_urls.length > 1 && (
-              <div className="border-t border-ink-700 p-3">
-                <p className="mb-2 text-xs text-neutral-500">
+              <div className="border-t border-line p-3">
+                <p className="mb-2 text-xs text-fg-3">
                   {creative.asset_urls.length}{" "}
                   {creative.type === "carousel"
                     ? "slides — pasa el mouse sobre uno para regenerarlo con IA o reemplazarlo con tu propia foto."
@@ -423,7 +423,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
             )}
 
             {creative && photoFrame && creative.template_id === photoFrame.id && isAppendable(creative) && (
-              <form action={addPhotosToCreativeAction} className="flex flex-wrap items-end gap-3 border-t border-ink-700 p-3">
+              <form action={addPhotosToCreativeAction} className="flex flex-wrap items-end gap-3 border-t border-line p-3">
                 <input type="hidden" name="tenantId" value={ctx.tenantId} />
                 <input type="hidden" name="date" value={date} />
                 <input type="hidden" name="creativeId" value={creative.id} />
@@ -451,14 +451,14 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
 
               <div className="space-y-4 text-sm">
                 {slot.hold_publish && (
-                  <p className="rounded-lg bg-status-orange/10 px-3 py-2 text-xs text-status-orange">
+                  <p className="rounded-btn bg-amber/10 px-3 py-2 text-xs text-amber">
                     La publicación automática de este día está en pausa. La generación sigue normal.
                   </p>
                 )}
 
                 {creative?.publications && creative.publications.length > 0 && (
                   <div>
-                    <p className="mb-1.5 text-[11px] uppercase tracking-wide text-neutral-500">Publicaciones</p>
+                    <p className="mb-1.5 eyebrow text-fg-3">Publicaciones</p>
                     <PublicationBadges publications={creative.publications} />
                   </div>
                 )}
@@ -522,7 +522,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                   )}
                 </div>
 
-                <div className="border-t border-ink-700 pt-4">
+                <div className="border-t border-line pt-4">
                   <MoveDateForm
                     tenantId={ctx.tenantId}
                     slotId={slot.id}
@@ -541,7 +541,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 />
                 <div className="space-y-4">
                   <BriefRows brief={creative.brief} />
-                  <div className="border-t border-ink-700 pt-4">
+                  <div className="border-t border-line pt-4">
                     <CaptionForm tenantId={ctx.tenantId} creativeId={creative.id} date={date} caption={captionText} />
                   </div>
                 </div>
@@ -625,7 +625,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
             {otherPhotoFrameCreatives.map((c) => (
               <Card key={c.id} padding="sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-300">
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-fg-2">
                     <span>
                       {c.asset_urls?.length ?? 0} foto{(c.asset_urls?.length ?? 0) !== 1 ? "s" : ""}
                     </span>
@@ -671,7 +671,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 <PublicationBadges publications={c.publications} />
 
                 {isAppendable(c) && (
-                  <form action={addPhotosToCreativeAction} className="mt-3 flex flex-wrap items-end gap-3 border-t border-ink-700 pt-3">
+                  <form action={addPhotosToCreativeAction} className="mt-3 flex flex-wrap items-end gap-3 border-t border-line pt-3">
                     <input type="hidden" name="tenantId" value={ctx.tenantId} />
                     <input type="hidden" name="date" value={date} />
                     <input type="hidden" name="creativeId" value={c.id} />
@@ -700,7 +700,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
             title="Crear nueva publicación con marco"
             description="Una publicación nueva y separada para este día."
           />
-          <p className="mb-4 text-sm text-neutral-500">
+          <p className="mb-4 text-sm text-fg-3">
             Úsalo cuando quieras publicar otra cosa distinta, no para sumar fotos a la que ya hiciste (para eso
             usa &quot;Agregar más fotos&quot; arriba). Sube una o varias fotos — cada una se compone
             automáticamente detrás de tu marco (configurado en Marca). Una foto crea una publicación normal;
@@ -733,7 +733,7 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
       {studentShowcase && (
         <Card>
           <CardHeader title="Alumna destacada" description="Arma el carrusel de una alumna con lo que tengas de cada tipo." />
-          <p className="mb-4 text-sm text-neutral-500">
+          <p className="mb-4 text-sm text-fg-3">
             Sube fotos de sus trabajos, certificado y retrato — cada una es opcional, y el carrusel sale solo con
             las que llenes, siempre en ese orden.
           </p>

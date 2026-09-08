@@ -86,22 +86,22 @@ export function MediaDropzone({
             inputRef.current?.click();
           }
         }}
-        className={`cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60 ${
+        className={`cursor-pointer rounded-card border-2 border-dashed px-4 py-5 text-center transition-colors duration-200 ${
           isDragging
-            ? "animate-pulse-ring border-pulso-primary bg-pulso-primary/10"
-            : "border-ink-700 hover:border-pulso-accent/60 hover:bg-ink-800"
+            ? "animate-pulse-ring border-accent bg-accent/10"
+            : "border-line hover:border-accent/60 hover:bg-surface-2"
         }`}
       >
         {showCurrent ? (
           <img
             src={currentPreviewUrl}
             alt=""
-            className="mx-auto mb-2 h-12 w-12 rounded-md border border-ink-700 bg-ink-950 object-contain"
+            className="mx-auto mb-2 h-12 w-12 rounded-md border border-line bg-ink object-contain"
           />
         ) : (
-          <UploadCloud size={22} className="mx-auto mb-2 text-neutral-600" aria-hidden="true" />
+          <UploadCloud size={22} className="mx-auto mb-2 text-fg-3" aria-hidden="true" />
         )}
-        <p className="text-sm text-neutral-400">{hint}</p>
+        <p className="text-sm text-fg-2">{hint}</p>
         <input
           ref={inputRef}
           type="file"
@@ -118,12 +118,12 @@ export function MediaDropzone({
           {files.map((file, index) => (
             <li
               key={`${file.name}-${index}`}
-              className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-2 py-1 text-xs text-neutral-300"
+              className="flex items-center gap-2 rounded-btn border border-line bg-surface-2 px-2 py-1 text-xs text-fg-2"
             >
               {previewUrls[index] ? (
                 <img src={previewUrls[index]} alt="" className="h-6 w-6 rounded object-cover" />
               ) : (
-                <FileText size={14} className="text-neutral-500" aria-hidden="true" />
+                <FileText size={14} className="text-fg-3" aria-hidden="true" />
               )}
               <span className="max-w-[10rem] truncate">{file.name}</span>
               <button
@@ -132,7 +132,7 @@ export function MediaDropzone({
                   event.stopPropagation();
                   removeFile(index);
                 }}
-                className="rounded p-0.5 text-neutral-500 transition-colors duration-200 hover:text-status-pink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60"
+                className="rounded p-0.5 text-fg-3 transition-colors duration-200 hover:text-danger"
                 aria-label={`Quitar ${file.name}`}
               >
                 <X size={12} aria-hidden="true" />

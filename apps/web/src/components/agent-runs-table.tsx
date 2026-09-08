@@ -76,7 +76,7 @@ export function AgentRunsTable({ tenantId }: { tenantId: string }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[560px] text-sm">
         <thead>
-          <tr className="border-b border-ink-700 text-left text-xs uppercase tracking-wide text-neutral-500">
+          <tr className="border-b border-line text-left eyebrow text-fg-3">
             {HEADERS.map((h) => (
               <th key={h} scope="col" className="pb-2 pr-4 font-medium">
                 {h}
@@ -88,14 +88,14 @@ export function AgentRunsTable({ tenantId }: { tenantId: string }) {
           {runs.map((run) => {
             const status = runStatus(run.status);
             return (
-              <tr key={run.id} className="border-b border-ink-700/60 last:border-b-0">
-                <td className="py-2 pr-4 text-neutral-100">{label(AGENT, run.agent)}</td>
-                <td className="py-2 pr-4 text-neutral-400">{label(EVENT_TYPE, run.trigger)}</td>
+              <tr key={run.id} className="border-b border-line last:border-b-0">
+                <td className="py-2 pr-4 text-fg">{label(AGENT, run.agent)}</td>
+                <td className="py-2 pr-4 text-fg-2">{label(EVENT_TYPE, run.trigger)}</td>
                 <td className="py-2 pr-4">
                   <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                 </td>
-                <td className="py-2 pr-4 whitespace-nowrap text-neutral-300">{formatDateTime(run.started_at)}</td>
-                <td className="py-2 pr-4 whitespace-nowrap text-neutral-300">
+                <td className="py-2 pr-4 whitespace-nowrap text-fg-2">{formatDateTime(run.started_at)}</td>
+                <td className="py-2 pr-4 whitespace-nowrap text-fg-2">
                   {run.finished_at
                     ? formatDuration(new Date(run.finished_at).getTime() - new Date(run.started_at).getTime())
                     : "—"}

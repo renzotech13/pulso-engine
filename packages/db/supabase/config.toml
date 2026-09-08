@@ -242,7 +242,7 @@ otp_expiry = 3600
 # default /verify redirect, which returns tokens in a URL fragment that a
 # server component/route handler can never read.
 [auth.email.template.magic_link]
-subject = "Tu enlace mágico — Pulso Engine"
+subject = "Tu enlace mágico de Amplifica Studio"
 content_path = "./supabase/templates/magic_link.html"
 
 # Uncomment to customize notification email template

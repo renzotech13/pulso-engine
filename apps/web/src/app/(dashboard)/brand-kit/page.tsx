@@ -109,16 +109,16 @@ export default async function BrandKitPage() {
           <div className="sm:col-span-2">
             <p className={labelClass}>Así se ven tus colores juntos</p>
             <div
-              className="flex h-28 w-full max-w-sm items-end rounded-xl border border-ink-700 p-4"
+              className="flex h-28 w-full max-w-sm items-end rounded-card border border-line p-4"
               style={{
                 background: `radial-gradient(circle at 30% 20%, ${colorSecondary} 0%, ${colorPrimary} 65%)`,
               }}
             >
-              <span className="font-display text-lg font-semibold text-white drop-shadow">
+              <span className="font-display text-lg font-semibold text-fg drop-shadow">
                 {ctx.tenantName}
               </span>
             </div>
-            <p className="mt-1 text-xs text-neutral-600">La vista previa se actualiza al guardar.</p>
+            <p className="mt-1 text-xs text-fg-3">La vista previa se actualiza al guardar.</p>
           </div>
 
           <div className="sm:col-span-2">
@@ -200,13 +200,13 @@ export default async function BrandKitPage() {
               multiple={false}
             />
             {brandKit?.brief_document_url && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-500">
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-fg-3">
                 Archivo actual:
                 <a
                   href={brandKit.brief_document_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-pulso-accent hover:underline"
+                  className="inline-flex items-center gap-1 text-accent-ink hover:underline"
                 >
                   {brandKit.brief_document_name ?? "ver documento"}
                   <ExternalLink size={12} aria-hidden="true" />
@@ -215,7 +215,7 @@ export default async function BrandKitPage() {
             )}
           </div>
 
-          <div className="flex justify-end border-t border-ink-700 pt-4 sm:col-span-2">
+          <div className="flex justify-end border-t border-line pt-4 sm:col-span-2">
             <SubmitButton pendingText="Guardando…">Guardar</SubmitButton>
           </div>
         </form>
@@ -287,7 +287,7 @@ export default async function BrandKitPage() {
           />
         ) : (
           <>
-            <p className="mb-3 text-xs text-neutral-500">
+            <p className="mb-3 text-xs text-fg-3">
               {assets.length} {assets.length === 1 ? "foto" : "fotos"} ·{" "}
               {assets.filter((a) => !a.last_used_at).length} sin usar ·{" "}
               {assets.filter((a) => a.tagged_at).length} etiquetadas
@@ -296,7 +296,7 @@ export default async function BrandKitPage() {
               {assets.map((asset) => {
                 const status = assetStatus(asset);
                 return (
-                  <div key={asset.id} className="rounded-lg border border-ink-700 bg-ink-950/60 p-2">
+                  <div key={asset.id} className="rounded-btn border border-line bg-ink/60 p-2">
                     <div className="group relative aspect-square overflow-hidden rounded-md">
                       <img src={asset.url} alt={asset.description ?? ""} className="h-full w-full object-cover" />
                       <form action={deleteMediaAssetAction} className="absolute right-1 top-1">
@@ -306,7 +306,7 @@ export default async function BrandKitPage() {
                           type="submit"
                           title="Eliminar esta foto"
                           aria-label="Eliminar esta foto"
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-ink-950/80 text-white opacity-0 transition-opacity duration-150 hover:bg-status-pink focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulso-accent/60 group-hover:opacity-100"
+                          className="flex h-6 w-6 items-center justify-center rounded-full bg-ink/80 text-fg opacity-0 transition-opacity duration-150 hover:bg-danger hover:text-accent-fg focus-visible:opacity-100 group-hover:opacity-100"
                         >
                           <X size={12} aria-hidden="true" />
                         </button>
@@ -316,20 +316,20 @@ export default async function BrandKitPage() {
                       {asset.tags.slice(0, 4).map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-full border border-ink-700 px-2 py-0.5 text-[10px] text-neutral-400"
+                          className="rounded-full border border-line px-2 py-0.5 text-[10px] text-fg-2"
                         >
                           {tag}
                         </span>
                       ))}
                       {asset.tags.length > 4 && (
-                        <span className="px-1 text-[10px] text-neutral-600">+{asset.tags.length - 4}</span>
+                        <span className="px-1 text-[10px] text-fg-3">+{asset.tags.length - 4}</span>
                       )}
                     </div>
                     <div className="mt-2">
                       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     </div>
                     <details className="mt-1">
-                      <summary className="cursor-pointer text-[11px] text-pulso-accent hover:underline">
+                      <summary className="cursor-pointer text-[11px] text-accent-ink hover:underline">
                         Editar etiquetas
                       </summary>
                       <form action={updateMediaAssetTagsAction} className="mt-2 space-y-2">

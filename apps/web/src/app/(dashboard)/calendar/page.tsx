@@ -177,7 +177,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           <Link href={navHref(prevStr)} className={buttonClass("secondary", "sm")} aria-label="Mes anterior">
             <ChevronLeft size={14} aria-hidden="true" />
           </Link>
-          <span className="min-w-[10rem] text-center font-display text-sm font-semibold text-neutral-200">
+          <span className="min-w-[10rem] text-center font-display text-sm font-semibold text-fg">
             {monthLabel(monthParam)}
           </span>
           <Link href={navHref(nextStr)} className={buttonClass("secondary", "sm")} aria-label="Mes siguiente">
@@ -190,35 +190,35 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           )}
         </div>
 
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-fg-3">
           Este mes:{" "}
-          <span className="text-neutral-300">
+          <span className="text-fg-2">
             {publishedCount} {publishedCount === 1 ? "publicada" : "publicadas"}
           </span>
           {" · "}
-          <span className="text-neutral-300">
+          <span className="text-fg-2">
             {readyCount} {readyCount === 1 ? "lista" : "listas"}
           </span>
           {" · "}
           {attentionCount > 0 ? (
-            <Link href={attentionHref} className="font-medium text-status-pink hover:underline">
+            <Link href={attentionHref} className="font-medium text-danger hover:underline">
               {attentionCount} {attentionCount === 1 ? "requiere" : "requieren"} atención
             </Link>
           ) : (
-            <span className="text-neutral-300">0 requieren atención</span>
+            <span className="text-fg-2">0 requieren atención</span>
           )}
         </p>
       </div>
 
       {view === "grid" ? (
         <div className="space-y-3">
-          <div className="overflow-hidden rounded-xl border border-ink-700">
-            <div className="grid grid-cols-7 border-b border-ink-700 bg-ink-900">
+          <div className="overflow-hidden rounded-card border border-line">
+            <div className="grid grid-cols-7 border-b border-line bg-surface">
               {WEEKDAY_LABELS.map((weekday, i) => (
                 <div
                   key={weekday}
-                  className={`px-2 py-2 text-center text-xs font-medium uppercase tracking-wide ${
-                    i >= 5 ? "text-neutral-600" : "text-neutral-500"
+                  className={`px-2 py-2 text-center eyebrow ${
+                    i >= 5 ? "text-fg-3" : "text-fg-3"
                   }`}
                 >
                   {weekday}
@@ -233,18 +233,18 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 const isToday = cell.date === today;
                 const cellContent = (
                   <div
-                    className={`flex h-24 flex-col gap-1 border-b border-r border-ink-700 p-1.5 transition-colors duration-200 last:border-r-0 sm:h-28 ${
-                      cell.inMonth ? "bg-ink-950 hover:bg-ink-900" : "bg-ink-950/40"
-                    } ${isToday ? "ring-1 ring-inset ring-pulso-accent/60" : ""}`}
+                    className={`flex h-24 flex-col gap-1 border-b border-r border-line p-1.5 transition-colors duration-200 last:border-r-0 sm:h-28 ${
+                      cell.inMonth ? "bg-ink hover:bg-surface" : "bg-ink/40"
+                    } ${isToday ? "ring-1 ring-inset ring-accent/60" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <span
                         className={`text-xs ${
                           isToday
-                            ? "font-semibold text-pulso-accent"
+                            ? "font-semibold text-accent-ink"
                             : cell.inMonth
-                              ? "text-neutral-300"
-                              : "text-neutral-700"
+                              ? "text-fg-2"
+                              : "text-fg-3"
                         }`}
                       >
                         {dayNumber}
@@ -256,11 +256,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                         return (
                           <p
                             key={daySlot.id}
-                            className="flex min-w-0 items-center gap-1 text-xs leading-tight text-neutral-400"
+                            className="flex min-w-0 items-center gap-1 text-xs leading-tight text-fg-2"
                           >
                             <StatusDot tone={state.tone} title={state.label} />
                             {daySlot.publish_hour !== null && (
-                              <span className="shrink-0 text-neutral-600">{daySlot.publish_hour}h</span>
+                              <span className="shrink-0 text-fg-3">{daySlot.publish_hour}h</span>
                             )}
                             <span className="truncate">{daySlot.theme}</span>
                           </p>
@@ -274,9 +274,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                         daySlots.some((daySlot) => daySlot.slot_index === index) ? null : (
                           <p
                             key={`free-${index}`}
-                            className="flex min-w-0 items-center gap-1 text-xs leading-tight text-neutral-700"
+                            className="flex min-w-0 items-center gap-1 text-xs leading-tight text-fg-3"
                           >
-                            <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-neutral-700" />
+                            <span className="h-2 w-2 shrink-0 rounded-full border border-dashed border-line-2" />
                             <span className="shrink-0">{hour}h</span>
                             <span className="truncate">libre</span>
                           </p>
@@ -320,7 +320,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           </div>
 
           {legend.size > 0 && (
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-fg-3">
               {[...legend.values()].map((state) => (
                 <span key={state.key} className="inline-flex items-center gap-1.5">
                   <StatusDot tone={state.tone} />
@@ -333,11 +333,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       ) : (
         <div className="space-y-4">
           {attentionOnly && (
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-fg-3">
               Mostrando solo lo que requiere atención.{" "}
               <Link
                 href={`/calendar?month=${monthStr}&view=list`}
-                className="text-pulso-accent hover:underline"
+                className="text-accent-ink hover:underline"
               >
                 Ver todo el mes
               </Link>
@@ -358,9 +358,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
           {listRows.map(({ date, daySlots }) => (
             <section key={date} className="space-y-1.5">
-              <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+              <h2 className="eyebrow text-fg-3">
                 {formatCalendarDay(date)}
-                {date === today && <span className="ml-2 text-pulso-accent">Hoy</span>}
+                {date === today && <span className="ml-2 text-accent-ink">Hoy</span>}
               </h2>
 
               {/* One card per slot, not per day: with two daily publications
@@ -377,7 +377,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                       action={updateCalendarSlotAction}
                       className="grid grid-cols-1 gap-2 md:grid-cols-[120px_1fr_150px_130px_auto] md:items-center"
                     >
-                      <div className="flex items-center gap-2 text-sm text-neutral-400">
+                      <div className="flex items-center gap-2 text-sm text-fg-2">
                         {slot.publish_hour !== null && <span>{slot.publish_hour}h</span>}
                         <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                       </div>
@@ -418,7 +418,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                     </form>
 
                     {slot.creative_id && (
-                      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-ink-700 pt-3">
+                      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
                         {creative?.status !== "failed" &&
                           (creative?.type === "video" ? (
                             <video
@@ -436,7 +436,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                           ))}
 
                         {creative?.status === "failed" && (
-                          <span className="text-sm text-status-pink">Falló el render de la pieza</span>
+                          <span className="text-sm text-danger">Falló el render de la pieza</span>
                         )}
 
                         {creative?.status !== "failed" && creative?.status !== "approved" && (
@@ -484,7 +484,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                                 </StatusBadge>
                                 {pub.error_message && (
                                   <span
-                                    className="max-w-xs truncate text-xs text-status-pink"
+                                    className="max-w-xs truncate text-xs text-danger"
                                     title={pub.error_message}
                                   >
                                     {pub.error_message}
@@ -502,7 +502,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                     )}
 
                     {!slot.creative_id && (
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-ink-700 pt-3 text-sm text-neutral-500">
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3 text-sm text-fg-3">
                         <span>
                           {slot.status === "approved"
                             ? "Generando la pieza… suele tardar 1-3 minutos."
@@ -520,7 +520,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           ))}
 
           {daysWithoutContent > 0 && (
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-fg-3">
               {daysWithoutContent} {daysWithoutContent === 1 ? "día sin contenido" : "días sin contenido"}
             </p>
           )}

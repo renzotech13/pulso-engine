@@ -35,17 +35,17 @@ export default function ForgotPasswordPage() {
 
   if (status === "sent") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+      <main className="flex min-h-screen items-center justify-center bg-ink p-4">
         <Card padding="none" className="w-full max-w-sm p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pulso-primary/15 text-pulso-accent">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent-ink">
             <MailCheck size={22} aria-hidden="true" />
           </div>
-          <h1 className="font-display text-2xl tracking-wide text-neutral-100">Revisa tu correo</h1>
-          <p className="mt-3 text-sm text-neutral-400">
-            Si <span className="text-neutral-200">{email}</span> tiene una cuenta, te enviamos un
+          <h1 className="font-display text-2xl tracking-tight text-fg">Revisa tu correo</h1>
+          <p className="mt-3 text-sm text-fg-2">
+            Si <span className="text-fg">{email}</span> tiene una cuenta, te enviamos un
             enlace para elegir una nueva contraseña.
           </p>
-          <p className="mt-6 text-xs text-neutral-500">
+          <p className="mt-6 text-xs text-fg-3">
             <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
               Volver a ingresar
             </Link>
@@ -56,13 +56,13 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-ink p-4">
       <Card padding="none" className="w-full max-w-sm p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
-            <h1 className="font-display text-2xl tracking-wide text-neutral-100">¿Olvidaste tu contraseña?</h1>
-            <p className="text-sm text-neutral-400">
+            <p className="eyebrow text-accent-ink">Amplifica Studio</p>
+            <h1 className="font-display text-2xl tracking-tight text-fg">¿Olvidaste tu contraseña?</h1>
+            <p className="text-sm text-fg-2">
               Escribe tu correo y te enviamos un enlace para elegir una nueva.
             </p>
           </div>
@@ -82,7 +82,7 @@ export default function ForgotPasswordPage() {
           </Field>
 
           {status === "error" && (
-            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+            <p role="alert" className="rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           )}
@@ -91,7 +91,7 @@ export default function ForgotPasswordPage() {
             Enviar enlace
           </Button>
 
-          <p className="text-center text-xs text-neutral-500">
+          <p className="text-center text-xs text-fg-3">
             <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
               Volver a ingresar
             </Link>

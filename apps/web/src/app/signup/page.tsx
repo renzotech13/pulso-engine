@@ -52,17 +52,17 @@ export default function SignupPage() {
 
   if (status === "sent") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+      <main className="flex min-h-screen items-center justify-center bg-ink p-4">
         <Card padding="none" className="w-full max-w-sm p-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-pulso-primary/15 text-pulso-accent">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/15 text-accent-ink">
             <MailCheck size={22} aria-hidden="true" />
           </div>
-          <h1 className="font-display text-2xl tracking-wide text-neutral-100">Revisa tu correo</h1>
-          <p className="mt-3 text-sm text-neutral-400">
-            Te enviamos un enlace de confirmación a <span className="text-neutral-200">{email}</span>.
+          <h1 className="font-display text-2xl tracking-tight text-fg">Revisa tu correo</h1>
+          <p className="mt-3 text-sm text-fg-2">
+            Te enviamos un enlace de confirmación a <span className="text-fg">{email}</span>.
             Ábrelo para activar tu cuenta.
           </p>
-          <p className="mt-6 text-xs text-neutral-500">
+          <p className="mt-6 text-xs text-fg-3">
             <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
               Volver a ingresar
             </Link>
@@ -73,13 +73,13 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-ink-950 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-ink p-4">
       <Card padding="none" className="w-full max-w-sm p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.2em] text-pulso-accent">Pulso Engine</p>
-            <h1 className="font-display text-2xl tracking-wide text-neutral-100">Crea tu cuenta</h1>
-            <p className="text-sm text-neutral-400">Necesitas una cuenta para configurar tu negocio.</p>
+            <p className="eyebrow text-accent-ink">Amplifica Studio</p>
+            <h1 className="font-display text-2xl tracking-tight text-fg">Crea tu cuenta</h1>
+            <p className="text-sm text-fg-2">Necesitas una cuenta para configurar tu negocio.</p>
           </div>
 
           <div className="space-y-4">
@@ -127,7 +127,7 @@ export default function SignupPage() {
           </div>
 
           {status === "error" && (
-            <p role="alert" className="rounded-lg border border-status-pink/40 bg-status-pink/10 px-3 py-2 text-sm text-status-pink">
+            <p role="alert" className="rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
               {errorMessage}
             </p>
           )}
@@ -136,7 +136,7 @@ export default function SignupPage() {
             Crear cuenta
           </Button>
 
-          <p className="text-center text-xs text-neutral-500">
+          <p className="text-center text-xs text-fg-3">
             ¿Ya tienes cuenta?{" "}
             <Link href="/login" className={buttonClass("link", "sm", "text-xs")}>
               Ingresa

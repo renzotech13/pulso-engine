@@ -1,5 +1,5 @@
 /**
- * Everything Pulso Engine schedules (calendar dates, publish hours) is in
+ * Everything Amplifica Studio schedules (calendar dates, publish hours) is in
  * Peru time, but the services run on the machine's clock and `toISOString()`
  * returns UTC. Between 19:00 and midnight in Lima those two disagree: for
  * UTC it's already tomorrow. That made publish.tick treat TOMORROW's slots

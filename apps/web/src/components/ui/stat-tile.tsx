@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { Card } from "./card";
 
 const VALUE_TONE = {
-  neutral: "text-neutral-100",
-  green: "text-status-green",
-  orange: "text-status-orange",
-  pink: "text-status-pink",
+  neutral: "text-fg",
+  green: "text-success",
+  orange: "text-amber",
+  pink: "text-danger",
 } as const;
 
 export function StatTile({
@@ -23,10 +23,10 @@ export function StatTile({
   href?: string | undefined;
 }) {
   const body = (
-    <Card padding="sm" className={href ? "transition-colors duration-200 hover:border-pulso-accent/60" : ""}>
-      <p className="text-[11px] uppercase tracking-wide text-neutral-500">{label}</p>
+    <Card padding="sm" className={href ? "transition-colors duration-200 hover:border-accent/60" : ""}>
+      <p className="eyebrow text-fg-3">{label}</p>
       <p className={`mt-1 font-display text-3xl ${VALUE_TONE[tone]}`}>{value}</p>
-      {hint && <p className="mt-1 text-xs text-neutral-500">{hint}</p>}
+      {hint && <p className="mt-1 text-xs text-fg-3">{hint}</p>}
     </Card>
   );
   return href ? <Link href={href}>{body}</Link> : body;

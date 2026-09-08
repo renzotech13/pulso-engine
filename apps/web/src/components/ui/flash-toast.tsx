@@ -6,9 +6,9 @@ import { dismissFlashAction } from "@/lib/actions";
 import type { Flash } from "@/lib/flash";
 
 const TONE_CLASS = {
-  success: "border-status-green/40 text-status-green",
-  error: "border-status-pink/40 text-status-pink",
-  info: "border-pulso-accent/40 text-pulso-accent",
+  success: "border-success/40 text-success",
+  error: "border-danger/40 text-danger",
+  info: "border-accent/40 text-accent-ink",
 } as const;
 
 const AUTO_DISMISS_MS = 5000;
@@ -38,15 +38,15 @@ export function FlashToast({ initial }: { initial: Flash | null }) {
     <div
       role="status"
       aria-live="polite"
-      className={`fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-2 rounded-xl border bg-ink-900 px-4 py-3 text-sm shadow-[0_8px_24px_rgba(0,0,0,0.4)] ${TONE_CLASS[flash.tone]}`}
+      className={`fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-2 rounded-card border bg-surface px-4 py-3 text-sm shadow-[0_8px_24px_rgba(0,0,0,0.4)] ${TONE_CLASS[flash.tone]}`}
     >
       <Icon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-      <p className="text-neutral-100">{flash.message}</p>
+      <p className="text-fg">{flash.message}</p>
       <button
         type="button"
         onClick={() => setFlash(null)}
         aria-label="Cerrar"
-        className="ml-1 text-neutral-500 hover:text-neutral-200"
+        className="ml-1 text-fg-3 hover:text-fg"
       >
         <X size={14} />
       </button>

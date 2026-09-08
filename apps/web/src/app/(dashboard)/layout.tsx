@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <DashboardShell
-      productLabel="Pulso Engine"
+      productLabel="Amplifica Studio"
       tenant={{ name: ctx.tenantName, memberships: ctx.memberships, activeTenantId: ctx.tenantId }}
       navItems={NAV_ITEMS}
       secondaryNavItems={operator ? OPERATOR_NAV_ITEMS : undefined}

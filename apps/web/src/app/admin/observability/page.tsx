@@ -86,11 +86,11 @@ export default async function AdminObservabilityPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-1 font-display text-xs uppercase tracking-[0.2em] text-pulso-accent">
+        <p className="mb-1 eyebrow text-accent-ink">
           Panel interno
         </p>
         <h1 className="font-display text-2xl font-semibold">Observabilidad de agentes</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-fg-3">
           Últimos {WINDOW_DAYS} días, todos los tenants. Costo siempre $0 con LM Studio (local).
         </p>
       </div>
@@ -104,7 +104,7 @@ export default async function AdminObservabilityPage() {
         <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
-            <tr className="text-left text-neutral-500">
+            <tr className="text-left text-fg-3">
               <th className="pb-2">Tenant</th>
               <th className="pb-2">Agente</th>
               <th className="pb-2">Tokens hoy</th>
@@ -117,19 +117,19 @@ export default async function AdminObservabilityPage() {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-4 text-neutral-500">
+                <td colSpan={7} className="py-4 text-fg-3">
                   Sin llamadas registradas todavía.
                 </td>
               </tr>
             )}
             {rows.map((row) => (
-              <tr key={`${row.tenantId}:${row.agentName}`} className="border-t border-ink-700">
+              <tr key={`${row.tenantId}:${row.agentName}`} className="border-t border-line">
                 <td className="py-2">{row.tenantName}</td>
                 <td className="py-2">{row.agentName}</td>
                 <td className="py-2">{row.tokensToday.toLocaleString()}</td>
                 <td className="py-2">{row.tokensMonth.toLocaleString()}</td>
                 <td className="py-2">${row.costMonth.toFixed(4)}</td>
-                <td className={`py-2 ${row.blockedCount > 0 ? "text-status-pink" : ""}`}>
+                <td className={`py-2 ${row.blockedCount > 0 ? "text-danger" : ""}`}>
                   {row.blockedCount}
                 </td>
                 <td className="py-2">

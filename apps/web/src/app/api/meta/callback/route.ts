@@ -105,7 +105,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const pages = await fetchManagedPages(longLivedUserToken);
 
     if (pages.length === 0) {
-      return fail("tu cuenta de Facebook no administra ninguna página, o PulsoEngine no tiene acceso a ella");
+      return fail("tu cuenta de Facebook no administra ninguna página, o Amplifica Studio no tiene acceso a ella");
     }
 
     const { data: existing } = await supabase

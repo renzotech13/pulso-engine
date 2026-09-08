@@ -77,23 +77,23 @@ export default async function CatalogPage() {
               return (
                 <div
                   key={product.id}
-                  className="overflow-hidden rounded-xl border border-ink-700 bg-ink-800/60"
+                  className="overflow-hidden rounded-card border border-line bg-surface-2/60"
                 >
-                  <div className="flex h-32 items-center justify-center bg-ink-800">
+                  <div className="flex h-32 items-center justify-center bg-surface-2">
                     {cover ? (
                       <img src={cover} alt={product.name} className="h-full w-full object-cover" />
                     ) : (
-                      <ImageOff size={28} className="text-neutral-600" aria-hidden="true" />
+                      <ImageOff size={28} className="text-fg-3" aria-hidden="true" />
                     )}
                   </div>
                   <div className="p-3">
-                    <p className="font-medium text-neutral-100">{product.name}</p>
-                    <p className="mt-0.5 text-sm text-pulso-accent">{formatPrice(product.price)}</p>
+                    <p className="font-medium text-fg">{product.name}</p>
+                    <p className="mt-0.5 text-sm text-accent-ink">{formatPrice(product.price)}</p>
                     {product.category && (
-                      <p className="mt-1 text-xs text-neutral-500">{product.category}</p>
+                      <p className="mt-1 text-xs text-fg-3">{product.category}</p>
                     )}
                     {showMedia && (
-                      <p className="mt-2 text-xs text-neutral-600">
+                      <p className="mt-2 text-xs text-fg-3">
                         {photoCount > 1 && `${photoCount} fotos`}
                         {photoCount > 1 && videoCount > 0 && " · "}
                         {videoCount > 0 && `${videoCount} ${videoCount === 1 ? "video" : "videos"}`}
@@ -189,7 +189,7 @@ export default async function CatalogPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
+                <tr className="text-left eyebrow text-fg-3">
                   <th className="pb-2 pr-4 font-medium">Nombre</th>
                   <th className="pb-2 pr-4 font-medium">Descuento</th>
                   <th className="pb-2 font-medium">Vigencia</th>
@@ -197,14 +197,14 @@ export default async function CatalogPage() {
               </thead>
               <tbody>
                 {promotionList.map((promo) => (
-                  <tr key={promo.id} className="border-t border-ink-700">
-                    <td className="py-2.5 pr-4 text-neutral-100">{promo.name}</td>
-                    <td className="py-2.5 pr-4 text-pulso-accent">
+                  <tr key={promo.id} className="border-t border-line">
+                    <td className="py-2.5 pr-4 text-fg">{promo.name}</td>
+                    <td className="py-2.5 pr-4 text-accent-ink">
                       {promo.discount_type === "percentage"
                         ? `${promo.discount_value}%`
                         : `S/ ${promo.discount_value}`}
                     </td>
-                    <td className="whitespace-nowrap py-2.5 text-neutral-400">
+                    <td className="whitespace-nowrap py-2.5 text-fg-2">
                       {formatPromoDay(promo.starts_at)} → {formatPromoDay(promo.ends_at)}
                     </td>
                   </tr>

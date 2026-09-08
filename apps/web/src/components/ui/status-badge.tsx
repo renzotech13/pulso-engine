@@ -1,23 +1,26 @@
 import type { ReactNode } from "react";
 
-// Only the status.* tokens from tailwind.config — no more ad-hoc
-// emerald/amber/red-400 that drifted from the palette.
+// Los tokens semánticos de tailwind.config — nada de emerald/amber/red-400
+// sueltos que se despeguen de la paleta. Acá el color va SIEMPRE atenuado de
+// fondo y pleno como texto: un badge de estado se lee de reojo en una tabla
+// y un relleno saturado por fila la vuelve ilegible.
 const TONE_CLASS = {
-  green: "bg-status-green/15 text-status-green",
-  orange: "bg-status-orange/15 text-status-orange",
-  pink: "bg-status-pink/15 text-status-pink",
-  blue: "bg-status-blue/20 text-neutral-100",
-  grey: "bg-ink-800 text-neutral-400",
-  accent: "bg-pulso-accent/15 text-pulso-accent",
+  green: "bg-success/15 text-success",
+  orange: "bg-amber/15 text-amber",
+  pink: "bg-danger/15 text-danger",
+  blue: "bg-info/15 text-info",
+  grey: "bg-surface-2 text-fg-2",
+  accent: "bg-accent/15 text-accent-ink",
 } as const;
 
 const DOT_CLASS = {
-  green: "bg-status-green",
-  orange: "bg-status-orange",
-  pink: "bg-status-pink",
-  blue: "bg-status-blue",
-  grey: "bg-neutral-600",
-  accent: "bg-pulso-accent",
+  green: "bg-success",
+  orange: "bg-amber",
+  pink: "bg-danger",
+  blue: "bg-info",
+  // El punto gris tiene que verse sobre la propia píldora gris.
+  grey: "bg-fg-3",
+  accent: "bg-accent",
 } as const;
 
 export type StatusTone = keyof typeof TONE_CLASS;

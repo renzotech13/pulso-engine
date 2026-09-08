@@ -75,25 +75,25 @@ export default async function NewsPage() {
         <div className="space-y-4">
           {pending.map((s) => (
             <Card key={s.id} padding="sm">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
-                <span className="uppercase tracking-[0.15em] text-neutral-500">{s.source_name ?? "Fuente"}</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-fg-3">
+                <span className="eyebrow text-fg-3">{s.source_name ?? "Fuente"}</span>
                 <span title={s.created_at}>{formatRelative(s.created_at, now)}</span>
               </div>
-              <h2 className="mt-1 font-display text-lg font-semibold text-neutral-100">
+              <h2 className="mt-1 font-display text-lg font-semibold text-fg">
                 <a
                   href={s.source_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-start gap-1.5 hover:text-pulso-accent"
+                  className="inline-flex items-start gap-1.5 hover:text-accent-ink"
                 >
                   <span>{s.headline}</span>
-                  <ExternalLink size={14} className="mt-1.5 shrink-0 text-neutral-600" aria-hidden="true" />
+                  <ExternalLink size={14} className="mt-1.5 shrink-0 text-fg-3" aria-hidden="true" />
                 </a>
               </h2>
-              {s.summary && <p className="mt-1 text-sm text-neutral-500">{s.summary}</p>}
+              {s.summary && <p className="mt-1 text-sm text-fg-3">{s.summary}</p>}
 
-              <div className="mt-3 rounded-lg border border-ink-700 bg-ink-950 p-3 text-sm text-neutral-300">
-                <span className="text-xs uppercase tracking-[0.15em] text-pulso-accent">Ángulo sugerido</span>
+              <div className="mt-3 rounded-btn border border-line bg-ink p-3 text-sm text-fg-2">
+                <span className="eyebrow text-accent-ink">Ángulo sugerido</span>
                 <p className="mt-1">{s.angle}</p>
               </div>
 
