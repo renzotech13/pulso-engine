@@ -212,6 +212,72 @@ export type Database = {
           },
         ]
       }
+      articles: {
+        Row: {
+          body_html: string
+          calendar_slot_id: string | null
+          created_at: string
+          hero_image_url: string | null
+          id: string
+          meta_description: string | null
+          published_at: string | null
+          slug: string
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+          url: string | null
+          word_count: number | null
+        }
+        Insert: {
+          body_html: string
+          calendar_slot_id?: string | null
+          created_at?: string
+          hero_image_url?: string | null
+          id?: string
+          meta_description?: string | null
+          published_at?: string | null
+          slug: string
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+          url?: string | null
+          word_count?: number | null
+        }
+        Update: {
+          body_html?: string
+          calendar_slot_id?: string | null
+          created_at?: string
+          hero_image_url?: string | null
+          id?: string
+          meta_description?: string | null
+          published_at?: string | null
+          slug?: string
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          url?: string | null
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_calendar_slot_id_fkey"
+            columns: ["calendar_slot_id"]
+            isOneToOne: false
+            referencedRelation: "content_calendar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "articles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_kits: {
         Row: {
           art_direction: string | null
@@ -948,6 +1014,53 @@ export type Database = {
             foreignKeyName: "render_templates_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_targets: {
+        Row: {
+          auto_publish: boolean
+          base_url: string
+          blog_dir: string
+          created_at: string
+          enabled: boolean
+          id: string
+          repo_path: string
+          shell_page: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          auto_publish?: boolean
+          base_url: string
+          blog_dir?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          repo_path: string
+          shell_page?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          auto_publish?: boolean
+          base_url?: string
+          blog_dir?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          repo_path?: string
+          shell_page?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_targets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },

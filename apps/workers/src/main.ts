@@ -14,6 +14,7 @@ import { runRenderTick } from "./agents/render-tick.js";
 import { runNewsAgentForTenant, runNewsTick } from "./agents/news.js";
 import { fillNewsSlotForTenant } from "./agents/news-slot.js";
 import { runMediaTagTick } from "./agents/media-tag-tick.js";
+import { runArticleAgentForCreative } from "./agents/article.js";
 
 loadConfig(); // fail fast at boot if env vars are missing/invalid
 
@@ -94,12 +95,19 @@ async function processRenderJob(job: Job): Promise<void> {
       await runCreativeAgentForSlot(event.tenant_id, payload.calendarSlotId, event.correlation_id, job.id);
       return;
     }
-    case "creative.generated":
+    case "creative.generated": {
       logger.info(
         { tenantId: event.tenant_id, correlationId: event.correlation_id },
         "creative generated",
       );
+      // The blog article rides on the same theme as the post that just got
+      // written. A no-op for every tenant without a website, and it can't
+      // take the creative down with it: the agent returns early on anything
+      // unexpected and the piece is already saved by this point.
+      const payload = event.payload as { creativeId: string };
+      await runArticleAgentForCreative(event.tenant_id, payload.creativeId, event.correlation_id);
       return;
+    }
     default:
       logger.warn({ eventType: event.type }, "render worker received unhandled event type");
   }

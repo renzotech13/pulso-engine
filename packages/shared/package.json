@@ -12,7 +12,9 @@
     "./image-gen": "./src/image-gen.ts",
     "./time": "./src/time.ts",
     "./image-describe": "./src/image-describe.ts",
-    "./image-prompts": "./src/image-prompts.ts"
+    "./image-prompts": "./src/image-prompts.ts",
+    "./article-gen": "./src/article-gen.ts",
+    "./article-html": "./src/article-html.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

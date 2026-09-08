@@ -67,6 +67,10 @@ type PublicationInsert = Database["public"]["Tables"]["publications"]["Insert"];
 type PublicationUpdate = Database["public"]["Tables"]["publications"]["Update"];
 type MediaAssetRow = Database["public"]["Tables"]["media_assets"]["Row"];
 type MediaAssetUpdate = Database["public"]["Tables"]["media_assets"]["Update"];
+type SiteTargetRow = Database["public"]["Tables"]["site_targets"]["Row"];
+type ArticleRow = Database["public"]["Tables"]["articles"]["Row"];
+type ArticleInsert = Database["public"]["Tables"]["articles"]["Insert"];
+type ArticleUpdate = Database["public"]["Tables"]["articles"]["Update"];
 type BrandKitRow = Database["public"]["Tables"]["brand_kits"]["Row"];
 
 /**
@@ -152,6 +156,17 @@ export interface TenantScopedClient {
   listRecentPhotoSources(limit: number): Promise<Array<{ source: string; assetId?: string }>>;
   /** Successful Gemini image generations today (Lima day), from agent_calls. */
   countGeminiImagesToday(): Promise<number>;
+  /** null when the tenant has no website wired up — most of them. */
+  getSiteTarget(): Promise<SiteTargetRow | null>;
+  getArticleByCalendarSlotId(calendarSlotId: string): Promise<ArticleRow | null>;
+  insertArticle(row: Omit<ArticleInsert, "tenant_id">): Promise<ArticleRow>;
+  updateArticle(id: string, patch: Omit<ArticleUpdate, "tenant_id">): Promise<void>;
+  /**
+   * Every article that already has a page on disk, newest first — the blog
+   * index is rewritten in full on each publish rather than patched, so it
+   * can never drift from what was actually written.
+   */
+  listPublishedArticles(): Promise<ArticleRow[]>;
 }
 
 export function createTenantScopedClient(
@@ -614,6 +629,76 @@ export function createTenantScopedClient(
       if (error) {
         throw new TenantIsolationError(`failed to mark media_asset ${id} used for tenant ${tenantId}`, error);
       }
+    },
+
+    async getSiteTarget() {
+      const { data, error } = await client
+        .from("site_targets")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (error) {
+        throw new TenantIsolationError(`failed to get site_target for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async getArticleByCalendarSlotId(calendarSlotId) {
+      const { data, error } = await client
+        .from("articles")
+        .select("*")
+        .eq("calendar_slot_id", calendarSlotId)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (error) {
+        throw new TenantIsolationError(
+          `failed to look up article for calendar slot ${calendarSlotId} in tenant ${tenantId}`,
+          error,
+        );
+      }
+      return data;
+    },
+
+    async insertArticle(row) {
+      const { data, error } = await client
+        .from("articles")
+        .insert({ ...row, tenant_id: tenantId })
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new TenantIsolationError(`failed to insert article for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async updateArticle(id, patch) {
+      const { error } = await client
+        .from("articles")
+        .update(patch)
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to update article ${id} for tenant ${tenantId}`, error);
+      }
+    },
+
+    async listPublishedArticles() {
+      const { data, error } = await client
+        .from("articles")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .eq("status", "published")
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list articles for tenant ${tenantId}`, error);
+      }
+      return data ?? [];
     },
   };
 }
