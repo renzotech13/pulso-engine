@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  alignWordSequences,
   assignAssetToScript,
   buildEdl,
   diceSimilarity,
@@ -12,6 +13,41 @@ import type { AudioAnalysis, ScriptVideo, TranscriptWord } from "../src/pipeline
 function word(text: string, startSec: number, endSec: number): TranscriptWord {
   return { text, startSec, endSec };
 }
+
+describe("alignWordSequences", () => {
+  it("aligns an identical sequence one-to-one", () => {
+    const a = ["hoy", "te", "explico"];
+    expect(alignWordSequences(a, a)).toEqual([0, 1, 2]);
+  });
+
+  it("localizes a split word instead of shifting everything after it", () => {
+    // Real case from transcribed audio: "RUC" (1 script word) heard as two
+    // words ("aria", "uce"). Everything before and after should stay
+    // exactly 1:1 — only the two words touching the actual split move.
+    const transcript = ["hoy", "te", "explico", "como", "sacar", "tu", "aria", "uce", "en", "sunarp"];
+    const script = ["hoy", "te", "explico", "como", "sacar", "tu", "ruc", "en", "sunarp"];
+
+    const alignment = alignWordSequences(transcript, script);
+
+    expect(alignment.slice(0, 6)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(alignment.slice(8)).toEqual([7, 8]);
+    // "aria" and "uce" resolve the split right there at index 6 ("ruc") —
+    // one of the two aligns to it and the other is unaligned (an edit-distance
+    // tie either way is fine — nothing needs to land on an unrelated word
+    // from smearing the gap across the segment, which is the actual bug this
+    // guards against).
+    expect([alignment[6], alignment[7]].filter((x) => x === 6)).toHaveLength(1);
+    expect([alignment[6], alignment[7]].filter((x) => x === null)).toHaveLength(1);
+  });
+
+  it("marks a transcript word with no script counterpart as unaligned", () => {
+    const transcript = ["eh", "hoy", "te", "explico"];
+    const script = ["hoy", "te", "explico"];
+    const alignment = alignWordSequences(transcript, script);
+    expect(alignment[0]).toBeNull();
+    expect(alignment.slice(1)).toEqual([0, 1, 2]);
+  });
+});
 
 describe("normalizeText", () => {
   it("strips accents, punctuation and case", () => {
@@ -173,5 +209,49 @@ describe("buildEdl", () => {
       silences: [],
     };
     expect(buildEdl(script, [analysis]).segmentos).toHaveLength(0);
+  });
+
+  it("carries the script's own spelling as guionTexto for a confident, full-length match", () => {
+    // Whole line said cleanly, matching the full script text exactly —
+    // should score high enough to trust the script's own wording.
+    const words: TranscriptWord[] = "hoy te explico como sacar tu ruc en sunarp paso a paso"
+      .split(" ")
+      .map((w, i) => word(w, i, i + 0.9));
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences: [] };
+
+    const edl = buildEdl(script, [analysis]);
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.guionTexto).toBe("hoy te explico como sacar tu ruc en sunarp paso a paso");
+  });
+
+  it("never keeps a one-word fragment just because that word also appears in the script", () => {
+    // Regression: searching a spread of window sizes around the run's own
+    // length (added so a mis-transcribed acronym like "su narb" for
+    // "Sunarp" doesn't throw off alignment by a couple of words) briefly
+    // allowed windowSize=1, and n=2 ngrams() falls back to treating a
+    // single-token array as a "unigram" for scoring short strings
+    // elsewhere — at length 1 that meant "is this one word equal to that
+    // one word," which handed a stray "tu" a bogus perfect score just
+    // because "tu" also appears somewhere in the script. Confirmed on real
+    // transcribed audio before this test was written.
+    const words: TranscriptWord[] = [word("tu", 0, 0.3)];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences: [] };
+    expect(buildEdl(script, [analysis]).segmentos).toHaveLength(0);
+  });
+
+  it("leaves guionTexto unset for a weak match, so subtitles fall back to the transcript", () => {
+    // Starts by genuinely echoing the script, then wanders off it entirely —
+    // enough shared bigrams to clear minRunScore, nowhere near enough to
+    // trust the rest of the "match" as the script's own wording.
+    const words: TranscriptWord[] = "hoy te explico algo distinto que no esta en el guion para nada"
+      .split(" ")
+      .map((w, i) => word(w, i, i + 0.9));
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences: [] };
+
+    const edl = buildEdl(script, [analysis], { minRunScore: 0.05 });
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.guionTexto).toBeUndefined();
   });
 });

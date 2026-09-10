@@ -5,7 +5,7 @@ import {
   STORY_PROMO_SIZE,
   storyPromoSchema,
 } from "./compositions/story-promo.schema.js";
-import { subtitleOverlaySchema } from "./compositions/subtitle-overlay.schema.js";
+import { overlaySchema } from "./compositions/overlay.schema.js";
 
 // Maps render_templates.component_ref to the Zod schema the creative's brief
 // must satisfy plus the fixed output geometry — mirrors
@@ -22,13 +22,13 @@ export const REMOTION_REGISTRY = {
     durationInFrames: STORY_PROMO_DURATION_FRAMES,
   },
   // Size/fps/duration aren't fixed like the two above — they come from the
-  // props at render time via calculateMetadata (Root.tsx), since a subtitle
-  // overlay has to exactly match whatever video-editor project it belongs
-  // to. The values here are just a placeholder default for the Studio
-  // preview; nothing reads them for a real render (selectComposition in
-  // render.ts resolves the true metadata from calculateMetadata instead).
-  "subtitle-overlay": {
-    schema: subtitleOverlaySchema,
+  // props at render time via calculateMetadata (Root.tsx), since this has
+  // to exactly match whatever video-editor project it belongs to. The
+  // values here are just a placeholder default for the Studio preview;
+  // nothing reads them for a real render (selectComposition in render.ts
+  // resolves the true metadata from calculateMetadata instead).
+  overlay: {
+    schema: overlaySchema,
     size: { width: 1080, height: 1920 },
     fps: 30,
     durationInFrames: 150,

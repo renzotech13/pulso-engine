@@ -13,12 +13,14 @@ import { parseScriptPdf } from "./script-pdf.js";
 import { getConfiguredProvider, analyzeAudio } from "./transcription.js";
 import { assignAssetToScript, buildEdl } from "./alignment.js";
 import { buildSubtitleTrack, toSrt } from "./subtitles.js";
-import { renderProject, DEFAULT_OUTPUT_SPEC, type OutputSpec } from "./render.js";
+import { renderProject } from "./render.js";
+import { loadDefaultPreset, loadPreset, resolveOutputSpec, type Preset } from "./preset.js";
 import {
   audioAnalysisSchema,
   edlSchema,
   scriptDocumentSchema,
   subtitleTrackSchema,
+  type AssetProbe,
   type AudioAnalysis,
   type Edl,
   type ScriptDocument,
@@ -31,7 +33,8 @@ export interface ProcessProjectOptions {
   pdfPath: string;
   outDir: string;
   language?: string | undefined;
-  outputSpec?: OutputSpec | undefined;
+  presetPath?: string | undefined;
+  musicPath?: string | undefined;
   force?: boolean | undefined;
 }
 
@@ -66,15 +69,17 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
   const artifactsDir = path.join(options.outDir, "artifacts");
   const outputDir = path.join(options.outDir, "output");
   const language = options.language ?? "es";
-  const spec = options.outputSpec ?? DEFAULT_OUTPUT_SPEC;
   const force = options.force ?? false;
+  const preset: Preset = options.presetPath ? await loadPreset(options.presetPath) : await loadDefaultPreset();
 
   // --- 2.1 Ingesta -----------------------------------------------------------
+  const probesByAsset = new Map<string, AssetProbe>();
   for (const videoPath of options.videoPaths) {
     const probe = await probeAsset(videoPath);
     if (!probe.hasAudio) {
       throw new Error(`"${videoPath}" no tiene pista de audio — no se puede usar en el editor de video.`);
     }
+    probesByAsset.set(videoPath, probe);
     logger.info({ videoPath, probe }, "asset validado");
   }
 
@@ -129,28 +134,39 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
       await writeJson(edlPath, edl);
     }
 
-    // --- 2.6 Subtítulos básicos ------------------------------------------------
+    // --- 2.6 Subtítulos -------------------------------------------------------
     const subtitlesPath = path.join(artifactsDir, "subtitles", `${scriptVideo.id}.json`);
     let subtitleTrack = force ? undefined : await readJsonIfExists(subtitlesPath, subtitleTrackSchema);
     if (!subtitleTrack) {
-      subtitleTrack = buildSubtitleTrack(edl as Edl, analysesByAsset);
+      subtitleTrack = buildSubtitleTrack(edl as Edl, analysesByAsset, preset.subtitulos.palabrasPorBloque);
       await writeJson(subtitlesPath, subtitleTrack);
     }
 
-    // --- 2.8 Render ---------------------------------------------------------
+    // --- 2.5/2.7/2.8 Título, música y render -----------------------------------
+    const firstSourceProbe = probesByAsset.get((edl as Edl).segmentos[0]!.archivo)!;
+    const outputSpec = resolveOutputSpec(preset, firstSourceProbe);
+
     await mkdir(outputDir, { recursive: true });
     const outputMp4Path = path.join(outputDir, `${scriptVideo.id}.mp4`);
-    await renderProject(edl as Edl, subtitleTrack, outputMp4Path, spec);
+    await renderProject(edl as Edl, scriptVideo, subtitleTrack, preset, outputSpec, outputMp4Path, {
+      musicPath: options.musicPath,
+    });
 
     const outputSrtPath = path.join(outputDir, `${scriptVideo.id}.srt`);
-    await writeFile(outputSrtPath, toSrt(subtitleTrack), "utf8");
+    await writeFile(
+      outputSrtPath,
+      toSrt(subtitleTrack, preset.subtitulos.maxCaracteresPorLinea, preset.subtitulos.maxLineas),
+      "utf8",
+    );
 
     const manifestPath = path.join(outputDir, `${scriptVideo.id}.manifest.json`);
     await writeJson(manifestPath, {
       videoId: scriptVideo.id,
       generatedAt: new Date().toISOString(),
       transcriptionProvider: provider.name,
-      outputSpec: spec,
+      presetId: preset.id,
+      outputSpec,
+      musicPath: options.musicPath ?? null,
       sourceAssets: assigned.map((a) => a.assetPath),
     });
 

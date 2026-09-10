@@ -4,4 +4,7 @@ export * from "./transcription.js";
 export * from "./script-pdf.js";
 export * from "./alignment.js";
 export * from "./subtitles.js";
+export * from "./preset.js";
+export * from "./music.js";
 export * from "./render.js";
+export * from "./project.js";

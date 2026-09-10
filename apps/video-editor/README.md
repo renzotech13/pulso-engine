@@ -1,17 +1,18 @@
 # @pulso/video-editor
 
 Automatiza la edición de videos cortos a partir de tomas en crudo y un guion:
-lee el guion, transcribe y analiza el audio, arma el corte, superpone
-subtítulos y (Fase 2) título y música — todo en pasos independientes que
-escriben su propio JSON, así que cambiar algo más adelante en el pipeline
-(el preset, por ejemplo) no obliga a repetir lo anterior (transcribir de
-nuevo, sobre todo, es lo más lento).
+lee el guion, transcribe y analiza el audio, arma el corte, superpone título
+y subtítulos con el estilo de marca, y mezcla música con ducking — todo en
+pasos independientes que escriben su propio JSON, así que cambiar el preset
+y volver a renderizar no obliga a repetir lo anterior (transcribir de nuevo,
+sobre todo, es lo más lento).
 
-**Estado:** Fase 1 (núcleo del pipeline, sin UI). Ver `PLAN.md` — no existe
-todavía, se agrega en Fase 4 — para el resto de fases. Esta es la versión
-mínima que prueba que el pipeline entero funciona de punta a punta: ingesta →
-guion → transcripción → alineación → EDL → render con subtítulos simples,
-sin estilo de marca todavía (eso es Fase 2).
+**Estado:** Fase 2 (estilos, título y música) completa. Ver `PLAN.md` — no
+existe todavía, se agrega en Fase 4 — para el resto de fases. Falta la
+interfaz (las tres pantallas, Fase 3) y el trabajo de calidad final
+(pruebas end-to-end automatizadas, este README completo — Fase 4); el
+pipeline en sí ya cubre ingesta → guion → transcripción → alineación → EDL
+→ título/subtítulos con estilo → música → render final.
 
 ## Requisitos
 
@@ -37,12 +38,15 @@ pnpm --filter @pulso/video-editor process \
   --videos toma1.mp4,toma2.mp4 \
   --pdf guiones.pdf \
   --out ./mi-proyecto \
+  --preset config/presets/default.json \
+  --music cancion.mp3 \
   --language es
 ```
 
 También acepta `--videos-dir <carpeta>` en vez de `--videos` (usa todos los
-`.mp4` que estén directamente dentro de esa carpeta), y `--force` para
-reprocesar todo ignorando los artefactos ya guardados.
+`.mp4` que estén directamente dentro de esa carpeta), `--force` para
+reprocesar todo ignorando los artefactos ya guardados, `--preset` (si se
+omite, usa `config/presets/default.json`) y `--music` (opcional).
 
 Cada corrida deja todo en `<out>/`:
 - `artifacts/` — el JSON intermedio de cada paso (`script.json`,
@@ -81,3 +85,32 @@ donde no haya podido confirmar el título.
 `WhisperCppProvider` es la única implementación hoy; para agregar otra (una
 API paga, por ejemplo) alcanza con otra clase que la implemente y cambiar
 `getConfiguredProvider()` — nada más del pipeline necesita cambiar.
+
+## Presets (línea gráfica)
+
+Un preset es un JSON validado con Zod (`src/pipeline/preset.ts`) que define
+tipografía, estilo de subtítulos (tamaño, colores, contorno, sombra, caja de
+fondo, karaoke, mayúsculas, agrupación por palabras, ajuste de línea),
+título (modo superpuesto o tarjeta, duración, animación) y salida (formato,
+resolución, fps, calidad). `config/presets/default.json` es el que se usa
+si no se pasa `--preset`. Ninguna propiedad del esquema de referencia queda
+sin soporte: al elegir Remotion en vez de subtítulos quemados con ASS (ver
+la decisión de Fase 0), esquinas redondeadas, sombras y resaltado por
+palabra son CSS nativo. Lo único que se degrada explícitamente (nunca en
+silencio: queda un `console.warn` con el motivo) es una animación no
+reconocida — hoy solo existen `"pop"` para subtítulos y `"fadeIn"/"fadeOut"`
+para el título.
+
+Cambiar el preset y volver a renderizar no requiere retranscribir ni
+realinear: `pnpm --filter @pulso/video-editor process ... --preset otro.json`
+reutiliza `artifacts/audio/` y `artifacts/edl/` tal cual y solo rehace el
+render final.
+
+## Música (2.7)
+
+Con `--music`, la voz se normaliza con `loudnorm` (-14 LUFS por defecto,
+configurable en `preset.musica`) y la música se mezcla debajo con ducking
+real (`sidechaincompress`: el volumen de la música baja cuando hay voz, no
+un volumen fijo más bajo todo el tiempo) más fade-in/fade-out. Sin
+`--music`, igual se aplica el `loudnorm` — "audio normalizado" no depende
+de que haya musicalización.

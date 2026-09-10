@@ -73,9 +73,12 @@ export const edlSegmentSchema = z.object({
   archivo: z.string(),
   inicio: z.number().nonnegative(),
   fin: z.number().nonnegative(),
+  /** What was actually SAID, per the transcript — kept for debugging/review even when guionTexto below is used for display. */
   lineaGuion: z.string(),
   /** Which script video this segment belongs to (scriptVideoSchema.id). */
   videoId: z.string(),
+  /** The script's own (correctly spelled/accented) wording for this segment, when the match was confident enough to trust it — see buildEdl's guionTextConfidence. Undefined falls back to lineaGuion for subtitles. */
+  guionTexto: z.string().optional(),
 });
 export type EdlSegment = z.infer<typeof edlSegmentSchema>;
 

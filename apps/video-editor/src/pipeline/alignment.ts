@@ -25,11 +25,84 @@ function tokenize(text: string): string[] {
   return normalized ? normalized.split(" ") : [];
 }
 
+/** Splits on whitespace only — keeps original casing/accents/punctuation, for when the matched text needs to be DISPLAYED, not just scored. */
+export function splitOriginalWords(text: string): string[] {
+  return text.trim().split(/\s+/).filter(Boolean);
+}
+
+export function normalizeToken(token: string): string {
+  return token
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function ngrams(tokens: string[], n: number): Set<string> {
   if (tokens.length < n) return new Set(tokens.length > 0 ? [tokens.join(" ")] : []);
   const result = new Set<string>();
   for (let i = 0; i <= tokens.length - n; i++) result.add(tokens.slice(i, i + n).join(" "));
   return result;
+}
+
+/**
+ * Classic Needleman-Wunsch global alignment between two token sequences —
+ * used to map each TRANSCRIPT word onto its corresponding SCRIPT word (see
+ * subtitles.ts) without just linearly compressing one length onto the
+ * other. A naive proportional mapping smears a single divergence (an
+ * acronym whisper.cpp heard as two words, "RUC" → "aría uce") across the
+ * WHOLE segment via rounding, duplicating an unrelated word near wherever
+ * the arithmetic happens to land — confirmed on real transcribed audio: it
+ * duplicated the segment's very FIRST word even though the true divergence
+ * was several words in. Real alignment costs one substitution + one
+ * deletion right at the two words that actually diverged and leaves
+ * everything before and after them exactly 1:1.
+ *
+ * Returns, for each index in `a` (the transcript), the aligned index in
+ * `b` (the script) — or null when `a[i]` has no script counterpart at all
+ * (whisper transcribed a word the script doesn't have; rare, since these
+ * words already passed a script-similarity threshold to get this far).
+ */
+export function alignWordSequences(a: readonly string[], b: readonly string[]): Array<number | null> {
+  const n = a.length;
+  const m = b.length;
+  // dp[i][j] = edit distance between a[0..i) and b[0..j).
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = 0; i <= n; i++) dp[i]![0] = i;
+  for (let j = 0; j <= m; j++) dp[0]![j] = j;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i]![j] = Math.min(
+        dp[i - 1]![j - 1]! + cost, // match or substitute
+        dp[i - 1]![j]! + 1, // delete a[i-1] (no script counterpart)
+        dp[i]![j - 1]! + 1, // insert b[j-1] (script word never said — skip it)
+      );
+    }
+  }
+
+  // Backtrack from (n, m) to (0, 0), recovering which move produced each
+  // cell — same three cases as the recurrence above, preferring a
+  // match/substitute (diagonal) whenever it's tied with an insert/delete,
+  // since that's the one that actually assigns a[i-1] to a script word.
+  const alignment: Array<number | null> = new Array(n).fill(null);
+  let i = n;
+  let j = m;
+  while (i > 0 || j > 0) {
+    const cost = i > 0 && j > 0 && a[i - 1] === b[j - 1] ? 0 : 1;
+    if (i > 0 && j > 0 && dp[i]![j] === dp[i - 1]![j - 1]! + cost) {
+      alignment[i - 1] = j - 1;
+      i--;
+      j--;
+    } else if (i > 0 && dp[i]![j] === dp[i - 1]![j]! + 1) {
+      alignment[i - 1] = null; // a[i-1] deleted — no script word for it
+      i--;
+    } else {
+      j--; // b[j-1] inserted — a script word with no spoken counterpart
+    }
+  }
+
+  return alignment;
 }
 
 /** 0 (nothing in common) to 1 (identical bag of n-grams). */
@@ -152,6 +225,16 @@ export interface BuildEdlOptions {
   duplicateThreshold?: number;
   /** Silence padding kept at each cut so it doesn't sound abrupt. */
   marginSec?: number;
+  /**
+   * At or above this match score, the script's own wording is trusted
+   * enough to REPLACE the transcript's guess in the subtitles (2.6) — a
+   * base whisper.cpp model routinely mishears acronyms/proper nouns
+   * ("RUC" → "aría uce", confirmed on real audio in Fase 1), but the
+   * segment's script-position score already measures exactly how well the
+   * two line up, so no separate check is needed. Below this, the segment
+   * keeps the transcript's own words and subtitles.ts marks it low-confidence.
+   */
+  guionTextConfidence?: number;
 }
 
 // Capping (rather than removing) the silence BETWEEN consecutive segments
@@ -163,6 +246,7 @@ const DEFAULT_OPTIONS: Required<BuildEdlOptions> = {
   minRunScore: 0.15,
   duplicateThreshold: 0.7,
   marginSec: 0.2,
+  guionTextConfidence: 0.35,
 };
 
 interface ScoredRun {
@@ -170,23 +254,62 @@ interface ScoredRun {
   run: SpeechRun;
   scriptPosition: number; // token index of the best-matching window in the script
   score: number;
+  /** The script's OWN words for the matched window — correct spelling/accents, unlike the transcript. Empty when the match was too weak to trust. */
+  guionWords: string[];
 }
 
-/** Where in the script's token stream this run's text best matches — used to order segments by script position, not recording order. */
-function bestScriptPosition(runText: string, scriptTokens: string[]): { position: number; score: number } {
+/**
+ * Where in the script's token stream this run's text best matches, AND the
+ * script's own (correctly spelled) words for that span — used both to order
+ * segments by script position (not recording order) and, later, to swap the
+ * transcript's guesses for the script's real wording in the subtitles
+ * (2.6). `scriptWordsOriginal` and `scriptTokensNormalized` must be the
+ * same length, index-for-index (see splitOriginalWords/normalizeToken).
+ */
+function bestScriptPosition(
+  runText: string,
+  scriptTokensNormalized: string[],
+  scriptWordsOriginal: string[],
+): { position: number; score: number; guionWords: string[] } {
   const runTokens = tokenize(runText);
-  if (runTokens.length === 0 || scriptTokens.length === 0) return { position: 0, score: 0 };
+  if (runTokens.length === 0 || scriptTokensNormalized.length === 0) {
+    return { position: 0, score: 0, guionWords: [] };
+  }
 
   const runGrams = ngrams(runTokens, 2);
-  const windowSize = Math.max(runTokens.length, 3);
 
-  let best = { position: 0, score: 0 };
-  for (let i = 0; i <= Math.max(0, scriptTokens.length - 1); i += 1) {
-    const window = scriptTokens.slice(i, i + windowSize);
-    const score = diceSimilarity(runGrams, ngrams(window, 2));
-    if (score > best.score) best = { position: i, score };
+  // Assuming the matching script span has exactly as many words as the run
+  // does is wrong whenever whisper.cpp's word count for a stretch doesn't
+  // match the script's own — routine for an acronym it doesn't know
+  // ("Sunarp" transcribed as two words, "su narb") — and it was wrong by
+  // enough on real audio to visibly duplicate two words across a segment
+  // boundary. Trying a small spread of window sizes around the run's own
+  // length, not just that exact length, is what actually fixes it: the
+  // correctly-sized window scores at least as well as the wrong-sized one
+  // (real script words in the right place beat an accidental partial
+  // match), so the highest score reliably lands on the right span.
+  let best = { position: 0, score: 0, windowSize: Math.max(runTokens.length, 3) };
+  for (let delta = -2; delta <= 2; delta += 1) {
+    // Never below 3: ngrams() falls back to treating a <2-token window as a
+    // single "unigram" (deliberately, for scoring genuinely short strings
+    // elsewhere) — at windowSize 1 that turns into "does this one word
+    // equal that one word," which scores a meaningless perfect 1.0 for any
+    // short/filler run that happens to share one common word ("tu", "la",
+    // "en"...) with the script. Confirmed on real audio: without this
+    // floor, a stray one-word fragment matched at score 1.0 and became its
+    // own bogus EDL segment.
+    const windowSize = Math.max(3, runTokens.length + delta);
+    for (let i = 0; i <= Math.max(0, scriptTokensNormalized.length - 1); i += 1) {
+      const window = scriptTokensNormalized.slice(i, i + windowSize);
+      const score = diceSimilarity(runGrams, ngrams(window, 2));
+      if (score > best.score) best = { position: i, score, windowSize };
+    }
   }
-  return best;
+  return {
+    position: best.position,
+    score: best.score,
+    guionWords: scriptWordsOriginal.slice(best.position, best.position + best.windowSize),
+  };
 }
 
 /**
@@ -202,16 +325,17 @@ export function buildEdl(
   options: BuildEdlOptions = {},
 ): Edl {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const scriptTokens = tokenize(scriptVideo.guion);
+  const scriptWordsOriginal = splitOriginalWords(scriptVideo.guion);
+  const scriptTokensNormalized = scriptWordsOriginal.map(normalizeToken);
 
   const candidates: ScoredRun[] = [];
   for (const analysis of assetAnalyses) {
     const runs = segmentIntoRuns(analysis.words, analysis.silences);
     for (const run of runs) {
       const text = run.words.map((w) => w.text).join(" ");
-      const { position, score } = bestScriptPosition(text, scriptTokens);
+      const { position, score, guionWords } = bestScriptPosition(text, scriptTokensNormalized, scriptWordsOriginal);
       if (score >= opts.minRunScore) {
-        candidates.push({ assetPath: analysis.assetPath, run, scriptPosition: position, score });
+        candidates.push({ assetPath: analysis.assetPath, run, scriptPosition: position, score, guionWords });
       }
     }
   }
@@ -242,6 +366,10 @@ export function buildEdl(
     fin: c.run.endSec + opts.marginSec,
     lineaGuion: c.run.words.map((w) => w.text).join(" "),
     videoId: scriptVideo.id,
+    // Only trusted enough to show verbatim above guionTextConfidence — a
+    // weak match's guionWords could easily be the WRONG stretch of script,
+    // which would be a worse subtitle than the transcript's own guess.
+    guionTexto: c.score >= opts.guionTextConfidence && c.guionWords.length > 0 ? c.guionWords.join(" ") : undefined,
   }));
 
   return { videoId: scriptVideo.id, segmentos };

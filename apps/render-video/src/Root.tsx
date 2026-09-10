@@ -7,7 +7,7 @@ import {
   StoryPromo,
   storyPromoSchema,
 } from "./compositions/StoryPromo.js";
-import { SubtitleOverlay, subtitleOverlaySchema } from "./compositions/SubtitleOverlay.js";
+import { Overlay, overlaySchema } from "./compositions/Overlay.js";
 
 const DEFAULT_BRAND = {
   logoUrl: null,
@@ -40,9 +40,9 @@ export function RemotionRoot() {
         defaultProps={{ brand: DEFAULT_BRAND, message: "20% en masajes" }}
       />
       <Composition
-        id="subtitle-overlay"
-        component={SubtitleOverlay}
-        schema={subtitleOverlaySchema}
+        id="overlay"
+        component={Overlay}
+        schema={overlaySchema}
         // Fixed values here are placeholders for the Studio preview only —
         // calculateMetadata below overrides them for every real render with
         // whatever this specific project's video actually measures.
@@ -50,7 +50,26 @@ export function RemotionRoot() {
         fps={30}
         width={1080}
         height={1920}
-        defaultProps={{ bloques: [], durationSec: 5, fps: 30, width: 1080, height: 1920 }}
+        defaultProps={{
+          durationSec: 5,
+          fps: 30,
+          width: 1080,
+          height: 1920,
+          fuente: { familia: "system-ui", peso: 700 },
+          subtitulos: [],
+          subtituloEstilo: {
+            tamano: 64,
+            color: "#FFFFFF",
+            colorPalabraActiva: "#FFD400",
+            posicion: "inferior",
+            margenSeguroInferiorPx: 220,
+            maxCaracteresPorLinea: 24,
+            maxLineas: 2,
+            mayusculas: true,
+            resaltarPalabraActiva: true,
+            animacion: "pop",
+          },
+        }}
         calculateMetadata={({ props }) => ({
           durationInFrames: Math.max(1, Math.round(props.durationSec * props.fps)),
           fps: props.fps,

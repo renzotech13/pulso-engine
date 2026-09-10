@@ -38,7 +38,8 @@ async function main(): Promise<void> {
 
   if (!args.pdf || !args.out || (!args.videos && !args["videos-dir"])) {
     console.error(
-      "uso: tsx src/cli.ts --videos a.mp4,b.mp4 --pdf guion.pdf --out ./salida [--videos-dir carpeta] [--force] [--language es]",
+      "uso: tsx src/cli.ts --videos a.mp4,b.mp4 --pdf guion.pdf --out ./salida " +
+        "[--videos-dir carpeta] [--preset ruta.json] [--music cancion.mp3] [--force] [--language es]",
     );
     process.exit(1);
   }
@@ -57,6 +58,8 @@ async function main(): Promise<void> {
     pdfPath: path.resolve(args.pdf!),
     outDir: path.resolve(args.out!),
     language: args.language,
+    presetPath: args.preset ? path.resolve(args.preset) : undefined,
+    musicPath: args.music ? path.resolve(args.music) : undefined,
     force: args.force === "true",
   });
 

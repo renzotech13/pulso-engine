@@ -1,10 +1,12 @@
 // 2.8: the only stage that touches ffmpeg for actual video composition.
-// Three ffmpeg-adjacent steps: (1) trim+normalize+concat the EDL's segments
-// into one video, (2) ask Remotion (via @pulso/render-video) for a
-// transparent-background overlay video with the subtitle text, (3) ffmpeg
-// composites the overlay onto the concatenated footage and does the final
-// encode. Remotion never sees the source footage or does the encode —
-// that split is deliberate (see the Fase 0 writeup on Remotion vs ASS).
+// Four ffmpeg-adjacent steps: (1) trim+normalize+concat the EDL's segments
+// into one video, (2) normalize the voice and mix in music if there is any
+// (2.7, music.ts), (3) ask Remotion (via @pulso/render-video) for a
+// transparent-background overlay video with the title and styled
+// subtitles, (4) ffmpeg composites the overlay onto the concatenated
+// footage WITH the mixed audio and does the final encode. Remotion never
+// sees the source footage, the music, or does the encode — that split is
+// deliberate (see the Fase 0 writeup on Remotion vs ASS).
 
 import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -14,7 +16,9 @@ import { promisify } from "node:util";
 import { renderLocal } from "@pulso/render-video/render";
 import { AppError } from "@pulso/shared/errors";
 import { FfmpegNotFoundError, InvalidMediaError } from "./ffmpeg.js";
-import type { AssetProbe, Edl, SubtitleTrack } from "./types.js";
+import { mixAudio } from "./music.js";
+import { resolveSubtitleAnimation, resolveTitleAnimation, type Preset } from "./preset.js";
+import type { Edl, ScriptVideo, SubtitleTrack } from "./types.js";
 
 const run = promisify(execFile);
 const MAX_BUFFER = 64 * 1024 * 1024;
@@ -33,8 +37,6 @@ export interface OutputSpec {
   /** libx264 CRF for the final encode — lower is higher quality/bigger file. */
   crf: number;
 }
-
-export const DEFAULT_OUTPUT_SPEC: OutputSpec = { width: 1080, height: 1920, fps: 30, crf: 18 };
 
 function isEnoent(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT";
@@ -87,7 +89,10 @@ async function concatenateSegments(edl: Edl, spec: OutputSpec, outputPath: strin
         "-c:v", "libx264",
         "-crf", String(spec.crf),
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac",
+        // Audio here is an intermediate for mixAudio (music.ts) to
+        // loudnorm/mix, not the final track — AAC is lossy, so this stays
+        // uncompressed PCM to not compound quality loss across two encodes.
+        "-c:a", "pcm_s16le",
         outputPath,
       ],
       { maxBuffer: MAX_BUFFER },
@@ -98,23 +103,79 @@ async function concatenateSegments(edl: Edl, spec: OutputSpec, outputPath: strin
   }
 }
 
-async function renderSubtitleOverlay(track: SubtitleTrack, durationSec: number, spec: OutputSpec): Promise<Buffer> {
-  return renderLocal(
-    "subtitle-overlay",
-    {
-      bloques: track.bloques.map((b) => ({ startSec: b.startSec, endSec: b.endSec, text: b.text })),
-      durationSec,
-      fps: spec.fps,
-      width: spec.width,
-      height: spec.height,
+function buildOverlayProps(
+  preset: Preset,
+  scriptVideo: ScriptVideo,
+  subtitleTrack: SubtitleTrack,
+  durationSec: number,
+  spec: OutputSpec,
+) {
+  const { subtitulos: s, titulo: tt } = preset;
+  return {
+    durationSec,
+    fps: spec.fps,
+    width: spec.width,
+    height: spec.height,
+    fuente: { familia: preset.fuente.familia, archivo: preset.fuente.archivo, peso: preset.fuente.peso },
+    subtitulos: subtitleTrack.bloques.map((b) => ({
+      startSec: b.startSec,
+      endSec: b.endSec,
+      text: b.text,
+      words: b.words,
+    })),
+    subtituloEstilo: {
+      tamano: s.tamano,
+      color: s.color,
+      colorPalabraActiva: s.colorPalabraActiva,
+      contorno: s.contorno,
+      sombra: s.sombra,
+      fondo: s.fondo,
+      posicion: s.posicion,
+      margenSeguroInferiorPx: s.margenSeguroInferiorPx,
+      maxCaracteresPorLinea: s.maxCaracteresPorLinea,
+      maxLineas: s.maxLineas,
+      mayusculas: s.mayusculas,
+      resaltarPalabraActiva: s.resaltarPalabraActiva,
+      animacion: resolveSubtitleAnimation(s.animacion),
     },
-    { codec: "prores-4444" },
-  );
+    // Absent entirely (not just empty text) when the script says not to show
+    // one — Overlay.tsx treats "no titulo prop" and "titulo for 0 seconds"
+    // differently only in intent, but omitting it is the honest signal.
+    titulo:
+      scriptVideo.mostrarTitulo && scriptVideo.titulo
+        ? {
+            texto: scriptVideo.titulo,
+            modo: tt.modo,
+            duracionSeg: tt.duracionSeg,
+            tamano: tt.tamano,
+            color: tt.color,
+            fondo: tt.fondo,
+            posicion: tt.posicion,
+            animacionEntrada: resolveTitleAnimation(tt.animacionEntrada) === "fadeIn" ? ("fadeIn" as const) : ("ninguna" as const),
+            animacionSalida: resolveTitleAnimation(tt.animacionSalida) === "fadeOut" ? ("fadeOut" as const) : ("ninguna" as const),
+            entradaSeg: tt.entradaSeg,
+            salidaSeg: tt.salidaSeg,
+          }
+        : undefined,
+  };
+}
+
+async function renderOverlay(
+  preset: Preset,
+  scriptVideo: ScriptVideo,
+  subtitleTrack: SubtitleTrack,
+  durationSec: number,
+  spec: OutputSpec,
+): Promise<Buffer> {
+  return renderLocal("overlay", buildOverlayProps(preset, scriptVideo, subtitleTrack, durationSec, spec), {
+    codec: "prores-4444",
+  });
 }
 
 async function compositeOverlay(
-  concatenatedPath: string,
+  concatenatedVideoPath: string,
   overlayPath: string,
+  audioPath: string,
   spec: OutputSpec,
   outputPath: string,
 ): Promise<void> {
@@ -123,28 +184,34 @@ async function compositeOverlay(
       "ffmpeg",
       [
         "-y",
-        "-i", concatenatedPath,
+        "-i", concatenatedVideoPath,
         "-i", overlayPath,
+        "-i", audioPath,
         "-filter_complex", "[0:v][1:v]overlay=format=auto[outv]",
         "-map", "[outv]",
-        "-map", "0:a",
+        "-map", "2:a",
         "-c:v", "libx264",
         "-crf", String(spec.crf),
         "-pix_fmt", "yuv420p",
         "-movflags", "+faststart",
         "-c:a", "aac",
+        "-shortest",
         outputPath,
       ],
       { maxBuffer: MAX_BUFFER },
     );
   } catch (err) {
     if (isEnoent(err)) throw new FfmpegNotFoundError("ffmpeg", err);
-    throw new RenderError("no se pudo componer el overlay de subtítulos sobre el video", err);
+    throw new RenderError("no se pudo componer el overlay y el audio final sobre el video", err);
   }
 }
 
 export interface RenderProjectResult {
   outputMp4Path: string;
+}
+
+export interface RenderProjectOptions {
+  musicPath?: string | undefined;
 }
 
 /**
@@ -154,26 +221,33 @@ export interface RenderProjectResult {
  */
 export async function renderProject(
   edl: Edl,
+  scriptVideo: ScriptVideo,
   subtitleTrack: SubtitleTrack,
+  preset: Preset,
+  spec: OutputSpec,
   outputMp4Path: string,
-  spec: OutputSpec = DEFAULT_OUTPUT_SPEC,
+  options: RenderProjectOptions = {},
 ): Promise<RenderProjectResult> {
   const workDir = await mkdtemp(path.join(tmpdir(), "pulso-video-editor-"));
   try {
-    const concatenatedPath = path.join(workDir, "concatenated.mp4");
+    // .mov, not .mp4: this carries uncompressed PCM audio (see
+    // concatenateSegments) as an intermediate for mixAudio to process,
+    // which MP4's muxer doesn't support cleanly the way QuickTime's does.
+    const concatenatedPath = path.join(workDir, "concatenated.mov");
     await concatenateSegments(edl, spec, concatenatedPath);
 
     const durationSec = edlDurationSec(edl);
-    const overlayBuffer = await renderSubtitleOverlay(subtitleTrack, durationSec, spec);
+
+    const mixedAudioPath = path.join(workDir, "mixed-audio.wav");
+    await mixAudio(concatenatedPath, options.musicPath, preset.musica, durationSec, mixedAudioPath);
+
+    const overlayBuffer = await renderOverlay(preset, scriptVideo, subtitleTrack, durationSec, spec);
     const overlayPath = path.join(workDir, "overlay.mov");
     await writeFile(overlayPath, overlayBuffer);
 
-    await compositeOverlay(concatenatedPath, overlayPath, spec, outputMp4Path);
+    await compositeOverlay(concatenatedPath, overlayPath, mixedAudioPath, spec, outputMp4Path);
     return { outputMp4Path };
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
 }
-
-/** Re-exported so callers building an OutputSpec can validate a probed asset against it if they need to. */
-export type { AssetProbe };
