@@ -1,7 +1,10 @@
 {
   "extends": "@pulso/tsconfig/base.json",
   "compilerOptions": {
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    // Compositions run inside Remotion's headless Chromium, not Node — real
+    // DOM APIs (document.fonts, FontFace) are available at runtime.
+    "lib": ["ES2022", "DOM"]
   },
   "include": ["src"]
 }

@@ -1,4 +1,5 @@
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { useEffect } from "react";
+import { AbsoluteFill, continueRender, delayRender, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import type { OverlayProps } from "./overlay.schema";
 
 export { overlaySchema, type OverlayProps } from "./overlay.schema";
@@ -12,19 +13,59 @@ export { overlaySchema, type OverlayProps } from "./overlay.schema";
  * comment on why: Remotion draws graphics, ffmpeg owns the source video
  * and the final encode).
  */
+/**
+ * A `@font-face` rule alone only tells the browser WHERE the font is —
+ * nothing makes a frame wait for it to actually finish downloading before
+ * getting captured. Every preset tested before this one omitted
+ * `fuente.archivo` entirely (falling back to the system stack, which needs
+ * no network fetch), so this gap never showed up until a preset with a real
+ * custom font — AZ Estudio Contable's Inter Tight, fetched from Google
+ * Fonts' CDN — rendered blank/fallback text on the first frames. Loading it
+ * explicitly via the FontFace API inside a delayRender/continueRender pair
+ * makes Remotion actually hold every frame of this composition until the
+ * font is ready, the same guarantee `@remotion/fonts` provides for its own
+ * bundled fonts.
+ */
+function useCustomFont(familia: string, archivo: string | undefined, peso: number): void {
+  useEffect(() => {
+    if (!archivo) return;
+    const handle = delayRender(`loading font "${familia}" from ${archivo}`);
+    const fontFace = new FontFace(familia, `url("${archivo}")`, { weight: String(peso) });
+    fontFace
+      .load()
+      .then((loaded) => {
+        // TypeScript's DOM lib omits `add` from its FontFaceSet typing even
+        // though every browser (this runs in headless Chromium) implements
+        // it per spec — a long-standing gap in lib.dom.d.ts, not a runtime
+        // concern.
+        (document.fonts as FontFaceSet & { add(font: FontFace): void }).add(loaded);
+        continueRender(handle);
+      })
+      .catch((err: unknown) => {
+        // A font that fails to load (network hiccup, bad URL) shouldn't take
+        // the whole render down — the text still renders, just in the
+        // system fallback stack instead of the brand's real typeface.
+        console.warn(`[render-video] no se pudo cargar la fuente "${familia}": ${String(err)}`);
+        continueRender(handle);
+      });
+    // Deliberately no cancelRender on unmount: this composition's lifetime
+    // IS the render's lifetime (Remotion doesn't remount it mid-render), so
+    // there's no cleanup case where the handle would otherwise leak.
+  }, [familia, archivo, peso]);
+}
+
 export function Overlay({ subtitulos, subtituloEstilo, titulo, fuente, width }: OverlayProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const t = frame / fps;
+
+  useCustomFont(fuente.familia, fuente.archivo, fuente.peso);
 
   const activeBlock = subtitulos.find((b) => t >= b.startSec && t < b.endSec);
   const showTitle = titulo !== undefined && t < titulo.duracionSeg;
 
   return (
     <AbsoluteFill style={{ fontFamily: fuente.archivo ? fuente.familia : "system-ui, -apple-system, sans-serif" }}>
-      {fuente.archivo && (
-        <style>{`@font-face{font-family:"${fuente.familia}";src:url("${fuente.archivo}");font-weight:${fuente.peso};}`}</style>
-      )}
       {showTitle && <TitleLayer titulo={titulo} t={t} width={width} />}
       {activeBlock && <SubtitleLayer block={activeBlock} estilo={subtituloEstilo} t={t} />}
     </AbsoluteFill>

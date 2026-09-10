@@ -72,6 +72,12 @@ export async function renderLocal(
     await renderMedia({
       composition,
       serveUrl,
+      // Without this, anything a composition logs (console.warn/error inside
+      // Overlay.tsx, say) runs in Chromium and is simply never seen — it
+      // doesn't propagate to this process's stdout on its own. Surfacing it
+      // here is what makes "fails loud, never silently" actually true for
+      // composition-side code, not just this package's own.
+      onBrowserLog: (log) => console.log(`[remotion:${log.type}] ${log.text}`),
       ...(options.codec === "prores-4444"
         ? {
             codec: "prores" as const,

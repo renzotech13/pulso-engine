@@ -1,0 +1,39 @@
+{
+  "id": "az-estudio-contable",
+  "nombre": "AZ Estudio Contable — línea principal",
+  "fuente": {
+    "familia": "Inter Tight",
+    "archivo": "https://fonts.gstatic.com/s/intertight/v9/NGSnv5HMAFg6IuGlBNMjxJEL2VmU3NS7Z2mj6AiaWy5SgqoUP_C5.woff2",
+    "peso": 700
+  },
+  "subtitulos": {
+    "tamano": 64,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#c19263",
+    "contorno": { "color": "#081630", "grosor": 3 },
+    "sombra": { "color": "#00000080", "desplazamiento": 2 },
+    "fondo": { "activo": true, "color": "#081630CC", "radio": 12, "padding": 16 },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 220,
+    "maxCaracteresPorLinea": 24,
+    "maxLineas": 2,
+    "palabrasPorBloque": 4,
+    "mayusculas": true,
+    "resaltarPalabraActiva": true,
+    "animacion": "pop"
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 3,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "fondo": { "activo": true, "color": "#081630E6", "radio": 0, "padding": 0 },
+    "posicion": "centro",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.3,
+    "salidaSeg": 0.3
+  },
+  "musica": { "volumenDb": -18, "ducking": true, "fadeInSeg": 1, "fadeOutSeg": 2 },
+  "salida": { "formato": "9:16", "resolucion": "1080x1920", "fps": 30, "crf": 18 }
+}
