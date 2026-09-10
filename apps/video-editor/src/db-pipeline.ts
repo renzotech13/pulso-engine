@@ -65,6 +65,7 @@ export async function processProjectJob({ projectId, tenantId }: ProcessProjectJ
     return;
   }
 
+  const startedAt = Date.now();
   try {
     await withTempDir("pulso-ve-process-", async (workDir) => {
       // --- 2.2 Guion -----------------------------------------------------------
@@ -140,6 +141,7 @@ export async function processProjectJob({ projectId, tenantId }: ProcessProjectJ
 
       await db.updateVideoProject(projectId, { status: "en_revision" });
     });
+    logger.info({ projectId, tenantId, durationMs: Date.now() - startedAt }, "processProjectJob completado");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ projectId, err }, "processProjectJob falló");
@@ -158,6 +160,7 @@ export async function renderVideoJob({ projectId, tenantId, videoId }: RenderVid
     return;
   }
 
+  const startedAt = Date.now();
   try {
     await db.updateVideoProjectVideo(videoId, { status: "renderizando", error_message: null });
 
@@ -220,6 +223,7 @@ export async function renderVideoJob({ projectId, tenantId, videoId }: RenderVid
         output_srt_path: outputSrtPath,
       });
     });
+    logger.info({ projectId, videoId, tenantId, durationMs: Date.now() - startedAt }, "renderVideoJob completado");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error({ projectId, videoId, err }, "renderVideoJob falló");
