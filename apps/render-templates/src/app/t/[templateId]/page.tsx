@@ -64,7 +64,10 @@ export default async function TemplatePage({
 
   const { creative, brandKit, tenantName } = result;
 
-  if (templateId === "social-post") {
+  // "social-post-az" is AZ Estudio Contable's own tenant-scoped variant
+  // (see render_templates: tenant_id set, component_ref "social-post-az")
+  // — same brief shape as the global template, just a different component.
+  if (templateId === "social-post" || templateId === "social-post-az") {
     const brief = socialPostBriefSchema.safeParse(creative.brief);
     if (!brief.success) notFound();
 
@@ -74,7 +77,7 @@ export default async function TemplatePage({
       ...(colorPrimary && colorSecondary ? { colorPrimary, colorSecondary } : {}),
     };
 
-    const Component = TEMPLATE_REGISTRY["social-post"];
+    const Component = TEMPLATE_REGISTRY[templateId];
     return <Component brand={brand} {...omitUndefined(templateProps)} />;
   }
 

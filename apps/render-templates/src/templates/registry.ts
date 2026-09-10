@@ -1,4 +1,5 @@
 import { SocialPostTemplate, SOCIAL_POST_SIZE, type SocialPostProps } from "./social-post";
+import { SocialPostTemplateAZ } from "./social-post-az";
 import { CarouselTemplate, CAROUSEL_SIZE, type CarouselProps } from "./carousel";
 import { PhotoFrameTemplate, type PhotoFrameProps } from "./photo-frame";
 import {
@@ -15,6 +16,7 @@ import {
  */
 export const TEMPLATE_REGISTRY = {
   "social-post": SocialPostTemplate,
+  "social-post-az": SocialPostTemplateAZ,
   carousel: CarouselTemplate,
   "photo-frame": PhotoFrameTemplate,
   "student-showcase": StudentShowcaseTemplate,
@@ -27,6 +29,7 @@ export const TEMPLATE_REGISTRY = {
 // the real size from the DB before it ever consults this map.
 export const TEMPLATE_SIZES = {
   "social-post": SOCIAL_POST_SIZE,
+  "social-post-az": SOCIAL_POST_SIZE,
   carousel: CAROUSEL_SIZE,
   "photo-frame": { width: 1080, height: 1080 },
   "student-showcase": STUDENT_SHOWCASE_SIZE,
