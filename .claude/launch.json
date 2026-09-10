@@ -25,6 +25,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@pulso/render-templates", "dev"],
       "port": 3001
+    },
+    {
+      "name": "az-estudio-contable",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/renzo/AZ Estudio Contable", "run", "dev"],
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }

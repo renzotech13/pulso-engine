@@ -100,6 +100,61 @@ export async function writeArticleFiles(input: WriteArticleInput): Promise<Write
   return { files };
 }
 
+export interface WriteMdxArticleInput {
+  site: SiteTargetRow;
+  article: {
+    slug: string;
+    title: string;
+    metaDescription: string;
+    bodyHtml: string;
+    publishedAt: string;
+  };
+}
+
+/** Double-quoted YAML scalar — JSON.stringify already escapes the same way YAML expects for plain text. */
+function yamlString(value: string): string {
+  return JSON.stringify(value);
+}
+
+/**
+ * For a tenant whose site already has its own blog (e.g. AZ Estudio
+ * Contable's Next.js app, reading `content/blog/*.mdx` via next-mdx-remote/
+ * gray-matter) rather than the plain-HTML pages writeArticleFiles produces.
+ * Only the one file: no index page to write, since a real app's own /blog
+ * route lists posts by reading the directory itself, and no shared
+ * stylesheet, since the app already has one. `bodyHtml` — already limited to
+ * a handful of basic tags by article-gen.ts's sanitizer — passes through
+ * as-is: plain HTML inside an .mdx file's body is standard Markdown/MDX,
+ * not something that needs converting.
+ *
+ * No `category` in the frontmatter: article-gen.ts's GeneratedArticle has no
+ * concept of one, and guessing wrong would be worse than the site's own
+ * fallback (confirmed in AZ's lib/mdx.ts: an absent category defaults to its
+ * first one rather than erroring).
+ */
+export async function writeMdxArticleFile(input: WriteMdxArticleInput): Promise<WriteArticleResult> {
+  const { site, article } = input;
+  assertSafeSlug(article.slug);
+
+  const blogDir = site.blog_dir.replace(/^\/+|\/+$/g, "");
+  const absoluteDir = path.join(site.repo_path, blogDir);
+  await mkdir(absoluteDir, { recursive: true });
+
+  const frontmatter = [
+    "---",
+    `title: ${yamlString(article.title)}`,
+    `description: ${yamlString(article.metaDescription)}`,
+    `date: ${yamlString(article.publishedAt.slice(0, 10))}`,
+    "---",
+    "",
+  ].join("\n");
+
+  const file = `${blogDir}/${article.slug}.mdx`;
+  await writeFile(path.join(site.repo_path, file), frontmatter + article.bodyHtml + "\n", "utf8");
+
+  return { files: [file] };
+}
+
 export type DeployResult = { ok: true; commit: string } | { ok: false; error: string };
 
 /**

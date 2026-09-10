@@ -19,7 +19,7 @@ import { generateArticle } from "@pulso/shared/article-gen";
 import { extractShell, EMPTY_SHELL, type SiteShell } from "@pulso/shared/article-html";
 import { limaToday } from "@pulso/shared/time";
 import { findBannedPhrase, findEmDash } from "./creative-helpers.js";
-import { writeArticleFiles, deployArticles } from "../site-publish.js";
+import { writeArticleFiles, writeMdxArticleFile, deployArticles } from "../site-publish.js";
 
 /** Only the morning evergreen slot becomes an article. See the skip below. */
 const ARTICLE_SLOT_INDEX = 0;
@@ -173,7 +173,12 @@ export async function runArticleAgentForCreative(
       }
 
       const article = generated.value;
-      const blogPath = `/${site.blog_dir.replace(/^\/+|\/+$/g, "")}`;
+      // blog_dir is where the FILE goes (relative to repo_path); the public
+      // URL path is usually the same folder (Aura's static site serves it
+      // directly) but not always — AZ's files sit in content/blog while its
+      // own Next.js route serves them at /blog. public_path overrides for
+      // exactly that case; null means "same as blog_dir", today's behavior.
+      const blogPath = `/${(site.public_path ?? site.blog_dir).replace(/^\/+|\/+$/g, "")}`;
       const baseUrl = site.base_url.replace(/\/$/, "");
 
       const row = await ctx.db.insertArticle({
@@ -193,30 +198,33 @@ export async function runArticleAgentForCreative(
       // has to look at it before it goes live, and the file on disk is what
       // a person would be looking at.
       const publishedAt = new Date().toISOString();
-      const written = await writeArticleFiles({
-        site,
-        businessName: tenant.name,
-        shell: await loadShell(site.repo_path, site.shell_page),
-        article: { ...article, heroImageUrl: brief.photoUrl, publishedAt },
-        // The index is rewritten whole from the database, so it can never
-        // drift from the pages that actually exist.
-        indexEntries: [
-          {
-            slug: article.slug,
-            title: article.title,
-            metaDescription: article.metaDescription,
-            publishedAt,
-            heroImageUrl: brief.photoUrl,
-          },
-          ...(await ctx.db.listPublishedArticles()).map((a) => ({
-            slug: a.slug,
-            title: a.title,
-            metaDescription: a.meta_description ?? "",
-            publishedAt: a.published_at ?? undefined,
-            heroImageUrl: a.hero_image_url ?? undefined,
-          })),
-        ],
-      });
+      const written =
+        site.format === "mdx"
+          ? await writeMdxArticleFile({ site, article: { ...article, publishedAt } })
+          : await writeArticleFiles({
+              site,
+              businessName: tenant.name,
+              shell: await loadShell(site.repo_path, site.shell_page),
+              article: { ...article, heroImageUrl: brief.photoUrl, publishedAt },
+              // The index is rewritten whole from the database, so it can
+              // never drift from the pages that actually exist.
+              indexEntries: [
+                {
+                  slug: article.slug,
+                  title: article.title,
+                  metaDescription: article.metaDescription,
+                  publishedAt,
+                  heroImageUrl: brief.photoUrl,
+                },
+                ...(await ctx.db.listPublishedArticles()).map((a) => ({
+                  slug: a.slug,
+                  title: a.title,
+                  metaDescription: a.meta_description ?? "",
+                  publishedAt: a.published_at ?? undefined,
+                  heroImageUrl: a.hero_image_url ?? undefined,
+                })),
+              ],
+            });
 
       let deployed = false;
       if (site.auto_publish) {

@@ -218,7 +218,16 @@ export async function runNewsAgentForTenant(
  */
 export async function runNewsTick(): Promise<void> {
   const service = createServiceRoleClient();
-  const { data: tenants, error } = await service.from("tenants").select("id").eq("status", "active");
+  // The news digest is purely social/afternoon-slot content — explicitly
+  // excluded from articles (see ARTICLE_SLOT_INDEX in article.ts) — so a
+  // social_paused tenant has nothing to gain from it and skips the LLM/API
+  // spend entirely, rather than generating content that publish-tick would
+  // just refuse to post anyway.
+  const { data: tenants, error } = await service
+    .from("tenants")
+    .select("id")
+    .eq("status", "active")
+    .eq("social_paused", false);
 
   if (error) {
     logger.error({ err: error }, "failed to list active tenants for news tick");

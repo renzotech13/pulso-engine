@@ -1026,7 +1026,9 @@ export type Database = {
           blog_dir: string
           created_at: string
           enabled: boolean
+          format: string
           id: string
+          public_path: string | null
           repo_path: string
           shell_page: string | null
           tenant_id: string
@@ -1038,7 +1040,9 @@ export type Database = {
           blog_dir?: string
           created_at?: string
           enabled?: boolean
+          format?: string
           id?: string
+          public_path?: string | null
           repo_path: string
           shell_page?: string | null
           tenant_id: string
@@ -1050,7 +1054,9 @@ export type Database = {
           blog_dir?: string
           created_at?: string
           enabled?: boolean
+          format?: string
           id?: string
+          public_path?: string | null
           repo_path?: string
           shell_page?: string | null
           tenant_id?: string
@@ -1132,6 +1138,7 @@ export type Database = {
           reels_paused: boolean
           rubro: string | null
           slug: string
+          social_paused: boolean
           status: string
           token_limit_daily: number | null
           token_limit_per_job: number | null
@@ -1149,6 +1156,7 @@ export type Database = {
           reels_paused?: boolean
           rubro?: string | null
           slug: string
+          social_paused?: boolean
           status?: string
           token_limit_daily?: number | null
           token_limit_per_job?: number | null
@@ -1166,6 +1174,7 @@ export type Database = {
           reels_paused?: boolean
           rubro?: string | null
           slug?: string
+          social_paused?: boolean
           status?: string
           token_limit_daily?: number | null
           token_limit_per_job?: number | null

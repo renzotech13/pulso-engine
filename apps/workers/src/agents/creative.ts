@@ -668,7 +668,13 @@ export async function runCreativeAgentForSlot(
         // Order matters here: the render route sets status back to 'ready'
         // on every fresh render, so approving before the fetch above would
         // just get silently overwritten.
-        if (tenant.hitl_mode === "full-auto") {
+        //
+        // social_paused skips ONLY this auto-approve-and-publish step, not
+        // the render above: a tenant can have its blog article (which reads
+        // this same rendered creative) keep going out while its social feed
+        // stays quiet — see the article agent, which runs off this same
+        // creative.generated event independent of hitl_mode.
+        if (tenant.hitl_mode === "full-auto" && !tenant.social_paused) {
           const rendered = await ctx.db.getCreativeById(creative.id);
           if (rendered?.status === "ready") {
             await ctx.db.updateCreativeStatus(creative.id, "approved");

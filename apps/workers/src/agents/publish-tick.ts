@@ -25,7 +25,11 @@ export async function runPublishTick(): Promise<void> {
     .from("tenants")
     .select("id")
     .eq("status", "active")
-    .eq("hitl_mode", "full-auto");
+    .eq("hitl_mode", "full-auto")
+    // A tenant can keep publishing its own blog (see article.ts, which runs
+    // off the same daily creative independent of hitl_mode) while its
+    // social feed stays quiet — this tick only ever touches Meta/Instagram.
+    .eq("social_paused", false);
 
   if (error) {
     logger.error({ err: error }, "failed to list full-auto tenants");

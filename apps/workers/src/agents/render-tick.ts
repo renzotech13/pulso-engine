@@ -138,11 +138,16 @@ export async function runRenderTick(): Promise<void> {
   }
   if (!stuck?.length) return;
 
+  // social_paused excluded here too: a recovered creative for that tenant
+  // still gets rendered above (harmless, and the blog article may need it),
+  // it just doesn't get auto-approved-and-published — same reasoning as
+  // creative.ts's own eager-publish gate.
   const { data: autoTenants } = await service
     .from("tenants")
     .select("id")
     .eq("status", "active")
-    .eq("hitl_mode", "full-auto");
+    .eq("hitl_mode", "full-auto")
+    .eq("social_paused", false);
   const fullAutoIds = new Set((autoTenants ?? []).map((t) => t.id));
 
   let recoveredCount = 0;
