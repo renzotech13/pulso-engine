@@ -1,0 +1,177 @@
+import { describe, expect, it } from "vitest";
+import {
+  assignAssetToScript,
+  buildEdl,
+  diceSimilarity,
+  normalizeText,
+  segmentIntoRuns,
+  textSimilarity,
+} from "../src/pipeline/alignment.js";
+import type { AudioAnalysis, ScriptVideo, TranscriptWord } from "../src/pipeline/types.js";
+
+function word(text: string, startSec: number, endSec: number): TranscriptWord {
+  return { text, startSec, endSec };
+}
+
+describe("normalizeText", () => {
+  it("strips accents, punctuation and case", () => {
+    expect(normalizeText("¡Hola, Ángel! ¿Cómo estás?")).toBe("hola angel como estas");
+  });
+});
+
+describe("textSimilarity / diceSimilarity", () => {
+  it("is 1 for identical text", () => {
+    expect(textSimilarity("hola mundo cruel", "hola mundo cruel")).toBe(1);
+  });
+
+  it("is 0 for completely unrelated text", () => {
+    expect(textSimilarity("formalizar tu empresa hoy", "receta de pastel de chocolate")).toBe(0);
+  });
+
+  it("rewards partial overlap between the two extremes", () => {
+    const score = textSimilarity("tu az bajo la manga", "guarda tu az bajo la manga siempre");
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThan(1);
+  });
+
+  it("treats two empty sets as identical, not undefined", () => {
+    expect(diceSimilarity(new Set(), new Set())).toBe(1);
+  });
+});
+
+describe("segmentIntoRuns", () => {
+  it("keeps one run when there is no silence between words", () => {
+    const words = [word("hola", 0, 0.3), word("mundo", 0.35, 0.7)];
+    const runs = segmentIntoRuns(words, []);
+    expect(runs).toHaveLength(1);
+    expect(runs[0]!.words).toHaveLength(2);
+  });
+
+  it("splits into two runs at a detected silence", () => {
+    const words = [word("hola", 0, 0.3), word("mundo", 3, 3.4)];
+    const runs = segmentIntoRuns(words, [{ startSec: 0.3, endSec: 3 }]);
+    expect(runs).toHaveLength(2);
+    expect(runs[0]!.words.map((w) => w.text)).toEqual(["hola"]);
+    expect(runs[1]!.words.map((w) => w.text)).toEqual(["mundo"]);
+  });
+
+  it("splits on a large timestamp gap even without a formally detected silence", () => {
+    const words = [word("hola", 0, 0.3), word("mundo", 5, 5.4)];
+    const runs = segmentIntoRuns(words, []);
+    expect(runs).toHaveLength(2);
+  });
+
+  it("returns nothing for an empty word list", () => {
+    expect(segmentIntoRuns([], [])).toEqual([]);
+  });
+});
+
+describe("assignAssetToScript", () => {
+  const scripts: ScriptVideo[] = [
+    { id: "video-1", titulo: "Formalización", mostrarTitulo: true, guion: "hoy te explico como sacar tu ruc en sunarp paso a paso", necesitaRevision: false },
+    { id: "video-2", titulo: "Multas", mostrarTitulo: true, guion: "esta es la multa que nadie te explica sobre tu declaracion mensual", necesitaRevision: false },
+  ];
+
+  function analysisWithText(assetPath: string, text: string): AudioAnalysis {
+    const words = text.split(" ").map((t, i) => word(t, i, i + 0.9));
+    return { assetPath, provider: "test", language: "es", words, silences: [] };
+  }
+
+  it("assigns a clip to the script its transcript resembles most", () => {
+    const assignment = assignAssetToScript(
+      analysisWithText("clip1.mp4", "hoy te explico como sacar tu ruc en sunarp"),
+      scripts,
+    );
+    expect(assignment.scriptVideoId).toBe("video-1");
+  });
+
+  it("leaves an unrelated clip unassigned rather than forcing a weak match", () => {
+    const assignment = assignAssetToScript(analysisWithText("clip3.mp4", "receta de pastel de chocolate casero"), scripts);
+    expect(assignment.scriptVideoId).toBeUndefined();
+  });
+
+  it("gives a filename hint matching the script id a boost", () => {
+    // Deliberately ambiguous text (touches both scripts a little) so the
+    // filename hint is what decides it.
+    const assignment = assignAssetToScript(
+      analysisWithText("video-2-take3.mp4", "esta es la multa y tambien tu ruc"),
+      scripts,
+    );
+    expect(assignment.scriptVideoId).toBe("video-2");
+  });
+});
+
+describe("buildEdl", () => {
+  const script: ScriptVideo = {
+    id: "video-1",
+    titulo: "Formalización",
+    mostrarTitulo: true,
+    guion: "hoy te explico como sacar tu ruc en sunarp paso a paso",
+    necesitaRevision: false,
+  };
+
+  it("drops a false start and keeps the last complete take of a repeated line", () => {
+    // "eh o sea" is a false start, unrelated to the script — dropped by the
+    // minRunScore filter. The line is then said twice; buildEdl should keep
+    // only the SECOND (chronologically later) attempt.
+    const words: TranscriptWord[] = [
+      word("eh", 0, 0.2),
+      word("o", 0.25, 0.35),
+      word("sea", 0.4, 0.6),
+      // silence
+      word("hoy", 3, 3.3),
+      word("te", 3.35, 3.5),
+      word("explico", 3.55, 4),
+      // silence (false start on the real line)
+      word("hoy", 6, 6.3),
+      word("te", 6.35, 6.5),
+      word("explico", 6.55, 7),
+      word("como", 7.05, 7.3),
+      word("sacar", 7.35, 7.7),
+      word("tu", 7.75, 7.9),
+      word("ruc", 7.95, 8.2),
+    ];
+    const silences = [
+      { startSec: 0.6, endSec: 3 },
+      { startSec: 4, endSec: 6 },
+    ];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences };
+
+    const edl = buildEdl(script, [analysis]);
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.lineaGuion).toContain("como sacar tu ruc");
+    expect(edl.segmentos[0]!.archivo).toBe("clip1.mp4");
+  });
+
+  it("orders segments by their position in the script, not recording order", () => {
+    // Second half of the line recorded first, first half recorded second —
+    // the EDL should still read in script order.
+    const words: TranscriptWord[] = [
+      word("paso", 0, 0.2),
+      word("a", 0.25, 0.3),
+      word("paso", 0.35, 0.6),
+      // silence
+      word("hoy", 3, 3.2),
+      word("te", 3.25, 3.4),
+      word("explico", 3.45, 3.8),
+    ];
+    const silences = [{ startSec: 0.6, endSec: 3 }];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences };
+
+    const edl = buildEdl(script, [analysis], { minRunScore: 0.05 });
+
+    expect(edl.segmentos.map((s) => s.lineaGuion)).toEqual(["hoy te explico", "paso a paso"]);
+  });
+
+  it("returns an empty EDL when nothing matches the script well enough", () => {
+    const analysis: AudioAnalysis = {
+      assetPath: "clip1.mp4",
+      provider: "test",
+      language: "es",
+      words: [word("receta", 0, 0.3), word("de", 0.35, 0.45), word("pastel", 0.5, 0.8)],
+      silences: [],
+    };
+    expect(buildEdl(script, [analysis]).segmentos).toHaveLength(0);
+  });
+});

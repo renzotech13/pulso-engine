@@ -1,5 +1,5 @@
 import { AbsoluteFill, Img, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import type { StoryPromoProps } from "./story-promo.schema";
+import type { StoryPromoProps } from "./story-promo.schema.js";
 
 export {
   storyPromoSchema,
@@ -7,7 +7,7 @@ export {
   STORY_PROMO_FPS,
   STORY_PROMO_DURATION_FRAMES,
   type StoryPromoProps,
-} from "./story-promo.schema";
+} from "./story-promo.schema.js";
 
 /**
  * Simpler than Reel on purpose — one message, slow ken-burns zoom on the

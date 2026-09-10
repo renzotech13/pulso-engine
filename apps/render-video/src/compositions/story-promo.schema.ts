@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { brandSchema } from "./brand-schema";
+import { brandSchema } from "./brand-schema.js";
 
 // Same split as reel.schema.ts — kept free of any "remotion" import.
 export const storyPromoSchema = z.object({

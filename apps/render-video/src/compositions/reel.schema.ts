@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { brandSchema } from "./brand-schema";
+import { brandSchema } from "./brand-schema.js";
 
 // Split from Reel.tsx on purpose: this file must stay free of any "remotion"
 // import. Next.js route handlers (React Server Components condition) can't

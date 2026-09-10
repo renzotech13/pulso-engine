@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@pulso/db/worker";
-import { renderLocal } from "./render";
-import { REMOTION_REGISTRY, isKnownRemotionRef } from "./registry";
+import { renderLocal } from "./render.js";
+import { REMOTION_REGISTRY, isKnownRemotionRef } from "./registry.js";
 
 // Vercel's serverless runtime can't run the video render step today —
 // apps/render-templates/src/lib/remotion-video.ts spawns `npx tsx cli.ts`

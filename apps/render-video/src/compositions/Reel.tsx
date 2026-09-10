@@ -1,7 +1,7 @@
 import { AbsoluteFill, Img, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import type { ReelProps } from "./reel.schema";
+import type { ReelProps } from "./reel.schema.js";
 
-export { reelSchema, REEL_SIZE, REEL_FPS, REEL_DURATION_FRAMES, type ReelProps } from "./reel.schema";
+export { reelSchema, REEL_SIZE, REEL_FPS, REEL_DURATION_FRAMES, type ReelProps } from "./reel.schema.js";
 
 /**
  * Same brief fields as SocialPostTemplate (Vía A), animated: headline

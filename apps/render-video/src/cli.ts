@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
-import { renderLocal } from "./render";
-import { isKnownRemotionRef } from "./registry";
+import { renderLocal } from "./render.js";
+import { isKnownRemotionRef } from "./registry.js";
 
 // Invoked as a subprocess (via tsx), never imported — see index.ts for why.
 const [, , compositionId, propsJson, outputPath] = process.argv;

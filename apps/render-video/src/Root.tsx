@@ -1,12 +1,13 @@
 import { Composition } from "remotion";
-import { Reel, REEL_DURATION_FRAMES, REEL_FPS, REEL_SIZE, reelSchema } from "./compositions/Reel";
+import { Reel, REEL_DURATION_FRAMES, REEL_FPS, REEL_SIZE, reelSchema } from "./compositions/Reel.js";
 import {
   STORY_PROMO_DURATION_FRAMES,
   STORY_PROMO_FPS,
   STORY_PROMO_SIZE,
   StoryPromo,
   storyPromoSchema,
-} from "./compositions/StoryPromo";
+} from "./compositions/StoryPromo.js";
+import { SubtitleOverlay, subtitleOverlaySchema } from "./compositions/SubtitleOverlay.js";
 
 const DEFAULT_BRAND = {
   logoUrl: null,
@@ -37,6 +38,25 @@ export function RemotionRoot() {
         height={STORY_PROMO_SIZE.height}
         schema={storyPromoSchema}
         defaultProps={{ brand: DEFAULT_BRAND, message: "20% en masajes" }}
+      />
+      <Composition
+        id="subtitle-overlay"
+        component={SubtitleOverlay}
+        schema={subtitleOverlaySchema}
+        // Fixed values here are placeholders for the Studio preview only —
+        // calculateMetadata below overrides them for every real render with
+        // whatever this specific project's video actually measures.
+        durationInFrames={150}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ bloques: [], durationSec: 5, fps: 30, width: 1080, height: 1920 }}
+        calculateMetadata={({ props }) => ({
+          durationInFrames: Math.max(1, Math.round(props.durationSec * props.fps)),
+          fps: props.fps,
+          width: props.width,
+          height: props.height,
+        })}
       />
     </>
   );
