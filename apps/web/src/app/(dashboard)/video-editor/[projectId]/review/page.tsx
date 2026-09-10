@@ -17,6 +17,10 @@ interface EdlSegment {
   lineaGuion: string;
   guionTexto?: string;
 }
+interface Edl {
+  videoId: string;
+  segmentos: EdlSegment[];
+}
 interface SubtitleBlock {
   startSec: number;
   endSec: number;
@@ -67,7 +71,7 @@ export default async function VideoProjectReviewPage({ params }: { params: Promi
       )}
 
       {(videos ?? []).map((video) => {
-        const edl = (video.edl as EdlSegment[] | null) ?? [];
+        const edl = ((video.edl as Edl | null)?.segmentos ?? []);
         const bloques = ((video.subtitulos as { bloques: SubtitleBlock[] } | null) ?? { bloques: [] }).bloques;
         const readOnly = video.status !== "en_revision";
 

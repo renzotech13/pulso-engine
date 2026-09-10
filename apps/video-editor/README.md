@@ -7,8 +7,11 @@ pasos independientes que escriben su propio JSON, así que cambiar el preset
 y volver a renderizar no obliga a repetir lo anterior (transcribir de nuevo,
 sobre todo, es lo más lento).
 
-**Estado:** Fase 3 (interfaz y jobs) completa. Falta el trabajo de calidad
-final (Fase 4: pruebas end-to-end automatizadas, este README terminado).
+**Estado:** completo (Fases 0-4) — probado con material real (voz
+sintetizada real, no tonos) tanto desde la CLI como desde el dashboard,
+incluyendo la subida de archivos real por el navegador. Pendiente, fuera del
+alcance de este paquete: correrlo como servicio permanente de `launchd` (hoy
+se levanta a mano con `pnpm dev` para desarrollo/pruebas).
 El pipeline (Fases 1-2) es el mismo que corre desde la CLI o desde el
 dashboard — solo cambia quién lo orquesta y dónde guarda sus resultados
 (archivos locales para la CLI, Supabase para el dashboard). Ver
@@ -55,6 +58,35 @@ Cada corrida deja todo en `<out>/`:
   preset y volver a renderizar sin retranscribir.
 - `output/<video>.mp4`, `.srt`, `.manifest.json` — uno por cada video que el
   PDF describe.
+
+## Pruebas
+
+```bash
+pnpm --filter @pulso/video-editor test
+```
+
+Dos capas:
+
+- **Unitarias** (`tests/alignment.test.ts`, `subtitles.test.ts`,
+  `script-pdf.test.ts`, `preset.test.ts`) — cubren la alineación guion/audio
+  (incluye los casos reales que ya rompieron la implementación una vez:
+  acrónimos partidos en dos palabras, falsos comienzos, tomas repetidas),
+  el armado de subtítulos y el reemplazo por la ortografía del guion, el
+  wrap de líneas/SRT, y la validación de presets.
+- **End-to-end** (`tests/e2e.test.ts`) — corre `processProject` completo sin
+  mockear nada: genera una toma real (voz sintetizada con `say`, no un tono),
+  un PDF real (`cupsfilter`, igual que cualquier guion real) y una música de
+  fondo, transcribe con whisper-cli de verdad, arma el EDL, renderiza con
+  Remotion y valida con `ffprobe` que el MP4 resultante es reproducible y
+  trae audio. Una segunda pasada confirma que cambiar de preset reutiliza el
+  artefacto de audio en vez de retranscribir (la promesa central de este
+  paquete: separar transcripción de render).
+
+  Solo corre en macOS con ffmpeg, whisper-cli + `WHISPER_MODEL_PATH`, y
+  `cupsfilter` (viene con macOS) disponibles — los mismos requisitos que usar
+  el editor de video en absoluto. Si falta alguno, se omite sola con un
+  aviso (`[e2e] omitida: ...`) en vez de fallar — así `pnpm test` no se
+  rompe en un entorno sin esas herramientas (CI, por ejemplo).
 
 ## Convención del PDF de guiones
 

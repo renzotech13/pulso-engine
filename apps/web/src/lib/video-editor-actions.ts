@@ -18,6 +18,10 @@ interface EdlSegment {
   videoId: string;
   guionTexto?: string;
 }
+interface Edl {
+  videoId: string;
+  segmentos: EdlSegment[];
+}
 interface SubtitleBlock {
   startSec: number;
   endSec: number;
@@ -97,8 +101,8 @@ async function saveVideoReviewActionImpl(formData: FormData): Promise<void> {
   // Segments: one "segIncluded_<i>" checkbox + "segInicio_<i>"/"segFin_<i>"
   // text fields per row, indexed the same way the review form rendered
   // them — excluding one just means it's missing from the array we save.
-  const originalEdl = (video.edl as EdlSegment[] | null) ?? [];
-  const edl: EdlSegment[] = originalEdl
+  const originalEdl = (video.edl as Edl | null) ?? { videoId, segmentos: [] };
+  const segmentos: EdlSegment[] = originalEdl.segmentos
     .map((segment, i) => {
       const included = formData.get(`segIncluded_${i}`) === "on";
       if (!included) return null;
@@ -108,7 +112,9 @@ async function saveVideoReviewActionImpl(formData: FormData): Promise<void> {
     })
     .filter((s): s is EdlSegment => s !== null);
 
-  if (edl.length === 0) throw new Error("no podés dejar la lista de segmentos vacía");
+  if (segmentos.length === 0) throw new Error("no podés dejar la lista de segmentos vacía");
+
+  const edl: Edl = { ...originalEdl, segmentos };
 
   const originalSubs = (video.subtitulos as { bloques: SubtitleBlock[] } | null) ?? { bloques: [] };
   const bloques: SubtitleBlock[] = originalSubs.bloques.map((block, i) => {
