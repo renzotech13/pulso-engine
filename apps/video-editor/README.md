@@ -7,12 +7,12 @@ pasos independientes que escriben su propio JSON, así que cambiar el preset
 y volver a renderizar no obliga a repetir lo anterior (transcribir de nuevo,
 sobre todo, es lo más lento).
 
-**Estado:** Fase 2 (estilos, título y música) completa. Ver `PLAN.md` — no
-existe todavía, se agrega en Fase 4 — para el resto de fases. Falta la
-interfaz (las tres pantallas, Fase 3) y el trabajo de calidad final
-(pruebas end-to-end automatizadas, este README completo — Fase 4); el
-pipeline en sí ya cubre ingesta → guion → transcripción → alineación → EDL
-→ título/subtítulos con estilo → música → render final.
+**Estado:** Fase 3 (interfaz y jobs) completa. Falta el trabajo de calidad
+final (Fase 4: pruebas end-to-end automatizadas, este README terminado).
+El pipeline (Fases 1-2) es el mismo que corre desde la CLI o desde el
+dashboard — solo cambia quién lo orquesta y dónde guarda sus resultados
+(archivos locales para la CLI, Supabase para el dashboard). Ver
+`src/db-pipeline.ts` para la versión que usa el dashboard.
 
 ## Requisitos
 
@@ -114,3 +114,49 @@ real (`sidechaincompress`: el volumen de la música baja cuando hay voz, no
 un volumen fijo más bajo todo el tiempo) más fade-in/fade-out. Sin
 `--music`, igual se aplica el `loudnorm` — "audio normalizado" no depende
 de que haya musicalización.
+
+## El dashboard (Fase 3)
+
+Tres pantallas en `apps/web`, bajo `/video-editor`: **Nuevo proyecto** (sube
+videos/PDF/música directo del navegador a Storage — un Server Action no
+aguanta archivos de varios GB), **Revisión** (guion asignado, título on/off,
+lista de segmentos con inicio/fin editables y opción de excluir, bloques de
+subtítulos editables con los de baja confianza marcados) y **Resultados**
+(descarga MP4/SRT, re-renderizar con otro preset).
+
+**Cómo arranca el trabajo pesado:** el dashboard nunca toca Redis/BullMQ
+directamente — llama una función RPC de Postgres
+(`request_video_project_processing`, `request_video_render`) que inserta un
+evento en la tabla `events`, el mismo outbox que ya usa el resto de Pulso
+Engine. El dispatcher que YA corre dentro de `apps/workers`
+(`src/dispatcher.ts`) enruta ese evento a la cola `video-editor` de BullMQ
+sin cambios — no hace falta un segundo poller. Este paquete solo corre su
+propio *worker* (`src/main.ts`, `pnpm --filter @pulso/video-editor dev`),
+consumiendo esa cola, como un servicio local más (launchd), igual que
+`apps/workers`/`apps/render-templates`.
+
+**Dos eventos, dos trabajos:**
+- `video.project.requested` → `processProjectJob` (2.1-2.4): descarga el
+  PDF y las tomas desde Storage, valida, transcribe, alinea, y deja un
+  `video_project_video` por cada video que el guion describe, en
+  `en_revision`.
+- `video.render.requested` → `renderVideoJob` (2.5-2.8): vuelve a descargar
+  solo lo que la EDL (ya editada en Revisión, si hiciera falta) todavía
+  referencia, y renderiza — nunca retranscribe.
+
+**Storage:** dos buckets privados, `video-editor-assets` (crudo: videos,
+PDF, música) y `video-editor-output` (render final + `.srt`). Privados
+porque el material sin editar o sin aprobar no tiene por qué quedar
+accesible por una URL pública adivinable, a diferencia de `product-media`/
+`creative-assets` — toda lectura pasa por una URL firmada de corta duración
+que el dashboard genera al momento de mostrar la página.
+
+**Presets desde el dashboard:** `video_presets` sigue el mismo patrón
+`tenant_id null = global` que `render_templates`. Corré
+`pnpm --filter @pulso/video-editor seed-preset` una vez (después de aplicar
+la migración) para cargar `config/presets/default.json` como preset global.
+
+**Límite conocido:** la subida usa `supabase.storage.upload()` directo, sin
+reanudación — el tamaño máximo de archivo lo define el límite del proyecto
+de Supabase (no es ilimitado). Migrar a subida reanudable (TUS) queda para
+cuando haga falta con material real.

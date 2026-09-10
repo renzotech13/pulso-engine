@@ -46,6 +46,19 @@ export const eventCatalog = {
     payload: z.object({ creativeId: z.string().uuid() }),
     queue: "publish",
   },
+  // Editor de Video (Fase 3) — su propio worker (apps/video-editor) corre
+  // como un servicio local separado (Fase 0), pero el ruteo outbox→BullMQ
+  // sigue centralizado en apps/workers/src/dispatcher.ts, que ya enruta
+  // genéricamente cualquier evento a la cola que su entrada del catálogo
+  // indique — no hace falta un segundo poller contra la misma tabla.
+  "video.project.requested": {
+    payload: z.object({ projectId: z.string().uuid() }),
+    queue: "video-editor",
+  },
+  "video.render.requested": {
+    payload: z.object({ projectId: z.string().uuid(), videoId: z.string().uuid() }),
+    queue: "video-editor",
+  },
 } as const;
 
 export type EventType = keyof typeof eventCatalog;

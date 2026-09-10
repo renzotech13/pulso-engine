@@ -7,15 +7,19 @@
     "./pipeline": "./src/pipeline/index.ts"
   },
   "scripts": {
+    "dev": "tsx watch src/main.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "process": "tsx src/cli.ts"
+    "process": "tsx src/cli.ts",
+    "seed-preset": "tsx src/seed-default-preset.ts"
   },
   "dependencies": {
     "@pulso/db": "workspace:*",
     "@pulso/render-video": "workspace:*",
     "@pulso/shared": "workspace:*",
+    "bullmq": "^5.34.0",
+    "ioredis": "^5.4.2",
     "pdf-parse": "^1.1.1",
     "zod": "^3.24.1"
   },

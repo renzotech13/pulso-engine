@@ -1181,6 +1181,224 @@ export type Database = {
           },
         ]
       }
+      video_assets: {
+        Row: {
+          analysis: Json | null
+          created_at: string
+          error_message: string | null
+          filename: string
+          id: string
+          path: string
+          probe: Json | null
+          project_id: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          analysis?: Json | null
+          created_at?: string
+          error_message?: string | null
+          filename: string
+          id?: string
+          path: string
+          probe?: Json | null
+          project_id: string
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          analysis?: Json | null
+          created_at?: string
+          error_message?: string | null
+          filename?: string
+          id?: string
+          path?: string
+          probe?: Json | null
+          project_id?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_assets_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_assets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_presets: {
+        Row: {
+          config: Json
+          created_at: string
+          id: string
+          nombre: string
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          config: Json
+          created_at?: string
+          id?: string
+          nombre: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          id?: string
+          nombre?: string
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_presets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_project_videos: {
+        Row: {
+          created_at: string
+          edl: Json
+          error_message: string | null
+          guion: string
+          id: string
+          mostrar_titulo: boolean
+          necesita_revision: boolean
+          output_mp4_path: string | null
+          output_srt_path: string | null
+          preview_path: string | null
+          project_id: string
+          script_id: string
+          status: string
+          subtitulos: Json
+          tenant_id: string
+          titulo: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          edl?: Json
+          error_message?: string | null
+          guion: string
+          id?: string
+          mostrar_titulo?: boolean
+          necesita_revision?: boolean
+          output_mp4_path?: string | null
+          output_srt_path?: string | null
+          preview_path?: string | null
+          project_id: string
+          script_id: string
+          status?: string
+          subtitulos?: Json
+          tenant_id: string
+          titulo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          edl?: Json
+          error_message?: string | null
+          guion?: string
+          id?: string
+          mostrar_titulo?: boolean
+          necesita_revision?: boolean
+          output_mp4_path?: string | null
+          output_srt_path?: string | null
+          preview_path?: string | null
+          project_id?: string
+          script_id?: string
+          status?: string
+          subtitulos?: Json
+          tenant_id?: string
+          titulo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_project_videos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "video_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_project_videos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_projects: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          music_path: string | null
+          nombre: string
+          pdf_path: string
+          preset_id: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          music_path?: string | null
+          nombre: string
+          pdf_path: string
+          preset_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          music_path?: string | null
+          nombre?: string
+          pdf_path?: string
+          preset_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_projects_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "video_presets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "video_projects_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1238,6 +1456,14 @@ export type Database = {
       }
       request_creative_publish: {
         Args: { target_creative_id: string }
+        Returns: undefined
+      }
+      request_video_project_processing: {
+        Args: { target_project_id: string }
+        Returns: undefined
+      }
+      request_video_render: {
+        Args: { target_video_id: string }
         Returns: undefined
       }
     }

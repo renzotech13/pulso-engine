@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { BarChart3, CalendarDays, Gauge, Link2, Newspaper, Package, Palette } from "lucide-react";
+import { BarChart3, CalendarDays, Clapperboard, Gauge, Link2, Newspaper, Package, Palette } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant-context";
 import { isAdminEmail } from "@/lib/admin";
 import { readFlash } from "@/lib/flash";
@@ -17,6 +17,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/catalog", label: "Catálogo", icon: <Package size={18} /> },
   { href: "/brand-kit", label: "Marca", icon: <Palette size={18} /> },
   { href: "/connections", label: "Conexiones", icon: <Link2 size={18} /> },
+  { href: "/video-editor", label: "Editor de Video", icon: <Clapperboard size={18} /> },
 ];
 
 const OPERATOR_NAV_ITEMS: NavItem[] = [

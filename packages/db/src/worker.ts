@@ -72,6 +72,14 @@ type ArticleRow = Database["public"]["Tables"]["articles"]["Row"];
 type ArticleInsert = Database["public"]["Tables"]["articles"]["Insert"];
 type ArticleUpdate = Database["public"]["Tables"]["articles"]["Update"];
 type BrandKitRow = Database["public"]["Tables"]["brand_kits"]["Row"];
+type VideoProjectRow = Database["public"]["Tables"]["video_projects"]["Row"];
+type VideoProjectUpdate = Database["public"]["Tables"]["video_projects"]["Update"];
+type VideoAssetRow = Database["public"]["Tables"]["video_assets"]["Row"];
+type VideoAssetUpdate = Database["public"]["Tables"]["video_assets"]["Update"];
+type VideoProjectVideoRow = Database["public"]["Tables"]["video_project_videos"]["Row"];
+type VideoProjectVideoInsert = Database["public"]["Tables"]["video_project_videos"]["Insert"];
+type VideoProjectVideoUpdate = Database["public"]["Tables"]["video_project_videos"]["Update"];
+type VideoPresetRow = Database["public"]["Tables"]["video_presets"]["Row"];
 
 /**
  * Tenant-scoped handle for agent code. Since service_role bypasses RLS,
@@ -167,6 +175,18 @@ export interface TenantScopedClient {
    * can never drift from what was actually written.
    */
   listPublishedArticles(): Promise<ArticleRow[]>;
+
+  // --- Editor de Video (Fase 3) ------------------------------------------
+
+  getVideoProject(id: string): Promise<VideoProjectRow | null>;
+  updateVideoProject(id: string, patch: Omit<VideoProjectUpdate, "tenant_id">): Promise<void>;
+  listVideoAssets(projectId: string): Promise<VideoAssetRow[]>;
+  updateVideoAsset(id: string, patch: Omit<VideoAssetUpdate, "tenant_id">): Promise<void>;
+  listVideoProjectVideos(projectId: string): Promise<VideoProjectVideoRow[]>;
+  insertVideoProjectVideo(row: Omit<VideoProjectVideoInsert, "tenant_id">): Promise<VideoProjectVideoRow>;
+  updateVideoProjectVideo(id: string, patch: Omit<VideoProjectVideoUpdate, "tenant_id">): Promise<void>;
+  /** Tenant's own preset if the id belongs to them, else the global one (tenant_id null) — same "override or global" shape as getAgentRegistration. */
+  getVideoPreset(id: string): Promise<VideoPresetRow | null>;
 }
 
 export function createTenantScopedClient(
@@ -699,6 +719,108 @@ export function createTenantScopedClient(
         throw new TenantIsolationError(`failed to list articles for tenant ${tenantId}`, error);
       }
       return data ?? [];
+    },
+
+    async getVideoProject(id) {
+      const { data, error } = await client
+        .from("video_projects")
+        .select("*")
+        .eq("id", id)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (error) {
+        throw new TenantIsolationError(`failed to get video_project ${id} for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async updateVideoProject(id, patch) {
+      const { error } = await client
+        .from("video_projects")
+        .update(patch)
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_project ${id} for tenant ${tenantId}`, error);
+      }
+    },
+
+    async listVideoAssets(projectId) {
+      const { data, error } = await client
+        .from("video_assets")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("tenant_id", tenantId)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list video_assets for project ${projectId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async updateVideoAsset(id, patch) {
+      const { error } = await client
+        .from("video_assets")
+        .update(patch)
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_asset ${id} for tenant ${tenantId}`, error);
+      }
+    },
+
+    async listVideoProjectVideos(projectId) {
+      const { data, error } = await client
+        .from("video_project_videos")
+        .select("*")
+        .eq("project_id", projectId)
+        .eq("tenant_id", tenantId)
+        .order("script_id", { ascending: true });
+
+      if (error) {
+        throw new TenantIsolationError(`failed to list video_project_videos for project ${projectId}`, error);
+      }
+      return data ?? [];
+    },
+
+    async insertVideoProjectVideo(row) {
+      const { data, error } = await client
+        .from("video_project_videos")
+        .insert({ ...row, tenant_id: tenantId })
+        .select()
+        .single();
+
+      if (error || !data) {
+        throw new TenantIsolationError(`failed to insert video_project_video for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async updateVideoProjectVideo(id, patch) {
+      const { error } = await client
+        .from("video_project_videos")
+        .update(patch)
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_project_video ${id} for tenant ${tenantId}`, error);
+      }
+    },
+
+    async getVideoPreset(id) {
+      const { data, error } = await client.from("video_presets").select("*").eq("id", id).maybeSingle();
+
+      if (error) {
+        throw new TenantIsolationError(`failed to get video_preset ${id}`, error);
+      }
+      if (!data) return null;
+      if (data.tenant_id !== null && data.tenant_id !== tenantId) return null;
+      return data;
     },
   };
 }

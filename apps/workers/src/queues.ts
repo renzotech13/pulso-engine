@@ -2,7 +2,7 @@ import { Queue } from "bullmq";
 import { Redis } from "ioredis";
 import { loadConfig } from "@pulso/shared/config";
 
-export type QueueName = "core" | "render" | "publish" | "ads" | "analytics" | "whatsapp-outbound";
+export type QueueName = "core" | "render" | "publish" | "ads" | "analytics" | "whatsapp-outbound" | "video-editor";
 
 let connection: Redis | undefined;
 
