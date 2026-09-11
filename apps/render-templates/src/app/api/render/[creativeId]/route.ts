@@ -4,7 +4,7 @@ import { isKnownRemotionRef, REMOTION_REGISTRY } from "@pulso/render-video";
 import { screenshotPage } from "@/lib/browser";
 import { getCreativeForRender, getRenderTemplateForCreative, resolveBrand } from "@/lib/data";
 import { renderRemotionComposition } from "@/lib/remotion-video";
-import { TEMPLATE_SIZES, isKnownTemplateRef } from "@/templates/registry";
+import { TEMPLATE_SIZES, isKnownTemplateRef, type TemplateRef } from "@/templates/registry";
 
 /**
  * Lazy generation, never batch: nothing renders until someone actually
@@ -40,12 +40,25 @@ export async function GET(
   }
 
   const isVideo = templateInfo.engine === "remotion";
-  const isCarousel = !isVideo && templateInfo.componentRef === "carousel";
+  // "carousel-az" (a tenant-scoped variant, same shape/handler, different
+  // component) needs the SAME multi-slide handling as the global "carousel"
+  // — matched by prefix rather than listing every tenant variant here.
+  const isCarousel = !isVideo && templateInfo.componentRef.startsWith("carousel");
   const isPhotoFrame = !isVideo && templateInfo.componentRef === "photo-frame";
   const isStudentShowcase = !isVideo && templateInfo.componentRef === "student-showcase";
 
   if (isCarousel) {
-    return handleCarouselRender(request, service, creativeId, creative.tenant_id, creative.brief);
+    if (!isKnownTemplateRef(templateInfo.componentRef)) {
+      return new Response("unknown carousel template", { status: 422 });
+    }
+    return handleCarouselRender(
+      request,
+      service,
+      creativeId,
+      creative.tenant_id,
+      creative.brief,
+      templateInfo.componentRef,
+    );
   }
 
   if (isPhotoFrame) {
@@ -164,6 +177,7 @@ async function handleCarouselRender(
   creativeId: string,
   tenantId: string,
   brief: unknown,
+  templateRef: TemplateRef,
 ): Promise<Response> {
   const slides = (brief as { slides?: unknown })?.slides;
   if (!Array.isArray(slides) || slides.length === 0) {
@@ -194,8 +208,8 @@ async function handleCarouselRender(
     const assetUrls: string[] = [];
 
     for (let i = 0; i < slideCount; i++) {
-      const templateUrl = `${origin}/t/carousel?creative=${creativeId}&slide=${i}`;
-      const output = await screenshotPage(templateUrl, TEMPLATE_SIZES.carousel);
+      const templateUrl = `${origin}/t/${templateRef}?creative=${creativeId}&slide=${i}`;
+      const output = await screenshotPage(templateUrl, TEMPLATE_SIZES[templateRef]);
 
       const assetPath = `${tenantId}/${prefix}${i}.png`;
       const { error: uploadError } = await service.storage

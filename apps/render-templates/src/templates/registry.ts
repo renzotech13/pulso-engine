@@ -1,6 +1,7 @@
 import { SocialPostTemplate, SOCIAL_POST_SIZE, type SocialPostProps } from "./social-post";
 import { SocialPostTemplateAZ } from "./social-post-az";
 import { CarouselTemplate, CAROUSEL_SIZE, type CarouselProps } from "./carousel";
+import { CarouselTemplateAZ } from "./carousel-az";
 import { PhotoFrameTemplate, type PhotoFrameProps } from "./photo-frame";
 import {
   StudentShowcaseTemplate,
@@ -18,6 +19,7 @@ export const TEMPLATE_REGISTRY = {
   "social-post": SocialPostTemplate,
   "social-post-az": SocialPostTemplateAZ,
   carousel: CarouselTemplate,
+  "carousel-az": CarouselTemplateAZ,
   "photo-frame": PhotoFrameTemplate,
   "student-showcase": StudentShowcaseTemplate,
 } satisfies Record<string, (props: never) => React.JSX.Element>;
@@ -31,6 +33,7 @@ export const TEMPLATE_SIZES = {
   "social-post": SOCIAL_POST_SIZE,
   "social-post-az": SOCIAL_POST_SIZE,
   carousel: CAROUSEL_SIZE,
+  "carousel-az": CAROUSEL_SIZE,
   "photo-frame": { width: 1080, height: 1080 },
   "student-showcase": STUDENT_SHOWCASE_SIZE,
 } satisfies Record<keyof typeof TEMPLATE_REGISTRY, { width: number; height: number }>;

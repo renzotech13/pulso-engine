@@ -104,7 +104,12 @@ export function buildBriefForComponentRef(
     return brief;
   }
 
-  if (componentRef === "carousel") {
+  // Matched by prefix, not exact equality: a tenant-scoped variant like
+  // "carousel-az" (a different render_templates.component_ref, same brief
+  // shape) still needs the slides/photoUrls brief here, not the generic
+  // headline/subheadline one below — same reasoning as route.ts's own
+  // isCarousel check.
+  if (componentRef.startsWith("carousel")) {
     const brief: Record<string, unknown> = { slides: copy.slides ?? [] };
     // One photo per slide (each themed to that slide's own text) rather than
     // a single shared photoUrl — a slide with no photo of its own (Gemini

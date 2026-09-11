@@ -81,7 +81,9 @@ export default async function TemplatePage({
     return <Component brand={brand} {...omitUndefined(templateProps)} />;
   }
 
-  if (templateId === "carousel") {
+  // "carousel-az" is AZ Estudio Contable's own tenant-scoped variant, same
+  // reasoning as "social-post-az" above.
+  if (templateId === "carousel" || templateId === "carousel-az") {
     const brief = carouselBriefSchema.safeParse(creative.brief);
     if (!brief.success) notFound();
 
@@ -96,7 +98,7 @@ export default async function TemplatePage({
       ...(colorPrimary && colorSecondary ? { colorPrimary, colorSecondary } : {}),
     };
 
-    const Component = TEMPLATE_REGISTRY["carousel"];
+    const Component = TEMPLATE_REGISTRY[templateId];
     return (
       <Component
         brand={brand}
