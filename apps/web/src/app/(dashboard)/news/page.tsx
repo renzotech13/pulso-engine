@@ -6,6 +6,7 @@ import { formatRelative, limaToday } from "@/lib/labels";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { SubmitButton } from "@/components/submit-button";
 import { UseIdeaForm } from "./use-idea-form";
 
@@ -36,16 +37,24 @@ export default async function NewsPage() {
   const ctx = await getTenantContext();
   const supabase = await createSupabaseServerClient();
 
-  const [{ data: suggestions }, { data: plannedSlots }, { data: tenant }] = await Promise.all([
-    supabase
-      .from("news_suggestions")
-      .select("*")
-      .eq("tenant_id", ctx.tenantId)
-      .eq("status", "pending")
-      .order("created_at", { ascending: false }),
-    supabase.from("content_calendar").select("date").eq("tenant_id", ctx.tenantId),
-    supabase.from("tenants").select("publish_hours").eq("id", ctx.tenantId).maybeSingle(),
-  ]);
+  const [{ data: suggestions }, { data: recentDecided }, { data: plannedSlots }, { data: tenant }] =
+    await Promise.all([
+      supabase
+        .from("news_suggestions")
+        .select("*")
+        .eq("tenant_id", ctx.tenantId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("news_suggestions")
+        .select("*")
+        .eq("tenant_id", ctx.tenantId)
+        .in("status", ["used", "dismissed"])
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase.from("content_calendar").select("date").eq("tenant_id", ctx.tenantId),
+      supabase.from("tenants").select("publish_hours, hitl_mode").eq("id", ctx.tenantId).maybeSingle(),
+    ]);
 
   const slotsPerDay = new Map<string, number>();
   for (const slot of plannedSlots ?? []) {
@@ -54,7 +63,14 @@ export default async function NewsPage() {
   const capacity = Math.max(tenant?.publish_hours?.length ?? 0, 1);
   const defaultDate = nextFreeDate(slotsPerDay, capacity, limaToday());
 
+  // full-auto ya elige la mejor sugerencia pendiente por su cuenta todos los
+  // días (ver news-slot.ts) — pedirle a alguien que además la apruebe acá
+  // sería una aprobación de mentira, nunca se llega a tiempo antes de que el
+  // agente ya haya elegido. approve-all/approve-creatives sí necesitan que
+  // una persona elija, así que mantienen los botones de siempre.
+  const isFullAuto = tenant?.hitl_mode === "full-auto";
   const pending = suggestions ?? [];
+  const decided = recentDecided ?? [];
   const now = new Date();
 
   return (
@@ -62,7 +78,11 @@ export default async function NewsPage() {
       <PageHeader
         eyebrow={ctx.tenantName}
         title="Noticias"
-        description={`${pendingLabel(pending.length)} El agente revisa los titulares cada día y te deja acá los que le sirven a tu negocio, con una idea concreta para cada uno. Nada se publica solo: tú eliges cuáles usar y para qué día.`}
+        description={
+          isFullAuto
+            ? `${pendingLabel(pending.length)} El agente revisa los titulares cada día y elige solo la que mejor le sirve a tu negocio para armar el post — no hace falta aprobar nada acá. Abajo queda el historial de cuáles se usaron.`
+            : `${pendingLabel(pending.length)} El agente revisa los titulares cada día y te deja acá los que le sirven a tu negocio, con una idea concreta para cada uno. Nada se publica solo: tú eliges cuáles usar y para qué día.`
+        }
       />
 
       {pending.length === 0 ? (
@@ -97,19 +117,45 @@ export default async function NewsPage() {
                 <p className="mt-1">{s.angle}</p>
               </div>
 
-              <div className="mt-4 flex flex-wrap items-end gap-3">
-                <UseIdeaForm tenantId={ctx.tenantId} suggestionId={s.id} defaultDate={defaultDate} />
+              {isFullAuto ? (
+                <p className="mt-4 text-xs text-fg-3">
+                  En espera de que el agente la evalúe junto con el resto de hoy — full-auto elige sola, no
+                  necesita que la apruebes.
+                </p>
+              ) : (
+                <div className="mt-4 flex flex-wrap items-end gap-3">
+                  <UseIdeaForm tenantId={ctx.tenantId} suggestionId={s.id} defaultDate={defaultDate} />
 
-                <form action={dismissNewsSuggestionAction}>
-                  <input type="hidden" name="tenantId" value={ctx.tenantId} />
-                  <input type="hidden" name="suggestionId" value={s.id} />
-                  <SubmitButton variant="dangerGhost" size="sm" pendingText="Descartando…">
-                    Descartar
-                  </SubmitButton>
-                </form>
-              </div>
+                  <form action={dismissNewsSuggestionAction}>
+                    <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                    <input type="hidden" name="suggestionId" value={s.id} />
+                    <SubmitButton variant="dangerGhost" size="sm" pendingText="Descartando…">
+                      Descartar
+                    </SubmitButton>
+                  </form>
+                </div>
+              )}
             </Card>
           ))}
+        </div>
+      )}
+
+      {decided.length > 0 && (
+        <div className="space-y-3">
+          <p className="eyebrow text-fg-3">Historial reciente</p>
+          <div className="space-y-2">
+            {decided.map((s) => (
+              <Card key={s.id} padding="sm" className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm text-fg">{s.headline}</p>
+                  <p className="text-xs text-fg-3">{s.source_name ?? "Fuente"} · {formatRelative(s.created_at, now)}</p>
+                </div>
+                <StatusBadge tone={s.status === "used" ? "green" : "grey"}>
+                  {s.status === "used" ? "Usada" : "Descartada"}
+                </StatusBadge>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
     </div>
