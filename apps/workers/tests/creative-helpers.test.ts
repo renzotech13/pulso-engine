@@ -276,12 +276,33 @@ describe("rankBankPhotos", () => {
     expect(ranked[0]!.matched).toContain("~ruc→sunat");
   });
 
-  it("penalizes a photo used in the last three days and honours excludeIds", () => {
+  it("penalizes a photo used in the last week and honours excludeIds", () => {
     const recent = photo("recent", ["sunat", "formalizacion"], { last_used_at: "2026-09-04T12:00:00Z" });
     const fresh = photo("fresh", ["sunat", "formalizacion"]);
     const ranked = rankBankPhotos([recent, fresh], { texts: ["sunat formalización"], now });
     expect(ranked[0]?.asset.id).toBe("fresh");
+    // Never a hard exclude, only ever a multiplier: with nothing else to
+    // pick, a real bank starvation case still degrades to the heavily
+    // penalized repeat instead of collapsing to a gradient.
     expect(rankBankPhotos([recent, fresh], { texts: ["sunat"], now, excludeIds: ["fresh"] }).map((r) => r.asset.id)).toEqual(["recent"]);
+  });
+
+  it("still favors a weak new match over a strong one used 5 days ago — repeats within the same week lose even to a mediocre alternative", () => {
+    // A tenant with a small bank saw the exact same well-tagged photo clear
+    // the old 3-day wall and go out again a few days later — this is the
+    // scenario that regressed against: at 5 days old (inside the old
+    // 4-14-day ×0.5 tier but now inside the new 0-7-day ×0.15 tier), a
+    // near-perfect match has to lose to a photo that barely qualifies.
+    const usedFiveDaysAgo = photo("used-5d", ["sunat", "formalizacion", "documento"], {
+      last_used_at: "2026-08-31T12:00:00Z",
+    });
+    const weakButUnused = photo("weak-unused", ["oficina"]);
+    const ranked = rankBankPhotos([usedFiveDaysAgo, weakButUnused], {
+      texts: ["sunat formalización"],
+      hints: ["oficina"],
+      now,
+    });
+    expect(ranked[0]?.asset.id).toBe("weak-unused");
   });
 
   it("prefers portrait photos for vertical formats and lands in the thresholds' range", () => {

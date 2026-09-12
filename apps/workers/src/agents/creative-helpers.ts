@@ -440,10 +440,16 @@ export function rankBankPhotos(
     // Hints and synonyms can push the numerator past the denominator; the
     // score stays a 0-1 "how well does this photo fit" for the thresholds.
     let score = maxScore > 0 ? Math.min(1, sum / maxScore) : 0;
+    // Widened from 3/14 days: a tenant with a small bank saw the same photo
+    // clear the 3-day wall and get picked again within the same week — a
+    // multiplier, never a hard exclude, so a real "the bank truly has
+    // nothing else" case still degrades to a heavily-penalized repeat
+    // instead of a gradient (see the excludeIds test below for exactly that
+    // scenario).
     if (asset.last_used_at) {
       const ageDays = (nowMs - Date.parse(asset.last_used_at)) / DAY_MS;
-      if (ageDays <= 3) score *= 0.2;
-      else if (ageDays <= 14) score *= 0.5;
+      if (ageDays <= 7) score *= 0.15;
+      else if (ageDays <= 21) score *= 0.5;
     }
     if (query.preferPortrait !== undefined) {
       if (asset.orientation === "portrait") score *= query.preferPortrait ? 1.15 : 0.85;

@@ -62,6 +62,25 @@ function formatProducts(list: ProductRow[]): string {
 }
 
 /**
+ * Every already-planned slot-0 theme in the same 30-day window, oldest
+ * first. The model only ever sees the dates still OPEN in one call — most
+ * days it's called, that's a single date at the far edge of the horizon,
+ * with zero visibility into the 29 themes already chosen on previous runs.
+ * That blindness is exactly what let "Yape" get proposed three times within
+ * a four-day span a few weeks out: nothing here repeats a real anti-spam
+ * check, it just gives the model the same picture a person skimming the
+ * calendar would have before picking the next topic.
+ */
+function formatRecentThemes(list: { date: string; theme: string | null }[]): string {
+  if (list.length === 0) return "(ninguno todavía)";
+  return list
+    .filter((slot): slot is { date: string; theme: string } => Boolean(slot.theme))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+    .map((slot) => `- ${slot.date}: ${slot.theme}`)
+    .join("\n");
+}
+
+/**
  * Detects gaps in the next 30 days, resolves relevant ephemerides/promos/
  * catalog for this tenant, and asks the local LLM to propose a theme for
  * each open date. Never trusts the model blindly: proposed dates outside
@@ -139,9 +158,14 @@ export async function runPlannerForTenant(
         ? `Máximo ${tenant.max_weekly_carousels} carrusel(es) por semana calendario (lunes a domingo) — para el resto de días libres de esa semana, usa post, story o reel.`
         : "";
 
+    const recentThemes = existingSlots
+      .filter((slot) => slot.slot_index === 0)
+      .map((slot) => ({ date: slot.date, theme: slot.theme }));
+
     const prompt = renderPrompt(promptTemplate, {
       RUBRO: tenant.rubro ?? "general",
       OPEN_DATES: openDates.join(", "),
+      RECENT_THEMES: formatRecentThemes(recentThemes),
       EPHEMERIDES: formatEphemerides(resolvedEphemerides),
       PROMOTIONS: formatPromotions(promotions),
       PRODUCTS: formatProducts(products),

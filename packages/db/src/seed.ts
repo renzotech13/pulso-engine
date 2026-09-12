@@ -137,6 +137,11 @@ Indicaciones de marca del negocio (tono, líneas de contenido a priorizar, cosas
 Para cada fecha libre que tenga sentido llenar (no es obligatorio llenar todas), propone un tema de contenido.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
 {"slots": [{"date": "YYYY-MM-DD", "slot_type": "post"|"carousel"|"story"|"reel", "theme": "string corto", "rationale": "string breve explicando por qué"}]}`;
+// Production is actually on version 4, which adds a {{RECENT_THEMES}} block
+// (apps/workers/src/agents/planner.ts now builds and passes it) — applied
+// directly to the live `prompts` table, not here, per this function's own
+// "re-seeding never touches the versions production has moved on to."
+// PLANNER_PROMPT_V1 stays a frozen v1 baseline for a truly fresh database.
 
 const CREATIVE_PROMPT_V1 = `Eres el redactor de piezas de marketing para un negocio local peruano.
 
