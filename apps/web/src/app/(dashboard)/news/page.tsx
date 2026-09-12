@@ -89,7 +89,7 @@ export default async function NewsPage() {
         <EmptyState
           icon={<Newspaper size={28} aria-hidden="true" />}
           title="Sin ideas pendientes"
-          description="El agente de noticias corre todos los días a las 10:30. Vuelve más tarde o pídele a alguien del equipo que lo dispare manualmente si necesitas verlo antes."
+          description="El agente de noticias corre todos los días a las 7:00. Vuelve más tarde o pídele a alguien del equipo que lo dispare manualmente si necesitas verlo antes."
         />
       ) : (
         <div className="space-y-4">

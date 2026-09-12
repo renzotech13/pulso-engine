@@ -224,9 +224,21 @@ async function main(): Promise<void> {
   // news.ts. To see it run without waiting for tomorrow, call
   // runNewsAgentForTenant directly for one tenant, same as the Planner's own
   // dev-loop note above.
+  //
+  // 7am, not 10:30: a tenant can now put its news slot on the EARLIER of its
+  // two publish_hours (AZ: [18, 9] — news at 9am, for same-morning "última
+  // hora" framing instead of yesterday's headlines; see news-slot.ts's own
+  // date-decision, `newsHour > limaHour()`). The digest has to land before
+  // whatever the earliest configured news hour across tenants is, or that
+  // tenant's morning slot picks up nothing until the FOLLOWING day. 7am
+  // isn't as fragile as the 05:00 attempt this file used to warn about
+  // (this machine sleeping through it) — same risk in kind, smaller in
+  // degree — but if it ever fails to fire, the fallback is exactly what
+  // happened before this change: the slot picks up the previous day's
+  // digest instead of missing content entirely.
   await coreQueue.upsertJobScheduler(
     "news-tick",
-    { pattern: "30 10 * * *", tz: LIMA_TZ },
+    { pattern: "0 7 * * *", tz: LIMA_TZ },
     { name: "news.tick" },
   );
 
