@@ -59,6 +59,7 @@ const tituloSchema = z.object({
   color: hexColorWithAlpha,
   fondo: backgroundSchema.optional(),
   posicion: z.enum(["inferior", "centro", "superior"]).default("centro"),
+  margenSeguroPx: z.number().nonnegative().default(0),
   animacionEntrada: z.string().default("ninguna"),
   animacionSalida: z.string().default("ninguna"),
   entradaSeg: z.number().nonnegative().default(0),

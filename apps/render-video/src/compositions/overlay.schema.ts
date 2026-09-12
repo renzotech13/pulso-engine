@@ -49,6 +49,8 @@ const tituloEstiloSchema = z.object({
   color: hexColor,
   fondo: backgroundSchema.optional(),
   posicion: z.enum(["inferior", "centro", "superior"]),
+  /** Padding kept clear of whichever edge `posicion` sits against — 0 (the old implicit behavior) when the preset doesn't set it. */
+  margenSeguroPx: z.number(),
   animacionEntrada: z.enum(["fadeIn", "ninguna"]),
   animacionSalida: z.enum(["fadeOut", "ninguna"]),
   entradaSeg: z.number(),

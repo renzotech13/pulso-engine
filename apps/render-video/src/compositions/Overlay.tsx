@@ -100,6 +100,8 @@ function TitleLayer({ titulo, t, width }: { titulo: NonNullable<OverlayProps["ti
         flexDirection: "column",
         justifyContent: JUSTIFY_BY_POSITION[titulo.posicion],
         alignItems: "center",
+        paddingTop: titulo.posicion === "superior" ? titulo.margenSeguroPx : undefined,
+        paddingBottom: titulo.posicion === "inferior" ? titulo.margenSeguroPx : undefined,
         backgroundColor: isCard ? (titulo.fondo?.activo ? titulo.fondo.color : "#000000") : undefined,
       }}
     >
@@ -185,6 +187,17 @@ function SubtitleLayer({ block, estilo, t }: { block: OverlayProps["subtitulos"]
                     textTransform: estilo.mayusculas ? "uppercase" : "none",
                     color: isActive ? estilo.colorPalabraActiva : estilo.color,
                     WebkitTextStroke: estilo.contorno ? `${estilo.contorno.grosor}px ${estilo.contorno.color}` : undefined,
+                    // Without this, Chromium paints the stroke ON TOP of the
+                    // fill instead of behind it — visible on real renders as
+                    // dark gashes cutting across diagonal strokes ("A", "R")
+                    // wherever the two passes don't align pixel-for-pixel.
+                    // `paintOrder: "stroke"` draws the stroke first so the
+                    // fill fully covers it except at the true outline edge,
+                    // which is the entire point of an outline. Confirmed by
+                    // rendering both versions of this exact word list and
+                    // comparing the frames.
+                    paintOrder: estilo.contorno ? "stroke" : undefined,
+                    WebkitTextFillColor: isActive ? estilo.colorPalabraActiva : estilo.color,
                     textShadow: textShadow || undefined,
                   }}
                 >

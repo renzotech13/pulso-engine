@@ -151,6 +151,7 @@ function buildOverlayProps(
             color: tt.color,
             fondo: tt.fondo,
             posicion: tt.posicion,
+            margenSeguroPx: tt.margenSeguroPx,
             animacionEntrada: resolveTitleAnimation(tt.animacionEntrada) === "fadeIn" ? ("fadeIn" as const) : ("ninguna" as const),
             animacionSalida: resolveTitleAnimation(tt.animacionSalida) === "fadeOut" ? ("fadeOut" as const) : ("ninguna" as const),
             entradaSeg: tt.entradaSeg,
