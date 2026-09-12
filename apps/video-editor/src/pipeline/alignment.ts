@@ -213,6 +213,30 @@ function toRun(words: TranscriptWord[]): SpeechRun {
   return { words, startSec: words[0]!.startSec, endSec: words[words.length - 1]!.endSec };
 }
 
+const COUNTDOWN_WORDS = new Set(["0", "1", "2", "3", "4", "5", "cero", "uno", "dos", "tres", "cuatro", "cinco"]);
+const COUNTDOWN_CUE_WORDS = new Set(["accion", "ya", "grabando", "camara", "luces", "claqueta", "rec", "grabar"]);
+
+/**
+ * Strips a spoken clapperboard countdown ("3, 2, 1, acción") from the very
+ * start of a run. It's real production audio, not script content, but it
+ * routinely runs straight into the actual line with no silence gap for
+ * segmentIntoRuns to split on — confirmed on real AZ footage, where "2, 1,
+ * acción. Soy ..." came through as a single continuous run and the countdown
+ * ended up baked into the cut.
+ *
+ * Requires at least TWO consecutive countdown words right at the start
+ * before assuming anything: a single leading number is ordinary script
+ * content too (ADS-06's real line opens with "Uno: revisamos gratis..."),
+ * so one alone is never enough to trigger this.
+ */
+export function stripLeadingCountdown(words: readonly TranscriptWord[]): readonly TranscriptWord[] {
+  let i = 0;
+  while (i < words.length && COUNTDOWN_WORDS.has(normalizeToken(words[i]!.text))) i++;
+  if (i < 2) return words;
+  if (i < words.length && COUNTDOWN_CUE_WORDS.has(normalizeToken(words[i]!.text))) i++;
+  return words.slice(i);
+}
+
 export interface BuildEdlOptions {
   /** Below this similarity to the script, a run is off-script chatter/filler — dropped. */
   minRunScore?: number;
@@ -331,7 +355,10 @@ export function buildEdl(
   const candidates: ScoredRun[] = [];
   for (const analysis of assetAnalyses) {
     const runs = segmentIntoRuns(analysis.words, analysis.silences);
-    for (const run of runs) {
+    for (const rawRun of runs) {
+      const words = stripLeadingCountdown(rawRun.words);
+      if (words.length === 0) continue;
+      const run = words.length === rawRun.words.length ? rawRun : toRun(words as TranscriptWord[]);
       const text = run.words.map((w) => w.text).join(" ");
       const { position, score, guionWords } = bestScriptPosition(text, scriptTokensNormalized, scriptWordsOriginal);
       if (score >= opts.minRunScore) {

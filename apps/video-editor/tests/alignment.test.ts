@@ -6,6 +6,7 @@ import {
   diceSimilarity,
   normalizeText,
   segmentIntoRuns,
+  stripLeadingCountdown,
   textSimilarity,
 } from "../src/pipeline/alignment.js";
 import type { AudioAnalysis, ScriptVideo, TranscriptWord } from "../src/pipeline/types.js";
@@ -99,6 +100,29 @@ describe("segmentIntoRuns", () => {
 
   it("returns nothing for an empty word list", () => {
     expect(segmentIntoRuns([], [])).toEqual([]);
+  });
+});
+
+describe("stripLeadingCountdown", () => {
+  it("drops a clapperboard countdown that runs straight into the line", () => {
+    const words = [word("tres", 0, 0.2), word("dos", 0.3, 0.5), word("uno", 0.6, 0.8), word("accion", 0.9, 1.2), word("hoy", 1.3, 1.5)];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["hoy"]);
+  });
+
+  it("drops the countdown even without a cue word after it", () => {
+    const words = [word("dos", 0, 0.2), word("uno", 0.3, 0.5), word("hoy", 0.6, 0.8)];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["hoy"]);
+  });
+
+  it("leaves a single leading number alone — real script content starts with one too", () => {
+    // ADS-06's real line: "Uno: revisamos gratis tu situación actual..."
+    const words = [word("uno", 0, 0.2), word("revisamos", 0.3, 0.7), word("gratis", 0.8, 1.1)];
+    expect(stripLeadingCountdown(words)).toBe(words);
+  });
+
+  it("leaves a run with no leading numbers untouched", () => {
+    const words = [word("hoy", 0, 0.2), word("te", 0.3, 0.4)];
+    expect(stripLeadingCountdown(words)).toBe(words);
   });
 });
 
@@ -220,6 +244,38 @@ describe("buildEdl", () => {
 
     expect(edl.segmentos).toHaveLength(1);
     expect(edl.segmentos[0]!.lineaGuion).toBe("hoy te explico como sacar tu ruc en sunarp paso a paso");
+  });
+
+  it("cuts out a clapperboard countdown baked into the same run as the real line", () => {
+    // Real AZ footage: "2, 1, acción. Soy Angel Zegarra..." transcribed as
+    // one continuous run (no silence between the clapper and the line) —
+    // without stripLeadingCountdown, the whole thing (including the
+    // countdown) would land in the EDL as segment start.
+    const words: TranscriptWord[] = [
+      word("tres", 0, 0.2),
+      word("dos", 0.25, 0.4),
+      word("uno", 0.45, 0.6),
+      word("accion", 0.65, 1),
+      word("hoy", 1.05, 1.25),
+      word("te", 1.3, 1.4),
+      word("explico", 1.45, 1.85),
+      word("como", 1.9, 2.15),
+      word("sacar", 2.2, 2.45),
+      word("tu", 2.5, 2.65),
+      word("ruc", 2.7, 2.95),
+      word("en", 3, 3.15),
+      word("sunarp", 3.2, 3.55),
+      word("paso", 3.6, 3.75),
+      word("a", 3.8, 3.85),
+      word("paso", 3.9, 4.15),
+    ];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences: [] };
+
+    const edl = buildEdl(script, [analysis]);
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.lineaGuion).toBe("hoy te explico como sacar tu ruc en sunarp paso a paso");
+    expect(edl.segmentos[0]!.inicio).toBeCloseTo(1.05 - 0.2, 5); // marginSec default is 0.2
   });
 
   it("orders segments by their position in the script, not recording order", () => {
