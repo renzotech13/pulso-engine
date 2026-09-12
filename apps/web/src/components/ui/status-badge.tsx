@@ -13,7 +13,9 @@ const TONE_CLASS = {
   accent: "bg-accent/15 text-accent-ink",
 } as const;
 
-const DOT_CLASS = {
+// Exportado además de TONE_CLASS: el Gantt del calendario necesita el mismo
+// color pero como relleno sólido de una barra, no como fondo atenuado de píldora.
+export const DOT_CLASS = {
   green: "bg-success",
   orange: "bg-amber",
   pink: "bg-danger",

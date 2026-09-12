@@ -36,6 +36,7 @@ import { inputClass, selectClass } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Segmented } from "@/components/ui/segmented";
 import { StatusBadge, StatusDot, type StatusTone } from "@/components/ui/status-badge";
+import { CalendarGanttView } from "./gantt-view";
 
 const RENDER_TEMPLATES_URL = process.env.NEXT_PUBLIC_RENDER_TEMPLATES_URL ?? "http://localhost:3001";
 
@@ -44,7 +45,7 @@ const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 // The states that need a human before anything else moves forward.
 const ATTENTION_KEYS = new Set<SlotDisplayState["key"]>(["overdue", "failed", "review"]);
 
-type View = "grid" | "list";
+type View = "grid" | "list" | "gantt";
 
 interface CalendarPageProps {
   searchParams: Promise<{ month?: string; view?: string; filtro?: string }>;
@@ -59,7 +60,7 @@ function publicationTone(status: string): StatusTone {
 export default async function CalendarPage({ searchParams }: CalendarPageProps) {
   const sp = await searchParams;
   const monthParam = parseMonthParam(sp.month);
-  const view: View = sp.view === "list" ? "list" : "grid";
+  const view: View = sp.view === "list" ? "list" : sp.view === "gantt" ? "gantt" : "grid";
   const attentionOnly = sp.filtro === "atencion";
   const monthStr = monthParamString(monthParam);
   const prevStr = monthParamString(prevMonthParam(monthParam));
@@ -155,6 +156,11 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                   href: `/calendar?month=${monthStr}&view=list${filterQuery}`,
                   label: "Lista",
                   active: view === "list",
+                },
+                {
+                  href: `/calendar?month=${monthStr}&view=gantt${filterQuery}`,
+                  label: "Gantt",
+                  active: view === "gantt",
                 },
               ]}
             />
@@ -330,6 +336,16 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
             </div>
           )}
         </div>
+      ) : view === "gantt" ? (
+        <CalendarGanttView
+          monthParam={monthParam}
+          today={today}
+          slotsByDate={slotsByDate}
+          publishHours={publishHours}
+          legend={legend}
+          monthStr={monthStr}
+          filterQuery={filterQuery}
+        />
       ) : (
         <div className="space-y-4">
           {attentionOnly && (
