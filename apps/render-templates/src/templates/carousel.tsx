@@ -36,7 +36,10 @@ export function CarouselTemplate({ brand, slides, slideIndex, photoUrls }: Carou
         overflow: "hidden",
         fontFamily: "system-ui, -apple-system, sans-serif",
         background: usePhoto
-          ? `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%), url(${photoUrl}) center/cover no-repeat`
+          ? // Quoted url(): unquoted breaks on a URL containing a space or
+            // parentheses (a real filename shape — e.g. a duplicate
+            // upload's "... (1).jpg" — confirmed live, not hypothetical).
+            `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%), url("${photoUrl}") center/cover no-repeat`
           : isLast
             ? `radial-gradient(circle at 50% 35%, ${brand.colorSecondary} 0%, ${brand.colorPrimary} 70%)`
             : `radial-gradient(circle at 30% 20%, ${brand.colorSecondary} 0%, ${brand.colorPrimary} 65%)`,

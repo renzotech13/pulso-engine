@@ -20,7 +20,11 @@ export function PhotoFrameTemplate({ photoUrl, frameUrl, width, height }: PhotoF
         width,
         height,
         overflow: "hidden",
-        background: `url(${photoUrl}) center/cover no-repeat`,
+        // Quoted: an unquoted url() breaks on any URL containing a space or
+        // parentheses — a real filename shape (e.g. a duplicate upload's
+        // "... (1).jpg"), not a hypothetical. Confirmed live: the whole
+        // background silently failed (blank white) on exactly such a file.
+        background: `url("${photoUrl}") center/cover no-repeat`,
       }}
     >
       <img

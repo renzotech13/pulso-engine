@@ -30,7 +30,10 @@ export function SocialPostTemplateAZ({ brand, headline, subheadline, priceLabel,
         overflow: "hidden",
         fontFamily: "system-ui, -apple-system, sans-serif",
         background: photoUrl
-          ? `linear-gradient(0deg, ${AZ_SKY_BLUE}F2 0%, ${AZ_SKY_BLUE}66 45%, ${AZ_SKY_BLUE}33 100%), url(${photoUrl}) center/cover no-repeat`
+          ? // Quoted url(): unquoted breaks on a URL containing a space or
+            // parentheses (a real filename shape — e.g. a duplicate
+            // upload's "... (1).jpg" — confirmed live, not hypothetical).
+            `linear-gradient(0deg, ${AZ_SKY_BLUE}F2 0%, ${AZ_SKY_BLUE}66 45%, ${AZ_SKY_BLUE}33 100%), url("${photoUrl}") center/cover no-repeat`
           : `radial-gradient(circle at 30% 20%, ${AZ_SKY_BLUE} 0%, ${AZ_SKY_BLUE} 65%)`,
       }}
     >

@@ -146,7 +146,7 @@ export function StudentShowcaseTemplate({
             <div
               style={{
                 flex: 1,
-                background: `url(${slide.photoUrls[0] ?? ""}) center/cover no-repeat`,
+                background: `url("${slide.photoUrls[0] ?? ""}") center/cover no-repeat`,
               }}
             />
             <NameBadge nameLine1={nameLine1} nameLine2={nameLine2} flag={flag} overlap={false} />
@@ -172,7 +172,7 @@ export function StudentShowcaseTemplate({
                     flex: 1,
                     aspectRatio: slide.type === "certificate" ? "3 / 4" : "1 / 1",
                     borderRadius: 20,
-                    background: `url(${url}) center/cover no-repeat`,
+                    background: `url("${url}") center/cover no-repeat`,
                   }}
                 />
               ))}
@@ -199,7 +199,7 @@ export function StudentShowcaseTemplate({
                 overflow: "hidden",
                 border: "3px solid white",
                 boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
-                background: `url(${brand.logoUrl}) center/cover no-repeat`,
+                background: `url("${brand.logoUrl}") center/cover no-repeat`,
               }}
             />
           ) : (

@@ -33,7 +33,10 @@ export function SocialPostTemplate({ brand, headline, subheadline, priceLabel, p
         overflow: "hidden",
         fontFamily: "system-ui, -apple-system, sans-serif",
         background: photoUrl
-          ? `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%), url(${photoUrl}) center/cover no-repeat`
+          ? // Quoted url(): unquoted breaks on a URL containing a space or
+            // parentheses (a real filename shape — e.g. a duplicate
+            // upload's "... (1).jpg" — confirmed live, not hypothetical).
+            `linear-gradient(0deg, ${brand.colorPrimary}F2 0%, ${brand.colorPrimary}66 45%, ${brand.colorPrimary}33 100%), url("${photoUrl}") center/cover no-repeat`
           : `radial-gradient(circle at 30% 20%, ${brand.colorSecondary} 0%, ${brand.colorPrimary} 65%)`,
       }}
     >
