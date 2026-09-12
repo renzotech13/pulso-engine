@@ -342,8 +342,16 @@ export function buildEdl(
 
   // Retakes: two runs are "the same line" if their OWN texts are similar to
   // each other, not just both similar to the script (a script line can
-  // legitimately repeat words across genuinely different lines). Later
-  // recording (by array order, which callers pass chronologically) wins.
+  // legitimately repeat words across genuinely different lines). The one
+  // that matches the SCRIPT better wins — not simply whichever was recorded
+  // later. Recording-order was tried first (a false start followed by a full
+  // take is common), but it breaks just as easily the other way: a talent
+  // nails the line, then keeps rolling through an unrelated retake or a
+  // camera/lighting test that was never trimmed out of the file, which would
+  // otherwise silently displace the actually-correct take. Scoring against
+  // the script itself is agnostic to which side of the good take the extra
+  // material falls on. Ties keep the later run, matching the old default
+  // when nothing else distinguishes the candidates.
   const kept: ScoredRun[] = [];
   for (const candidate of candidates) {
     const candidateText = candidate.run.words.map((w) => w.text).join(" ");
@@ -353,8 +361,8 @@ export function buildEdl(
     );
     if (duplicateIndex === -1) {
       kept.push(candidate);
-    } else {
-      kept[duplicateIndex] = candidate; // this one was recorded later — replace, don't append
+    } else if (candidate.score >= kept[duplicateIndex]!.score) {
+      kept[duplicateIndex] = candidate;
     }
   }
 

@@ -180,6 +180,48 @@ describe("buildEdl", () => {
     expect(edl.segmentos[0]!.archivo).toBe("clip1.mp4");
   });
 
+  it("keeps the cleaner earlier take over a stumbled retake left in the file afterward", () => {
+    // Not every shoot is "keep rolling until it's right" — some raw takes
+    // nail the line first, then keep recording an unrelated extra attempt
+    // that's never trimmed out. The later run here stumbles (an inserted
+    // "eh" breaks two script bigrams) and drops the last word, so it scores
+    // worse against the script even though it still reads as "the same
+    // line" as the clean first take (duplicateThreshold is about containment
+    // between the two runs, not about either one's script score).
+    const words: TranscriptWord[] = [
+      word("hoy", 0, 0.2),
+      word("te", 0.25, 0.35),
+      word("explico", 0.4, 0.8),
+      word("como", 0.85, 1.1),
+      word("sacar", 1.15, 1.4),
+      word("tu", 1.45, 1.6),
+      word("ruc", 1.65, 1.9),
+      word("en", 1.95, 2.1),
+      word("sunarp", 2.15, 2.5),
+      word("paso", 2.55, 2.7),
+      word("a", 2.75, 2.8),
+      word("paso", 2.85, 3.1),
+      // silence
+      word("hoy", 6, 6.2),
+      word("te", 6.25, 6.35),
+      word("eh", 6.4, 6.6),
+      word("explico", 6.65, 7.05),
+      word("como", 7.1, 7.35),
+      word("sacar", 7.4, 7.65),
+      word("tu", 7.7, 7.85),
+      word("ruc", 7.9, 8.15),
+      word("en", 8.2, 8.35),
+      word("sunarp", 8.4, 8.75),
+    ];
+    const silences = [{ startSec: 3.1, endSec: 6 }];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences };
+
+    const edl = buildEdl(script, [analysis]);
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.lineaGuion).toBe("hoy te explico como sacar tu ruc en sunarp paso a paso");
+  });
+
   it("orders segments by their position in the script, not recording order", () => {
     // Second half of the line recorded first, first half recorded second —
     // the EDL should still read in script order.
