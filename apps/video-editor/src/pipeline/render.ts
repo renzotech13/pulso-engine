@@ -15,7 +15,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { renderLocal } from "@pulso/render-video/render";
 import { AppError } from "@pulso/shared/errors";
-import { FfmpegNotFoundError, InvalidMediaError } from "./ffmpeg.js";
+import { denoiseAudio } from "./denoise.js";
+import { extractAudioForDenoise, FfmpegNotFoundError, InvalidMediaError } from "./ffmpeg.js";
 import { mixAudio } from "./music.js";
 import { resolveSubtitleAnimation, resolveTitleAnimation, type Preset } from "./preset.js";
 import type { Edl, ScriptVideo, SubtitleTrack } from "./types.js";
@@ -252,8 +253,22 @@ export async function renderProject(
 
     const durationSec = edlDurationSec(edl);
 
+    // Denoising happens on the concatenated voice track, BEFORE loudnorm and
+    // any music ducking — the model expects to see the voice's real noise
+    // floor, not one that's already been normalized/mixed. When not
+    // configured, mixAudio reads the concatenated file's own audio directly,
+    // same as before this feature existed.
+    let voicePath = concatenatedPath;
+    if (preset.limpiezaAudio?.activo) {
+      const rawVoicePath = path.join(workDir, "voice-raw.wav");
+      await extractAudioForDenoise(concatenatedPath, rawVoicePath);
+      const denoisedVoicePath = path.join(workDir, "voice-denoised.wav");
+      await denoiseAudio(rawVoicePath, denoisedVoicePath, process.env.DEEP_FILTER_BIN_PATH);
+      voicePath = denoisedVoicePath;
+    }
+
     const mixedAudioPath = path.join(workDir, "mixed-audio.wav");
-    await mixAudio(concatenatedPath, options.musicPath, preset.musica, durationSec, mixedAudioPath);
+    await mixAudio(voicePath, options.musicPath, preset.musica, durationSec, mixedAudioPath);
 
     const overlayBuffer = await renderOverlay(preset, scriptVideo, subtitleTrack, durationSec, spec);
     const overlayPath = path.join(workDir, "overlay.mov");

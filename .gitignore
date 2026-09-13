@@ -34,3 +34,7 @@ apps/video-editor/models/
 # LUTs de cámara (del fabricante, no de este repo) — un preset las referencia
 # por ruta absoluta en correccionColor.lutPath.
 apps/video-editor/config/luts/
+
+# Binario nativo de DeepFilterNet (~27 MB, descargado de GitHub releases) —
+# ver DEEP_FILTER_BIN_PATH / apps/video-editor/README.md.
+apps/video-editor/bin/

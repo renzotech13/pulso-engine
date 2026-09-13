@@ -77,6 +77,15 @@ const correccionColorSchema = z.object({
   lutPath: z.string(),
 });
 
+// Limpia ruido de fondo de la voz ya concatenada (antes de mezclar música y
+// normalizar volumen) con DeepFilterNet — no un filtro clásico tipo
+// afftdn/arnndn, un modelo de reducción de ruido que deja la voz sonando
+// mucho más cerca de un estudio. Opcional: requiere el binario `deep-filter`
+// (ver DEEP_FILTER_BIN_PATH), y no todo tenant lo necesita.
+const limpiezaAudioSchema = z.object({
+  activo: z.boolean(),
+});
+
 const musicaSchema = z.object({
   volumenDb: z.number(),
   ducking: z.boolean().default(true),
@@ -105,6 +114,7 @@ export const presetSchema = z.object({
   subtitulos: subtitulosSchema,
   titulo: tituloSchema,
   correccionColor: correccionColorSchema.optional(),
+  limpiezaAudio: limpiezaAudioSchema.optional(),
   musica: musicaSchema,
   salida: salidaSchema,
 });

@@ -189,3 +189,20 @@ export async function extractAudioForTranscription(path: string, outputWavPath: 
     throw new InvalidMediaError(path, "no se pudo extraer el audio", err);
   }
 }
+
+/**
+ * Extracts the audio track at 48kHz (DeepFilterNet's native rate) keeping
+ * the source's own channel count — unlike extractAudioForTranscription,
+ * this feeds a denoiser meant to improve the FINAL voice track, not a
+ * transcription-only throwaway copy, so it doesn't downsample to 16kHz mono.
+ */
+export async function extractAudioForDenoise(path: string, outputWavPath: string): Promise<void> {
+  try {
+    await run("ffmpeg", ["-y", "-i", path, "-vn", "-ar", "48000", "-c:a", "pcm_s16le", outputWavPath], {
+      maxBuffer: MAX_BUFFER,
+    });
+  } catch (err) {
+    if (isEnoent(err)) throw new FfmpegNotFoundError("ffmpeg", err);
+    throw new InvalidMediaError(path, "no se pudo extraer el audio", err);
+  }
+}
