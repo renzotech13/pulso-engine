@@ -137,16 +137,27 @@ async function pollContainerUntilFinished(creationId: string, accessToken: strin
   throw new Error(`Instagram no terminó de procesar el video en ${totalSeconds}s — se agotó el tiempo de espera`);
 }
 
+/**
+ * `isStory` routes a video/image to Instagram's ephemeral Stories tray
+ * (`media_type: STORIES`) instead of the feed/Reels tab. No `caption` param
+ * here on purpose — the Content Publishing API doesn't support one for
+ * Stories (there's no text overlay slot the way a feed post has a caption),
+ * so passing it would just be silently ignored at best.
+ */
 async function publishToInstagram(
   igUserId: string,
   accessToken: string,
   assetUrl: string,
   isVideo: boolean,
   caption: string,
+  isStory = false,
 ): Promise<string> {
-  const containerParams: Record<string, string> = isVideo
-    ? { video_url: assetUrl, caption, media_type: "REELS", access_token: accessToken }
-    : { image_url: assetUrl, caption, access_token: accessToken };
+  const assetParam = isVideo ? { video_url: assetUrl } : { image_url: assetUrl };
+  const containerParams: Record<string, string> = isStory
+    ? { ...assetParam, media_type: "STORIES", access_token: accessToken }
+    : isVideo
+      ? { ...assetParam, caption, media_type: "REELS", access_token: accessToken }
+      : { ...assetParam, caption, access_token: accessToken };
 
   const container = await graphPost(`${igUserId}/media`, containerParams);
   const creationId = container.id ?? "";
@@ -319,6 +330,11 @@ export async function runPublishAgentForCreative(
       const assetUrl = creative.asset_urls[0]!;
       const isVideo = creative.type === "video";
       const isCarousel = creative.type === "carousel";
+      // A "story" slot's creative is a video (see SLOT_TYPE_TO_TEMPLATE_NAME
+      // in creative-helpers.ts — story-promo renders through Remotion like a
+      // reel does), so without this it's indistinguishable from a reel below
+      // and goes out as one instead of an ephemeral Story.
+      const isStory = slot?.slot_type === "story";
       const caption = buildCaption(creative.brief as Record<string, unknown>);
 
       // A still-to-come slot means "schedule what Meta lets us schedule, wait
@@ -414,6 +430,7 @@ export async function runPublishAgentForCreative(
                   assetUrl,
                   isVideo,
                   caption,
+                  isStory,
                 );
 
           await ctx.db.updatePublication(publication.id, schedulingThisOne
