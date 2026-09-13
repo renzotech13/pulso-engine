@@ -48,6 +48,21 @@ function edlDurationSec(edl: Edl): number {
 }
 
 /**
+ * Groups a raw take with its own retakes/parts of the SAME scene — real crews
+ * commonly split one continuous scene across files ("ADS-01-ESCENA-03-PARTE-01",
+ * "...-PARTE-02") when a recording gets stopped and restarted. Two segments
+ * whose files share everything up to that "-PARTE-N" suffix are the same
+ * scene; anything else (a different scene, a different take with no PARTE
+ * suffix at all) gets its own key. Best-effort: a tenant with a different
+ * naming convention just gets every segment treated as its own scene, which
+ * is the same behavior as before this existed.
+ */
+function sceneKeyForFile(filePath: string): string {
+  const base = path.basename(filePath).replace(/\.[^.]+$/, "");
+  return base.replace(/-parte-?\d+$/i, "");
+}
+
+/**
  * One ffmpeg invocation: every segment gets its own trim+(LUT)+scale+pad+fps
  * filter chain (normalizing away any source resolution/fps mismatch), then
  * the concat filter joins them — a single pass, no per-segment temp files.
@@ -115,6 +130,129 @@ async function concatenateSegments(
     if (isEnoent(err)) throw new FfmpegNotFoundError("ffmpeg", err);
     throw new InvalidMediaError(edl.videoId, "no se pudieron unir los segmentos de la EDL", err);
   }
+}
+
+export interface TransitionOptions {
+  duracionSeg: number;
+  /** 0 disables the opening zoom entirely. */
+  zoomInicialSeg: number;
+}
+
+/**
+ * Same job as concatenateSegments, but joins consecutive segments with a
+ * transition instead of a hard cut — a quick native ffmpeg zoom-in between
+ * two DIFFERENT scenes, and a bright flash (xfade's own "fadewhite") between
+ * two parts of the SAME scene (see sceneKeyForFile: a real crew's own
+ * retake/continuation split, e.g. "-PARTE-01"/"-PARTE-02"). Both are a
+ * SINGLE xfade — real overlapping dissolves, not an inserted clip — so
+ * neither one adds any duration: the transition happens ON TOP of the last D
+ * seconds of the outgoing take and the first D seconds of the incoming one,
+ * exactly at the cut, never as its own extra shot. (An earlier version tried
+ * the light-leak as two chained xfades through an inserted color clip — that
+ * DID add real screen time, which is exactly the "toma aparte" this is
+ * built to avoid.) The very first segment also gets a brief opening zoom-in.
+ *
+ * ffmpeg's xfade/acrossfade only join TWO streams at a time, so this chains
+ * them pairwise left to right, tracking the combined timeline's duration so
+ * far to compute each next `offset`.
+ *
+ * Returns the ACTUAL output duration — shorter than the naive sum of segment
+ * durations, since every xfade/acrossfade overlaps D seconds of the two
+ * clips it joins. Callers that need the real length for anything downstream
+ * (music fades, audio trimming) must use this, not edlDurationSec.
+ */
+async function concatenateSegmentsWithTransitions(
+  edl: Edl,
+  spec: OutputSpec,
+  outputPath: string,
+  colorLutPath: string | undefined,
+  transitions: TransitionOptions,
+): Promise<number> {
+  if (edl.segmentos.length === 0) {
+    throw new RenderError(`el guion "${edl.videoId}" no tiene ningún segmento en su EDL — nada que renderizar`);
+  }
+  // Nothing to transition between — same output shape as the plain path.
+  if (edl.segmentos.length === 1) {
+    await concatenateSegments(edl, spec, outputPath, colorLutPath);
+    return edlDurationSec(edl);
+  }
+
+  const uniqueFiles = [...new Set(edl.segmentos.map((s) => s.archivo))];
+  const fileIndex = new Map(uniqueFiles.map((file, i) => [file, i]));
+  const inputArgs = uniqueFiles.flatMap((file) => ["-i", file]);
+
+  const colorLut = colorLutPath
+    ? `,format=gbrp16le,lut3d=file=${colorLutPath}:interp=tetrahedral,format=yuv420p`
+    : "";
+
+  const D = transitions.duracionSeg;
+  const sameSceneAsPrev = edl.segmentos.map(
+    (s, i) => i > 0 && sceneKeyForFile(s.archivo) === sceneKeyForFile(edl.segmentos[i - 1]!.archivo),
+  );
+
+  const filterParts: string[] = [];
+
+  edl.segmentos.forEach((segment, i) => {
+    const inputIdx = fileIndex.get(segment.archivo)!;
+    const openingZoom =
+      i === 0 && transitions.zoomInicialSeg > 0
+        ? `,crop=w='iw*(1-0.12*min(t/${transitions.zoomInicialSeg}\\,1))':h='ih*(1-0.12*min(t/${transitions.zoomInicialSeg}\\,1))':x='(iw-ow)/2':y='(ih-oh)/2',scale=${spec.width}:${spec.height}`
+        : "";
+    filterParts.push(
+      `[${inputIdx}:v]trim=start=${segment.inicio}:end=${segment.fin},setpts=PTS-STARTPTS${colorLut},` +
+        `scale=${spec.width}:${spec.height}:force_original_aspect_ratio=decrease,` +
+        // xfade requires both sides on the same timebase — mismatched
+        // timebases across separately-decoded/filtered inputs fail loud
+        // ("do not match") rather than silently misbehaving.
+        `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps}${openingZoom},settb=1/${spec.fps}[v${i}]`,
+    );
+    filterParts.push(`[${inputIdx}:a]atrim=start=${segment.inicio}:end=${segment.fin},asetpts=PTS-STARTPTS[a${i}]`);
+  });
+
+  let videoLabel = "v0";
+  let audioLabel = "a0";
+  let accumulated = edl.segmentos[0]!.fin - edl.segmentos[0]!.inicio;
+
+  for (let i = 1; i < edl.segmentos.length; i++) {
+    const segDur = edl.segmentos[i]!.fin - edl.segmentos[i]!.inicio;
+    const nextVideoLabel = `vx${i}`;
+    const offset = accumulated - D;
+    const transitionType = sameSceneAsPrev[i] ? "fadewhite" : "zoomin";
+    filterParts.push(
+      `[${videoLabel}][v${i}]xfade=transition=${transitionType}:duration=${D}:offset=${offset}[${nextVideoLabel}]`,
+    );
+    accumulated = accumulated + segDur - D;
+
+    const nextAudioLabel = `ax${i}`;
+    filterParts.push(`[${audioLabel}][a${i}]acrossfade=d=${D}[${nextAudioLabel}]`);
+
+    videoLabel = nextVideoLabel;
+    audioLabel = nextAudioLabel;
+  }
+
+  try {
+    await run(
+      "ffmpeg",
+      [
+        "-y",
+        ...inputArgs,
+        "-filter_complex", filterParts.join(";"),
+        "-map", `[${videoLabel}]`,
+        "-map", `[${audioLabel}]`,
+        "-c:v", "libx264",
+        "-crf", String(spec.crf),
+        "-pix_fmt", "yuv420p",
+        "-c:a", "pcm_s16le",
+        outputPath,
+      ],
+      { maxBuffer: MAX_BUFFER },
+    );
+  } catch (err) {
+    if (isEnoent(err)) throw new FfmpegNotFoundError("ffmpeg", err);
+    throw new InvalidMediaError(edl.videoId, "no se pudieron unir los segmentos de la EDL con transiciones", err);
+  }
+
+  return accumulated;
 }
 
 function buildOverlayProps(
@@ -249,9 +387,16 @@ export async function renderProject(
     // concatenateSegments) as an intermediate for mixAudio to process,
     // which MP4's muxer doesn't support cleanly the way QuickTime's does.
     const concatenatedPath = path.join(workDir, "concatenated.mov");
-    await concatenateSegments(edl, spec, concatenatedPath, preset.correccionColor?.lutPath);
-
-    const durationSec = edlDurationSec(edl);
+    let durationSec: number;
+    if (preset.transiciones?.activo) {
+      durationSec = await concatenateSegmentsWithTransitions(edl, spec, concatenatedPath, preset.correccionColor?.lutPath, {
+        duracionSeg: preset.transiciones.duracionSeg,
+        zoomInicialSeg: preset.transiciones.zoomInicialSeg,
+      });
+    } else {
+      await concatenateSegments(edl, spec, concatenatedPath, preset.correccionColor?.lutPath);
+      durationSec = edlDurationSec(edl);
+    }
 
     // Denoising happens on the concatenated voice track, BEFORE loudnorm and
     // any music ducking — the model expects to see the voice's real noise

@@ -86,6 +86,24 @@ const limpiezaAudioSchema = z.object({
   activo: z.boolean(),
 });
 
+// Suaviza los cortes entre segmentos en vez de un corte seco: zoom-in nativo
+// de ffmpeg entre escenas distintas, un destello cálido (light leak,
+// generado — no un archivo externo) entre partes de una MISMA escena (ver
+// sceneKeyForFile en render.ts: un guion real puede quedar dividido en
+// "-PARTE-01"/"-PARTE-02" por un corte de grabación). También agrega un
+// zoom-in breve al inicio del video.
+const transicionesSchema = z.object({
+  activo: z.boolean(),
+  duracionSeg: z.number().positive().default(0.4),
+  zoomInicialSeg: z.number().nonnegative().default(1.2),
+  // How much silence padding buildEdl keeps around each detected speech run
+  // (alignment.ts's own default is 0.2s — a little breathing room around a
+  // plain hard cut). A transition needs to happen exactly where speech stops
+  // and starts, not into leftover silence, so this pulls that padding down
+  // close to zero specifically for tenants using transitions.
+  margenSilencioSeg: z.number().nonnegative().default(0.2),
+});
+
 const musicaSchema = z.object({
   volumenDb: z.number(),
   ducking: z.boolean().default(true),
@@ -115,6 +133,7 @@ export const presetSchema = z.object({
   titulo: tituloSchema,
   correccionColor: correccionColorSchema.optional(),
   limpiezaAudio: limpiezaAudioSchema.optional(),
+  transiciones: transicionesSchema.optional(),
   musica: musicaSchema,
   salida: salidaSchema,
 });

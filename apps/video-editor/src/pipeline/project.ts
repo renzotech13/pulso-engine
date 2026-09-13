@@ -130,7 +130,11 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
     const edlPath = path.join(artifactsDir, "edl", `${scriptVideo.id}.json`);
     let edl = force ? undefined : await readJsonIfExists(edlPath, edlSchema);
     if (!edl) {
-      edl = buildEdl(scriptVideo, assigned);
+      edl = buildEdl(
+        scriptVideo,
+        assigned,
+        preset.transiciones ? { marginSec: preset.transiciones.margenSilencioSeg } : {},
+      );
       await writeJson(edlPath, edl);
     }
 
