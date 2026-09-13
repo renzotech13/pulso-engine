@@ -228,28 +228,50 @@ function toRun(words: TranscriptWord[]): SpeechRun {
 
 const COUNTDOWN_WORDS = new Set(["0", "1", "2", "3", "4", "5", "cero", "uno", "dos", "tres", "cuatro", "cinco"]);
 // "va" confirmed on real AZ footage (whisper.cpp transcript: "3, 2, 1, va."
-// repeated across multiple takes) — this crew's own cue word for "go/action",
-// not just a generic guess.
-const COUNTDOWN_CUE_WORDS = new Set(["accion", "ya", "va", "grabando", "camara", "luces", "claqueta", "rec", "grabar"]);
+// repeated across multiple takes) — this crew's own cue word for "go/action".
+// Real production audio, never real ad copy this early: no script opens
+// with a director calling "acción" or a second voice answering "ya"/"va".
+const CUE_WORDS = new Set([
+  "accion",
+  "ya",
+  "va",
+  "grabando",
+  "camara",
+  "luces",
+  "claqueta",
+  "rec",
+  "grabar",
+  "corte",
+  "listo",
+  "listos",
+]);
 
 /**
- * Strips a spoken clapperboard countdown ("3, 2, 1, acción") from the very
- * start of a run. It's real production audio, not script content, but it
- * routinely runs straight into the actual line with no silence gap for
- * segmentIntoRuns to split on — confirmed on real AZ footage, where "2, 1,
- * acción. Soy ..." came through as a single continuous run and the countdown
- * ended up baked into the cut.
+ * Strips leading clapperboard/set chatter — a spoken countdown ("3, 2, 1,
+ * acción"), a bare director/talent exchange with no numbers at all
+ * ("Acción" ... "Ya" — confirmed on real AZ footage: two different voices,
+ * one giving the cue and the other confirming), or any mix of the two — from
+ * the very start of a run. It's real production audio, not script content,
+ * but it routinely runs straight into the actual line with no silence gap
+ * for segmentIntoRuns to split on.
  *
- * Requires at least TWO consecutive countdown words right at the start
- * before assuming anything: a single leading number is ordinary script
- * content too (ADS-06's real line opens with "Uno: revisamos gratis..."),
- * so one alone is never enough to trigger this.
+ * Consumes consecutive digit/cue words from BOTH vocabularies together
+ * (not "digits, then at most one cue word") — a run of "3, 2, 1, acción, ya"
+ * needs every one of those five stripped, not just the first four, or the
+ * leftover "ya" ends up spoken over the real line's opening word.
+ *
+ * Requires at least TWO consecutive words from this vocabulary right at the
+ * start before assuming anything: a single leading number OR a single "ya"
+ * is ordinary script content too (ADS-06 opens a line with "Uno: revisamos
+ * gratis...", ADS-05 opens one with "Ya sé qué tengo que ordenar..."), so
+ * one alone is never enough to trigger this.
  */
 export function stripLeadingCountdown(words: readonly TranscriptWord[]): readonly TranscriptWord[] {
   let i = 0;
-  while (i < words.length && COUNTDOWN_WORDS.has(normalizeToken(words[i]!.text))) i++;
+  while (i < words.length && (COUNTDOWN_WORDS.has(normalizeToken(words[i]!.text)) || CUE_WORDS.has(normalizeToken(words[i]!.text)))) {
+    i++;
+  }
   if (i < 2) return words;
-  if (i < words.length && COUNTDOWN_CUE_WORDS.has(normalizeToken(words[i]!.text))) i++;
   return words.slice(i);
 }
 
@@ -363,6 +385,14 @@ function bestScriptPosition(
  * Sin costos escondidos y con tu primera asesoría..." scored high enough
  * (chatter diluted but didn't kill the match) to become a candidate with ALL
  * of that baked into the final cut.
+ *
+ * Word-for-word alignment (alignWordSequences, the same tool subtitles.ts
+ * uses for spelling correction) was tried here first and rejected: its edit
+ * distance costs a substitution the same as a deletion, so on a tie the
+ * backtrack prefers substituting a chatter word against whatever script word
+ * happens to be adjacent rather than marking it unaligned — it essentially
+ * never recognizes chatter as chatter, confirmed by it leaving both test
+ * cases below completely untrimmed.
  *
  * Greedily trims from whichever end currently improves the match score more,
  * stopping the moment neither end helps — cheap (a handful of iterations,

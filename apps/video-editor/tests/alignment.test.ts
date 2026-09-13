@@ -132,6 +132,29 @@ describe("stripLeadingCountdown", () => {
     const words = [word("tres", 0, 0.2), word("dos", 0.3, 0.5), word("uno", 0.6, 0.8), word("va", 0.9, 1.1), word("en", 1.2, 1.4)];
     expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["en"]);
   });
+
+  it("drops a bare director/talent cue exchange with no numbers at all", () => {
+    // Real AZ footage: one voice off-camera calls "Acción", the on-camera
+    // talent answers "Ya", then the real line starts — no countdown digits
+    // anywhere. Previously only handled as "digits, then at most one cue
+    // word", so this fell through untouched.
+    const words = [word("accion", 0, 0.3), word("ya", 0.4, 0.6), word("hoy", 0.7, 0.9)];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["hoy"]);
+  });
+
+  it("drops every trailing cue word after a countdown, not just the first", () => {
+    // "3, 2, 1, acción, ya" — the old code stopped after consuming one cue
+    // word past the digits, leaving "ya" spoken over the real line's start.
+    const words = [
+      word("tres", 0, 0.2),
+      word("dos", 0.3, 0.5),
+      word("uno", 0.6, 0.8),
+      word("accion", 0.9, 1.1),
+      word("ya", 1.2, 1.4),
+      word("hoy", 1.5, 1.7),
+    ];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["hoy"]);
+  });
 });
 
 describe("assignAssetToScript", () => {
