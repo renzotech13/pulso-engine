@@ -66,6 +66,17 @@ const tituloSchema = z.object({
   salidaSeg: z.number().nonnegative().default(0),
 });
 
+// Corrige tomas grabadas en un perfil plano tipo log (S-Log3, etc.) que sin
+// esto salen pálidas/desaturadas — una LUT 3D del propio fabricante de la
+// cámara, no algo que este repo genere o distribuya (ver config/luts/,
+// gitignored). Opcional porque no todo el metraje de un preset necesariamente
+// viene de la misma cámara/perfil: un preset que la active asume que TODO su
+// metraje comparte ese perfil (mezclar b-roll ya en Rec.709 con esto activo
+// lo corregiría dos veces y se vería mal).
+const correccionColorSchema = z.object({
+  lutPath: z.string(),
+});
+
 const musicaSchema = z.object({
   volumenDb: z.number(),
   ducking: z.boolean().default(true),
@@ -93,6 +104,7 @@ export const presetSchema = z.object({
   }),
   subtitulos: subtitulosSchema,
   titulo: tituloSchema,
+  correccionColor: correccionColorSchema.optional(),
   musica: musicaSchema,
   salida: salidaSchema,
 });

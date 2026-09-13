@@ -47,13 +47,18 @@ function edlDurationSec(edl: Edl): number {
 }
 
 /**
- * One ffmpeg invocation: every segment gets its own trim+scale+pad+fps
+ * One ffmpeg invocation: every segment gets its own trim+(LUT)+scale+pad+fps
  * filter chain (normalizing away any source resolution/fps mismatch), then
  * the concat filter joins them — a single pass, no per-segment temp files.
  * Segments that repeat the same source file reuse ONE `-i` for it (ffmpeg
  * seeks internally per trim), so a 3-take file isn't opened three times.
  */
-async function concatenateSegments(edl: Edl, spec: OutputSpec, outputPath: string): Promise<void> {
+async function concatenateSegments(
+  edl: Edl,
+  spec: OutputSpec,
+  outputPath: string,
+  colorLutPath: string | undefined,
+): Promise<void> {
   if (edl.segmentos.length === 0) {
     throw new RenderError(`el guion "${edl.videoId}" no tiene ningún segmento en su EDL — nada que renderizar`);
   }
@@ -63,12 +68,20 @@ async function concatenateSegments(edl: Edl, spec: OutputSpec, outputPath: strin
 
   const inputArgs = uniqueFiles.flatMap((file) => ["-i", file]);
 
+  // Applied BEFORE scale/pad — a log profile's values aren't perceptually
+  // linear, so grading first and resizing the already-graded image matches
+  // normal color-pipeline order (and how an NLE would do it), rather than
+  // interpolating log-encoded pixels during the resize.
+  const colorLut = colorLutPath
+    ? `,format=gbrp16le,lut3d=file=${colorLutPath}:interp=tetrahedral,format=yuv420p`
+    : "";
+
   const filterParts: string[] = [];
   const concatRefs: string[] = [];
   edl.segmentos.forEach((segment, i) => {
     const inputIdx = fileIndex.get(segment.archivo)!;
     filterParts.push(
-      `[${inputIdx}:v]trim=start=${segment.inicio}:end=${segment.fin},setpts=PTS-STARTPTS,` +
+      `[${inputIdx}:v]trim=start=${segment.inicio}:end=${segment.fin},setpts=PTS-STARTPTS${colorLut},` +
         `scale=${spec.width}:${spec.height}:force_original_aspect_ratio=decrease,` +
         `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps}[v${i}]`,
     );
@@ -235,7 +248,7 @@ export async function renderProject(
     // concatenateSegments) as an intermediate for mixAudio to process,
     // which MP4's muxer doesn't support cleanly the way QuickTime's does.
     const concatenatedPath = path.join(workDir, "concatenated.mov");
-    await concatenateSegments(edl, spec, concatenatedPath);
+    await concatenateSegments(edl, spec, concatenatedPath, preset.correccionColor?.lutPath);
 
     const durationSec = edlDurationSec(edl);
 

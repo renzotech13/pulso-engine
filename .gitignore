@@ -30,3 +30,7 @@ packages/db/supabase/snippets/
 # Modelos de whisper.cpp (cientos de MB) — se descargan una vez a mano, ver
 # apps/video-editor/README.md. WHISPER_MODEL_PATH apunta a uno de estos.
 apps/video-editor/models/
+
+# LUTs de cámara (del fabricante, no de este repo) — un preset las referencia
+# por ruta absoluta en correccionColor.lutPath.
+apps/video-editor/config/luts/

@@ -35,6 +35,9 @@
     "entradaSeg": 0.3,
     "salidaSeg": 0.3
   },
+  "correccionColor": {
+    "lutPath": "/Users/renzo/Pulso Engine/apps/video-editor/config/luts/sony-slog3-sgamut3cine-to-cine709.cube"
+  },
   "musica": { "volumenDb": -18, "ducking": true, "fadeInSeg": 1, "fadeOutSeg": 2 },
   "salida": { "formato": "9:16", "resolucion": "1080x1920", "fps": 30, "crf": 18 }
 }
