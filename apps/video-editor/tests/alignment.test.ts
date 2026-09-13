@@ -124,6 +124,14 @@ describe("stripLeadingCountdown", () => {
     const words = [word("hoy", 0, 0.2), word("te", 0.3, 0.4)];
     expect(stripLeadingCountdown(words)).toBe(words);
   });
+
+  it("drops 'va' as a cue word — this crew's own countdown convention", () => {
+    // Real AZ footage: whisper.cpp transcribed "3, 2, 1, va." repeated
+    // across multiple takes — "va" leaked into a final cut because the cue
+    // word list only had "ya"/"accion"/etc, not this crew's actual word.
+    const words = [word("tres", 0, 0.2), word("dos", 0.3, 0.5), word("uno", 0.6, 0.8), word("va", 0.9, 1.1), word("en", 1.2, 1.4)];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["en"]);
+  });
 });
 
 describe("assignAssetToScript", () => {

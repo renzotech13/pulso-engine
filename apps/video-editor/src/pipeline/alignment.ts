@@ -227,7 +227,10 @@ function toRun(words: TranscriptWord[]): SpeechRun {
 }
 
 const COUNTDOWN_WORDS = new Set(["0", "1", "2", "3", "4", "5", "cero", "uno", "dos", "tres", "cuatro", "cinco"]);
-const COUNTDOWN_CUE_WORDS = new Set(["accion", "ya", "grabando", "camara", "luces", "claqueta", "rec", "grabar"]);
+// "va" confirmed on real AZ footage (whisper.cpp transcript: "3, 2, 1, va."
+// repeated across multiple takes) — this crew's own cue word for "go/action",
+// not just a generic guess.
+const COUNTDOWN_CUE_WORDS = new Set(["accion", "ya", "va", "grabando", "camara", "luces", "claqueta", "rec", "grabar"]);
 
 /**
  * Strips a spoken clapperboard countdown ("3, 2, 1, acción") from the very
