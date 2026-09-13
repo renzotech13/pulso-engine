@@ -5,6 +5,7 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  onnxruntime-node: true
   puppeteer: true
   sharp: true
 minimumReleaseAgeExclude:
