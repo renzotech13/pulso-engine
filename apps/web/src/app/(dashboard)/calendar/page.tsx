@@ -164,6 +164,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
                 },
               ]}
             />
+            <Link href="/calendar/import" className={buttonClass("secondary", "sm")}>
+              Importar cronograma
+            </Link>
             <form action={requestCalendarRegenerationAction}>
               <input type="hidden" name="tenantId" value={ctx.tenantId} />
               <SubmitButton

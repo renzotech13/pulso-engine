@@ -13,6 +13,7 @@ import { createServiceRoleClient } from "./supabase/service";
 import { createSupabaseServerClient } from "./supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "./tenant-context";
 import { requireAdmin } from "./admin";
+import { isValidImportRow, parseCalendarImportHtml, type ImportRow, type ImportRowError } from "./calendar-import";
 
 async function createTenantActionImpl(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
@@ -265,6 +266,155 @@ export async function moveCalendarSlotDateAction(
 
   revalidatePath("/calendar");
   redirect(`/calendar/${newDate}?slot=${targetIndex}`);
+}
+
+export interface ImportPreviewRow extends ImportRow {
+  /** The theme already sitting on that day's main slot, if any — importing overwrites it. */
+  existingTheme: string | null;
+}
+
+export interface CalendarImportState {
+  step: "start" | "preview" | "done";
+  error: string | null;
+  rows: ImportPreviewRow[];
+  rowErrors: ImportRowError[];
+  result: { created: number; updated: number } | null;
+}
+
+const CALENDAR_IMPORT_IDLE: Omit<CalendarImportState, "error"> = {
+  step: "start",
+  rows: [],
+  rowErrors: [],
+  result: null,
+};
+
+/**
+ * Two-step import of a hand-written content plan (see calendar-import.ts for
+ * why this is a fixed HTML table, not free-form text through an LLM): the
+ * same action previews (parses the file, shows what would change, changes
+ * nothing) and confirms (writes content_calendar + fires the same
+ * request_creative_generation RPC the status dropdown already uses — see
+ * updateCalendarSlotAction above), branching on `intent` so the client only
+ * needs one useActionState hook (see import-form.tsx).
+ *
+ * Always writes to slot_index 0 (the main daily slot) — this is the owner's
+ * plan, so unlike the Planner it does NOT re-apply weekly caps or the reels
+ * pause; it also does not re-trigger generation for a day that was already
+ * approved (same "only on draft/skipped → approved" guard as
+ * updateCalendarSlotAction), so overwriting an already-generated day's theme
+ * leaves its old piece in place until someone hits "Regenerar".
+ */
+export async function calendarImportAction(
+  _prevState: CalendarImportState,
+  formData: FormData,
+): Promise<CalendarImportState> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const intent = String(formData.get("intent") ?? "preview");
+  if (!tenantId) return { ...CALENDAR_IMPORT_IDLE, error: "Falta el tenant." };
+
+  const supabase = await createSupabaseServerClient();
+  await requireTenantEditor(supabase, tenantId);
+
+  if (intent === "confirm") {
+    let candidateRows: unknown;
+    try {
+      candidateRows = JSON.parse(String(formData.get("rows") ?? "[]"));
+    } catch {
+      candidateRows = [];
+    }
+    const rows = (Array.isArray(candidateRows) ? candidateRows : []).filter(isValidImportRow);
+    if (rows.length === 0) {
+      return { ...CALENDAR_IMPORT_IDLE, error: "Se perdió la previsualización — subí el archivo de nuevo." };
+    }
+
+    const service = createServiceRoleClient();
+    let created = 0;
+    let updated = 0;
+
+    for (const row of rows) {
+      const { data: existing } = await service
+        .from("content_calendar")
+        .select("id, status")
+        .eq("tenant_id", tenantId)
+        .eq("date", row.date)
+        .eq("slot_index", 0)
+        .maybeSingle();
+
+      const payload = {
+        theme: row.theme,
+        slot_type: row.slotType,
+        status: "approved" as const,
+        notes: row.notes ?? null,
+        source: { agent: "manual-import", rationale: "Importado desde cronograma HTML" },
+      };
+
+      let slotId: string;
+      const wasApproved = existing?.status === "approved";
+      if (existing) {
+        const { error } = await service.from("content_calendar").update(payload).eq("id", existing.id);
+        if (error) return { ...CALENDAR_IMPORT_IDLE, error: error.message };
+        slotId = existing.id;
+        updated += 1;
+      } else {
+        const { data: inserted, error } = await service
+          .from("content_calendar")
+          .insert({ tenant_id: tenantId, date: row.date, slot_index: 0, ...payload })
+          .select("id")
+          .single();
+        if (error || !inserted) return { ...CALENDAR_IMPORT_IDLE, error: error?.message ?? "no se pudo crear el día" };
+        slotId = inserted.id;
+        created += 1;
+      }
+
+      if (!wasApproved) {
+        const { error: rpcError } = await supabase.rpc("request_creative_generation", {
+          target_calendar_slot_id: slotId,
+        });
+        if (rpcError) return { ...CALENDAR_IMPORT_IDLE, error: rpcError.message };
+      }
+    }
+
+    revalidatePath("/calendar");
+    return { step: "done", error: null, rows: [], rowErrors: [], result: { created, updated } };
+  }
+
+  // intent === "preview" — parses and shows what would change, writes nothing.
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ...CALENDAR_IMPORT_IDLE, error: "Subí un archivo .html." };
+  }
+
+  const html = await file.text();
+  const { rows, errors } = parseCalendarImportHtml(html);
+  if (rows.length === 0) {
+    return {
+      ...CALENDAR_IMPORT_IDLE,
+      error:
+        errors.length > 0
+          ? "Ninguna fila válida — revisá los errores de abajo."
+          : "No se encontró ninguna fila con fecha (AAAA-MM-DD) en el archivo.",
+      rowErrors: errors,
+    };
+  }
+
+  const { data: existingSlots } = await supabase
+    .from("content_calendar")
+    .select("date, theme")
+    .eq("tenant_id", tenantId)
+    .eq("slot_index", 0)
+    .in(
+      "date",
+      rows.map((r) => r.date),
+    );
+  const existingByDate = new Map((existingSlots ?? []).map((s) => [s.date, s.theme]));
+
+  return {
+    step: "preview",
+    error: null,
+    rows: rows.map((r) => ({ ...r, existingTheme: existingByDate.get(r.date) ?? null })),
+    rowErrors: errors,
+    result: null,
+  };
 }
 
 async function approveCreativeActionImpl(formData: FormData): Promise<void> {
