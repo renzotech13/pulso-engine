@@ -142,6 +142,30 @@ describe("stripLeadingCountdown", () => {
     expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["hoy"]);
   });
 
+  it("tolerates an ordinary connector word INSIDE the countdown ('Grabando en 3, 2, 1, Acción')", () => {
+    // Real AZ footage, ADS-01-ESCENA-01: "¡Grabando en 3, 2, 1, ¡Acción!" —
+    // "en" breaks up what would otherwise be a clean run of countdown/cue
+    // words, and the old code just stopped at "grabando" (a single match,
+    // below the 2-word threshold), leaving the whole countdown in the cut.
+    const words = [
+      word("grabando", 0, 0.2),
+      word("en", 0.2, 0.3),
+      word("tres", 0.3, 0.5),
+      word("dos", 0.5, 0.7),
+      word("uno", 0.7, 0.9),
+      word("accion", 0.9, 1.2),
+      word("sigues", 1.3, 1.5),
+    ];
+    expect(stripLeadingCountdown(words).map((w) => w.text)).toEqual(["sigues"]);
+  });
+
+  it("does not swallow a real connector word when nothing countdown-shaped follows it", () => {
+    // "en" is ordinary Spanish — plenty of real script lines contain it —
+    // so it must never be treated as part of a countdown on its own.
+    const words = [word("en", 0, 0.2), word("la", 0.2, 0.3), word("notaria", 0.3, 0.6)];
+    expect(stripLeadingCountdown(words)).toBe(words);
+  });
+
   it("drops every trailing cue word after a countdown, not just the first", () => {
     // "3, 2, 1, acción, ya" — the old code stopped after consuming one cue
     // word past the digits, leaving "ya" spoken over the real line's start.

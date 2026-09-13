@@ -97,6 +97,11 @@ const limpiezaAudioSchema = z.object({
 // "ochocientos" con 0.4s de duración.
 const transicionesSchema = z.object({
   activo: z.boolean(),
+  // Any ffmpeg xfade transition name (fade, zoomin, dissolve, wipeleft...).
+  // Not validated against ffmpeg's own list here — an unsupported name just
+  // fails loud at render time with ffmpeg's own error, same as a typo in any
+  // other ffmpeg-facing preset field.
+  tipo: z.string().default("fade"),
   duracionSeg: z.number().positive().default(0.15),
   zoomInicialSeg: z.number().nonnegative().default(1.2),
   // How much silence padding buildEdl keeps around each detected speech run

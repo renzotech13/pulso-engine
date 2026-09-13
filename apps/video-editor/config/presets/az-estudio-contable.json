@@ -39,7 +39,7 @@
     "lutPath": "/Users/renzo/Pulso Engine/apps/video-editor/config/luts/sony-slog3-sgamut3cine-to-lc709typea.cube"
   },
   "limpiezaAudio": { "activo": true },
-  "transiciones": { "activo": true, "duracionSeg": 0.15, "zoomInicialSeg": 1.2, "margenSilencioSeg": 0.1 },
+  "transiciones": { "activo": true, "tipo": "fade", "duracionSeg": 0.08, "zoomInicialSeg": 1.2, "margenSilencioSeg": 0.1 },
   "musica": { "volumenDb": -18, "ducking": true, "fadeInSeg": 1, "fadeOutSeg": 2 },
   "salida": { "formato": "9:16", "resolucion": "1080x1920", "fps": 30, "crf": 18 }
 }

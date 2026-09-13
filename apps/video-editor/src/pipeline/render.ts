@@ -125,6 +125,8 @@ async function concatenateSegments(
 }
 
 export interface TransitionOptions {
+  /** Any ffmpeg xfade transition name (fade, zoomin, dissolve, wipeleft...). */
+  tipo: string;
   duracionSeg: number;
   /** 0 disables the opening zoom entirely. */
   zoomInicialSeg: number;
@@ -132,7 +134,8 @@ export interface TransitionOptions {
 
 /**
  * Same job as concatenateSegments, but joins consecutive DIFFERENT scenes
- * with a quick native ffmpeg zoom-in (xfade) instead of a hard cut. Parts of
+ * with a quick native ffmpeg xfade transition (transitions.tipo — "fade" by
+ * default, but any ffmpeg xfade name works) instead of a hard cut. Parts of
  * the SAME scene (see sceneKeyForFile: a real crew's own retake/continuation
  * split, e.g. "-PARTE-01"/"-PARTE-02") stay a plain hard cut — no transition
  * at all — on purpose: an xfade/acrossfade overlaps the last D seconds of
@@ -140,10 +143,10 @@ export interface TransitionOptions {
  * same-scene join is exactly where that overlap lands ON somebody's actual
  * words. Confirmed on real footage: a light-leak-style xfade there faded out
  * the tail of "ochocientos" mid-word while the next take's audio was
- * already fading in underneath it, and the same D applied to zoom-in joins
- * risks the same thing at scene boundaries. Kept short by default for
- * exactly that reason — long enough to read as a quick visual flourish,
- * short enough to rarely land squarely on a spoken word.
+ * already fading in underneath it, and the same D applied to a
+ * different-scene join risks the same thing at scene boundaries. Kept short
+ * by default for exactly that reason — long enough to read as a quick
+ * visual flourish, short enough to rarely land squarely on a spoken word.
  *
  * ffmpeg's xfade/acrossfade/concat only join TWO streams at a time, so this
  * chains them pairwise left to right. computeSegmentStartOffsets (shared
@@ -225,7 +228,7 @@ async function concatenateSegmentsWithTransitions(
       filterParts.push(`[${audioLabel}][a${i}]concat=n=2:v=0:a=1[${nextAudioLabel}]`);
     } else {
       filterParts.push(
-        `[${videoLabel}][v${i}]xfade=transition=zoomin:duration=${D}:offset=${offsets[i]}[${nextVideoLabel}]`,
+        `[${videoLabel}][v${i}]xfade=transition=${transitions.tipo}:duration=${D}:offset=${offsets[i]}[${nextVideoLabel}]`,
       );
       filterParts.push(`[${audioLabel}][a${i}]acrossfade=d=${D}[${nextAudioLabel}]`);
     }
@@ -395,6 +398,7 @@ export async function renderProject(
     let durationSec: number;
     if (preset.transiciones?.activo) {
       durationSec = await concatenateSegmentsWithTransitions(edl, spec, concatenatedPath, preset.correccionColor?.lutPath, {
+        tipo: preset.transiciones.tipo,
         duracionSeg: preset.transiciones.duracionSeg,
         zoomInicialSeg: preset.transiciones.zoomInicialSeg,
       });

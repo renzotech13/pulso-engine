@@ -247,6 +247,19 @@ const CUE_WORDS = new Set([
   "listos",
 ]);
 
+// Ordinary connector words that can sit BETWEEN countdown/cue words in a real
+// clapperboard call without being real script content themselves — confirmed
+// on real AZ footage: "¡Grabando EN 3, 2, 1, Acción!". Only ever tolerated
+// when a real countdown/cue word follows immediately after (see
+// stripLeadingCountdown) — on their own they're completely ordinary Spanish
+// and plenty of real script lines contain them.
+const COUNTDOWN_CONNECTOR_WORDS = new Set(["en", "y"]);
+
+function isCountdownOrCueWord(text: string): boolean {
+  const token = normalizeToken(text);
+  return COUNTDOWN_WORDS.has(token) || CUE_WORDS.has(token);
+}
+
 /**
  * Strips leading clapperboard/set chatter — a spoken countdown ("3, 2, 1,
  * acción"), a bare director/talent exchange with no numbers at all
@@ -259,21 +272,42 @@ const CUE_WORDS = new Set([
  * Consumes consecutive digit/cue words from BOTH vocabularies together
  * (not "digits, then at most one cue word") — a run of "3, 2, 1, acción, ya"
  * needs every one of those five stripped, not just the first four, or the
- * leftover "ya" ends up spoken over the real line's opening word.
+ * leftover "ya" ends up spoken over the real line's opening word. A lone
+ * ordinary connector ("en", "y") is also tolerated, but ONLY when a real
+ * countdown/cue word immediately follows it — "¡Grabando en 3, 2, 1,
+ * Acción!" needs "en" stripped too, but a connector with nothing
+ * countdown-shaped after it just ends the run normally (real script content
+ * routinely contains "en"/"y", so one on its own proves nothing).
  *
- * Requires at least TWO consecutive words from this vocabulary right at the
- * start before assuming anything: a single leading number OR a single "ya"
- * is ordinary script content too (ADS-06 opens a line with "Uno: revisamos
- * gratis...", ADS-05 opens one with "Ya sé qué tengo que ordenar..."), so
- * one alone is never enough to trigger this.
+ * Requires at least TWO consecutive words from the countdown/cue vocabulary
+ * (connectors don't count toward this) right at the start before assuming
+ * anything: a single leading number OR a single "ya" is ordinary script
+ * content too (ADS-06 opens a line with "Uno: revisamos gratis...", ADS-05
+ * opens one with "Ya sé qué tengo que ordenar..."), so one alone is never
+ * enough to trigger this.
  */
 export function stripLeadingCountdown(words: readonly TranscriptWord[]): readonly TranscriptWord[] {
   let i = 0;
-  while (i < words.length && (COUNTDOWN_WORDS.has(normalizeToken(words[i]!.text)) || CUE_WORDS.has(normalizeToken(words[i]!.text)))) {
-    i++;
+  let matchCount = 0;
+  let cutAt = 0;
+
+  while (i < words.length) {
+    if (isCountdownOrCueWord(words[i]!.text)) {
+      i++;
+      matchCount++;
+      cutAt = i;
+      continue;
+    }
+    const isConnector = COUNTDOWN_CONNECTOR_WORDS.has(normalizeToken(words[i]!.text));
+    if (isConnector && i + 1 < words.length && isCountdownOrCueWord(words[i + 1]!.text)) {
+      i++; // tentatively skip; cutAt only advances past this once the next real match lands
+      continue;
+    }
+    break;
   }
-  if (i < 2) return words;
-  return words.slice(i);
+
+  if (matchCount < 2) return words;
+  return words.slice(cutAt);
 }
 
 export interface BuildEdlOptions {
