@@ -153,6 +153,19 @@ export interface AssetAssignment {
  * simply hasn't been compared against yet. A filename hint (the script's id
  * appearing in the asset's path) adds a flat bonus rather than deciding
  * things outright, since a rename would otherwise silently break it.
+ *
+ * Scored with containment, not symmetric Dice: one raw take is normally a
+ * short excerpt of ONE scene, while a script can legitimately bundle several
+ * scenes into a single `guion` (a whole ad, several lines long). Dice
+ * penalizes that size gap directly — a perfectly-matching 9-word clip
+ * against an 80-word multi-scene script scores low no matter how clean the
+ * match is, just because the script is so much longer than the clip.
+ * Confirmed on real footage: a take whose entire transcript was a clean
+ * excerpt of its script still scored under the old default `minScore`
+ * (0.08) via Dice, and was silently dropped from the final cut. Containment
+ * asks the right question instead — "is the SHORT side's content really in
+ * there" — which is exactly what "does this take belong to this script"
+ * means.
  */
 export function assignAssetToScript(
   analysis: AudioAnalysis,
@@ -164,7 +177,7 @@ export function assignAssetToScript(
 
   let best: AssetAssignment = { scriptVideoId: undefined, score: 0 };
   for (const script of scripts) {
-    let score = textSimilarity(transcriptText, script.guion);
+    let score = textContainment(transcriptText, script.guion);
     if (filename.includes(script.id.toLowerCase())) score += 0.15;
     if (score > best.score) best = { scriptVideoId: script.id, score };
   }

@@ -159,6 +159,43 @@ describe("assignAssetToScript", () => {
     );
     expect(assignment.scriptVideoId).toBe("video-2");
   });
+
+  it("assigns a short clean take to the one script it belongs to, even when that script bundles several scenes into one long guion", () => {
+    // Real bug, real numbers: AZ's ADS-01 guion bundles 5 scenes (~80 words)
+    // into one `guion` string, and this take (ADS-01-ESCENA-03-PARTE-01) is
+    // whisper.cpp's actual transcript of just ONE of those scenes — "Tú solo
+    // firmas en la notaría, precio cerrado desde S/ 800" misheard as "Su
+    // solo firma..." / "presos cerrado...". Symmetric Dice scored this
+    // 0.058 (confirmed by temporarily reverting this function to use
+    // textSimilarity instead of textContainment and re-running this exact
+    // test) — under the default minScore (0.08) purely because an 80-word
+    // script structurally caps how high a 10-word clip's Dice score can
+    // reach, even with a clean match. The take was silently dropped from
+    // the final cut despite clearly belonging there.
+    const ads01: ScriptVideo = {
+      id: "video-1",
+      titulo: "Tu empresa en 7 días, 100% online",
+      mostrarTitulo: true,
+      guion:
+        "¿Sigues vendiendo con tu DNI? En 7 días hábiles puedes tener tu empresa con RUC 20... sin salir de casa. " +
+        "Nosotros reservamos el nombre, redactamos tu minuta, coordinamos la notaría, inscribimos en SUNARP y sacamos tu RUC y tu Clave SOL. " +
+        "Tú solo firmas en la notaría. Precio cerrado desde S/ 800 con IGV, sin costos escondidos, y con tu primera asesoría contable incluida. " +
+        "Soy Alexis Ramos y en AZ te atendemos nosotros, con nombre y apellido, en menos de 24 horas. " +
+        "Escríbenos por WhatsApp y te decimos hoy qué tipo de empresa te conviene. Gratis.",
+      necesitaRevision: false,
+    };
+
+    const assignment = assignAssetToScript(
+      analysisWithText(
+        "ADS-01-ESCENA-03-PARTE-01.mp4",
+        "Su solo firma en la notaria, presos cerrado desde 800 soles.",
+      ),
+      [...scripts, ads01],
+    );
+
+    expect(assignment.scriptVideoId).toBe("video-1");
+    expect(assignment.score).toBeGreaterThanOrEqual(0.08);
+  });
 });
 
 describe("buildEdl", () => {
