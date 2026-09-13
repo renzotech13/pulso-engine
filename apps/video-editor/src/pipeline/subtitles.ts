@@ -41,6 +41,35 @@ function nearestAligned(alignment: readonly (number | null)[], i: number): numbe
 }
 
 /**
+ * True only when index `i` sits BETWEEN two real alignments (something
+ * non-null both before and after it) — the shape of a mis-heard word
+ * splitting into extra transcript tokens ("Sunarp" → "su narb": "en" aligns
+ * before, "y" aligns after). False for a TRAILING or LEADING run of
+ * unaligned words, which is a different shape entirely: real content the
+ * matched guion text simply didn't reach (guionTexto stopped at "desde" while
+ * the take kept going "...800 soles"). Borrowing a neighbor's word for that
+ * trailing run is wrong twice over — it shows the wrong word, and the
+ * dedup pass right after this then collapses it with its borrowed-from
+ * neighbor, silently deleting real spoken content from the subtitle.
+ * Confirmed on real AZ footage: "800" and "soles" both borrowed "desde" from
+ * the last aligned word and vanished into it.
+ */
+function isInteriorGap(alignment: readonly (number | null)[], i: number): boolean {
+  let hasBefore = false;
+  for (let j = i - 1; j >= 0; j--) {
+    if (alignment[j] !== null) {
+      hasBefore = true;
+      break;
+    }
+  }
+  if (!hasBefore) return false;
+  for (let j = i + 1; j < alignment.length; j++) {
+    if (alignment[j] !== null) return true;
+  }
+  return false;
+}
+
+/**
  * One EDL segment's words, retimed onto the OUTPUT timeline and, when
  * trustworthy, showing the SCRIPT's spelling instead of the transcript's.
  * Uses a real sequence alignment (alignWordSequences) rather than
@@ -71,12 +100,18 @@ function resolveSegmentWords(
     : [];
 
   const resolved = transcriptWords.map((word, i) => {
-    const guionIndex = useGuionText ? (alignment[i] ?? nearestAligned(alignment, i)) : null;
+    const direct = useGuionText ? alignment[i] : null;
+    const guionIndex = direct ?? (useGuionText && isInteriorGap(alignment, i) ? nearestAligned(alignment, i) : null);
     return {
       text: guionIndex !== null ? guionWords[guionIndex]! : word.text,
       startSec: outputCursor + (word.startSec - segment.inicio),
       endSec: outputCursor + (word.endSec - segment.inicio),
-      bajaConfianza: !useGuionText,
+      // A trailing/leading run past the matched guion span keeps the
+      // transcript's own words (real content the confidence gate just
+      // didn't extend guionTexto over) — worth flagging low-confidence even
+      // when the rest of the segment trusted the script's spelling, since
+      // this word specifically didn't get that benefit.
+      bajaConfianza: !useGuionText || guionIndex === null,
     };
   });
 

@@ -136,6 +136,57 @@ describe("remapWordsToEdlTimeline", () => {
     expect(last.endSec).toBeCloseTo(0.9);
   });
 
+  it("keeps trailing real content the guion text didn't reach, instead of collapsing it into the last matched word", () => {
+    // Real bug, real numbers: ADS-01-ESCENA-03-PARTE-01. guionTexto only
+    // reached "...precio cerrado desde" (buildEdl's confidence gate didn't
+    // extend past it, since the take's actual wording — "800 soles" —
+    // diverges from the script's "S/ 800 con IGV"). The real take keeps
+    // talking past that point. Before this fix, "800" and "soles" both had
+    // no alignment of their own (guionWords ran out), borrowed the nearest
+    // aligned neighbor ("desde") via nearestAligned, and then the dedup
+    // pass collapsed all three into one "desde" — silently deleting the
+    // price from the subtitle even though it's genuinely in the audio.
+    const edl: Edl = {
+      videoId: "video-1",
+      segmentos: [
+        segment({
+          archivo: "a.mp4",
+          inicio: 0,
+          fin: 2,
+          guionTexto: "Tú solo firmas en la notaría. Precio cerrado desde",
+        }),
+      ],
+    };
+    const analysis: AudioAnalysis = {
+      assetPath: "a.mp4",
+      provider: "test",
+      language: "es",
+      words: [
+        word("Tu", 0, 0.1),
+        word("solo", 0.1, 0.2),
+        word("firma", 0.2, 0.3),
+        word("en", 0.3, 0.4),
+        word("la", 0.4, 0.5),
+        word("notaria", 0.5, 0.6),
+        word("precio", 0.6, 0.7),
+        word("cerrado", 0.7, 0.8),
+        word("desde", 0.8, 0.9),
+        word("800", 0.9, 1.0),
+        word("soles", 1.0, 1.1),
+      ],
+      silences: [],
+    };
+
+    const remapped = remapWordsToEdlTimeline(edl, new Map([["a.mp4", analysis]]));
+    const texts = remapped.map((w) => w.text.toLowerCase());
+
+    expect(texts).toContain("800");
+    expect(texts).toContain("soles");
+    // Both trailing words keep their OWN raw text, not a shared borrowed
+    // one — they must not have been deduped into each other or into "desde".
+    expect(texts.filter((t) => t === "desde")).toHaveLength(1);
+  });
+
   it("swaps in the script's own wording when the word count matches the transcript", () => {
     const edl: Edl = {
       videoId: "video-1",
