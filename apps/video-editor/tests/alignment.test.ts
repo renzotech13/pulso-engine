@@ -383,10 +383,14 @@ describe("buildEdl", () => {
     expect(buildEdl(script, [analysis]).segmentos).toHaveLength(0);
   });
 
-  it("leaves guionTexto unset for a weak match, so subtitles fall back to the transcript", () => {
+  it("trims off trailing chatter once it recognizes a confident match in the earlier part of the run", () => {
     // Starts by genuinely echoing the script, then wanders off it entirely —
-    // enough shared bigrams to clear minRunScore, nowhere near enough to
-    // trust the rest of the "match" as the script's own wording.
+    // whisper.cpp routinely captures this on real takes when a talent trails
+    // into unrelated chatter with no detected silence for segmentIntoRuns to
+    // split on. trimRunToBestMatch should find and keep just the clean
+    // "hoy te explico" prefix rather than either dropping the whole run
+    // (its blended score clears minRunScore) or trusting the wandered-off
+    // tail as if it were also the script's wording.
     const words: TranscriptWord[] = "hoy te explico algo distinto que no esta en el guion para nada"
       .split(" ")
       .map((w, i) => word(w, i, i + 0.9));
@@ -395,6 +399,36 @@ describe("buildEdl", () => {
     const edl = buildEdl(script, [analysis], { minRunScore: 0.05 });
 
     expect(edl.segmentos).toHaveLength(1);
-    expect(edl.segmentos[0]!.guionTexto).toBeUndefined();
+    expect(edl.segmentos[0]!.lineaGuion).toBe("hoy te explico");
+    expect(edl.segmentos[0]!.guionTexto).toBe("hoy te explico");
+  });
+
+  it("trims leading set chatter and a countdown that isn't at the very start of the run", () => {
+    // Real AZ footage, real whisper.cpp (small model) transcript for
+    // ADS-01-ESCENA-03-PARTE-02: several lines of off-set chatter run
+    // straight into a "3, 2, 1, va" countdown and then the actual line, all
+    // as ONE continuous run (no detected silence to split on). stripLeadingCountdown
+    // alone doesn't help here — the countdown isn't at position zero, the
+    // chatter is. Without this trim, the whole thing (including the
+    // clapperboard) ends up baked into the final cut.
+    const bundledScript: ScriptVideo = {
+      id: "video-1",
+      titulo: "Tu empresa en 7 días, 100% online",
+      mostrarTitulo: true,
+      guion:
+        "Tú solo firmas en la notaría. Precio cerrado desde S/ 800 con IGV, sin costos escondidos, y con tu primera asesoría contable incluida. " +
+        "Soy Alexis Ramos y en AZ te atendemos nosotros, con nombre y apellido, en menos de 24 horas.",
+      necesitaRevision: false,
+    };
+    const chatterAndLine =
+      "Es verdad no pasa nada no pasa nada gracias ahi esta bien ahi esta bien si tres dos uno va " +
+      "sin costos escondidos y con tu primera asesoria contable incluida";
+    const words: TranscriptWord[] = chatterAndLine.split(" ").map((w, i) => word(w, i, i + 0.9));
+    const analysis: AudioAnalysis = { assetPath: "ADS-01-ESCENA-03-PARTE-02.mp4", provider: "test", language: "es", words, silences: [] };
+
+    const edl = buildEdl(bundledScript, [analysis], { minRunScore: 0.1 });
+
+    expect(edl.segmentos).toHaveLength(1);
+    expect(edl.segmentos[0]!.lineaGuion).toBe("sin costos escondidos y con tu primera asesoria contable incluida");
   });
 });

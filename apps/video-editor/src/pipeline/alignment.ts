@@ -353,6 +353,73 @@ function bestScriptPosition(
 }
 
 /**
+ * Finds the tightest contiguous sub-range of `words` whose text best matches
+ * the script. Real takes routinely have off-script chatter stapled onto a
+ * run that segmentIntoRuns couldn't split apart because there's no detected
+ * silence between the junk and the real line — direction, renegotiating a
+ * price out loud, a countdown that isn't at the very start (stripLeadingCountdown
+ * only catches one at position zero). Confirmed on real AZ footage: a run
+ * transcribed as "Es verdad. No pasa nada... Ahí está bien. Sí. 3, 2, 1, va.
+ * Sin costos escondidos y con tu primera asesoría..." scored high enough
+ * (chatter diluted but didn't kill the match) to become a candidate with ALL
+ * of that baked into the final cut.
+ *
+ * Greedily trims from whichever end currently improves the match score more,
+ * stopping the moment neither end helps — cheap (a handful of iterations,
+ * not exhaustive over every sub-range) and correct for the realistic shape
+ * of the problem: junk sits at one end, not scattered through the middle of
+ * an otherwise-clean take.
+ */
+function trimRunToBestMatch(
+  words: readonly TranscriptWord[],
+  scriptTokensNormalized: string[],
+  scriptWordsOriginal: string[],
+): { words: readonly TranscriptWord[]; position: number; score: number; guionWords: string[] } {
+  const scoreRange = (lo: number, hi: number) => {
+    const text = words
+      .slice(lo, hi)
+      .map((w) => w.text)
+      .join(" ");
+    return bestScriptPosition(text, scriptTokensNormalized, scriptWordsOriginal);
+  };
+
+  let lo = 0;
+  let hi = words.length;
+  let best = scoreRange(lo, hi);
+
+  // Only worth hunting for a tighter sub-range when the whole run's own
+  // match is already weak enough to suggest it's diluted by off-script
+  // content. A run that matches cleanly as a whole should never get
+  // shrunk just because some smaller inner slice happens to score
+  // marginally higher — a clean 10-word take and its own best 7-word
+  // substring both score close to 1.0, and greedily preferring the
+  // smaller one throws away real content (confirmed: this exact thing
+  // broke a passing test before this threshold was added) for no actual
+  // gain.
+  if (best.score >= 0.5) {
+    return { words, position: best.position, score: best.score, guionWords: best.guionWords };
+  }
+
+  let improved = true;
+  while (improved && hi - lo > 3) {
+    improved = false;
+    const trimLeft = scoreRange(lo + 1, hi);
+    const trimRight = scoreRange(lo, hi - 1);
+    if (trimLeft.score > best.score && trimLeft.score >= trimRight.score) {
+      lo += 1;
+      best = trimLeft;
+      improved = true;
+    } else if (trimRight.score > best.score) {
+      hi -= 1;
+      best = trimRight;
+      improved = true;
+    }
+  }
+
+  return { words: words.slice(lo, hi), position: best.position, score: best.score, guionWords: best.guionWords };
+}
+
+/**
  * Builds the EDL for one script from every clip assigned to it. Runs are
  * scored against the script to drop filler, deduplicated to keep only the
  * last complete take of a repeated line, then ordered by where their
@@ -372,11 +439,15 @@ export function buildEdl(
   for (const analysis of assetAnalyses) {
     const runs = segmentIntoRuns(analysis.words, analysis.silences);
     for (const rawRun of runs) {
-      const words = stripLeadingCountdown(rawRun.words);
-      if (words.length === 0) continue;
-      const run = words.length === rawRun.words.length ? rawRun : toRun(words as TranscriptWord[]);
-      const text = run.words.map((w) => w.text).join(" ");
-      const { position, score, guionWords } = bestScriptPosition(text, scriptTokensNormalized, scriptWordsOriginal);
+      const afterCountdown = stripLeadingCountdown(rawRun.words);
+      if (afterCountdown.length === 0) continue;
+      const { words: trimmedWords, position, score, guionWords } = trimRunToBestMatch(
+        afterCountdown,
+        scriptTokensNormalized,
+        scriptWordsOriginal,
+      );
+      if (trimmedWords.length === 0) continue;
+      const run = toRun(trimmedWords as TranscriptWord[]);
       if (score >= opts.minRunScore) {
         candidates.push({ assetPath: analysis.assetPath, run, scriptPosition: position, score, guionWords });
       }
