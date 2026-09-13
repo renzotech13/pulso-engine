@@ -44,6 +44,59 @@ describe("remapWordsToEdlTimeline", () => {
     expect(remapped[1]!.endSec).toBeCloseTo(2.8);
   });
 
+  it("shrinks the offset by the transition duration at a DIFFERENT-scene join, matching what render.ts actually plays", () => {
+    // Real bug: render.ts's transitions mode overlaps (shortens) the output
+    // at every different-scene xfade join, but this function used to just
+    // add up segment durations as if every join were a hard cut — the
+    // subtitle for every segment after the first transition started later
+    // than the audio actually got there, and the gap compounded with each
+    // further transition. Confirmed on real output: it read as the subtitle
+    // "skipping" a segment's opening words once the drift caught up to the
+    // next block boundary.
+    const edl: Edl = {
+      videoId: "video-1",
+      segmentos: [
+        segment({ archivo: "ADS-01-ESCENA-03.mp4", inicio: 10, fin: 12 }),
+        // A different scene (no shared "-PARTE-N"-stripped basename) — a
+        // real transition, so the join overlaps and shortens the timeline.
+        segment({ archivo: "ADS-01-ESCENA-04.mp4", inicio: 20, fin: 22 }),
+      ],
+    };
+    const analyses = new Map<string, AudioAnalysis>([
+      ["ADS-01-ESCENA-03.mp4", { assetPath: "ADS-01-ESCENA-03.mp4", provider: "test", language: "es", words: [word("hola", 10.5, 11)], silences: [] }],
+      ["ADS-01-ESCENA-04.mp4", { assetPath: "ADS-01-ESCENA-04.mp4", provider: "test", language: "es", words: [word("mundo", 20.2, 20.8)], silences: [] }],
+    ]);
+
+    const remapped = remapWordsToEdlTimeline(edl, analyses, 0.4);
+
+    // Without the transition duration, "mundo" would start at 2.2 (as the
+    // very first test above shows for the no-transitions case). Joined with
+    // a 0.4s transition, the second segment's own start offset is 2 - 0.4 =
+    // 1.6, so "mundo" (0.2s into its segment) lands at 1.8, not 2.2.
+    expect(remapped[1]!.startSec).toBeCloseTo(1.8);
+  });
+
+  it("does NOT shrink the offset across a SAME-scene hard cut (a real crew's own -PARTE split)", () => {
+    const edl: Edl = {
+      videoId: "video-1",
+      segmentos: [
+        segment({ archivo: "ADS-01-ESCENA-03-PARTE-01.mp4", inicio: 10, fin: 12 }),
+        segment({ archivo: "ADS-01-ESCENA-03-PARTE-02.mp4", inicio: 20, fin: 22 }),
+      ],
+    };
+    const analyses = new Map<string, AudioAnalysis>([
+      ["ADS-01-ESCENA-03-PARTE-01.mp4", { assetPath: "ADS-01-ESCENA-03-PARTE-01.mp4", provider: "test", language: "es", words: [word("hola", 10.5, 11)], silences: [] }],
+      ["ADS-01-ESCENA-03-PARTE-02.mp4", { assetPath: "ADS-01-ESCENA-03-PARTE-02.mp4", provider: "test", language: "es", words: [word("mundo", 20.2, 20.8)], silences: [] }],
+    ]);
+
+    // Same transitionDurationSec as the test above, but this join is a hard
+    // cut (render.ts never applies a transition within the same scene), so
+    // the offset stays exactly what it'd be with no transitions at all.
+    const remapped = remapWordsToEdlTimeline(edl, analyses, 0.4);
+
+    expect(remapped[1]!.startSec).toBeCloseTo(2.2);
+  });
+
   it("drops words that fall outside every kept segment", () => {
     const edl: Edl = { videoId: "video-1", segmentos: [segment({ archivo: "a.mp4", inicio: 10, fin: 12 })] };
     const analysis: AudioAnalysis = {

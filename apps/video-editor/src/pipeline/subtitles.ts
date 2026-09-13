@@ -5,7 +5,7 @@
 // preset's palabrasPorBloque, and wraps each block's text into display
 // lines per maxCaracteresPorLinea/maxLineas.
 
-import { alignWordSequences, normalizeToken, splitOriginalWords } from "./alignment.js";
+import { alignWordSequences, computeSegmentStartOffsets, normalizeToken, splitOriginalWords } from "./alignment.js";
 import type { AudioAnalysis, Edl, SubtitleBlock, SubtitleTrack, TranscriptWord } from "./types.js";
 
 const DEFAULT_WORDS_PER_BLOCK = 6;
@@ -109,15 +109,29 @@ function resolveSegmentWords(
  * away) and how far into that segment it is — everything before the first
  * segment's start, after the last one's end, or in a gap between segments
  * that got cut has no output position and is dropped.
+ *
+ * `transitionDurationSec` MUST match whatever render.ts actually used to
+ * join segments (0 for a preset with no transitions, preset.transiciones's
+ * own duracionSeg otherwise) — a transition overlaps two segments and so
+ * shortens the real output by that much at every DIFFERENT-scene join
+ * (computeSegmentStartOffsets, shared with render.ts, is what keeps the two
+ * in agreement). Getting this wrong doesn't error, it just makes every
+ * subtitle after the first transition start later than the audio actually
+ * does, and the gap compounds with each further transition — confirmed on
+ * real output: it read as the subtitle "skipping" a segment's opening words
+ * entirely once the drift caught up to the next block boundary.
  */
-export function remapWordsToEdlTimeline(edl: Edl, analysesByAsset: ReadonlyMap<string, AudioAnalysis>): ResolvedWord[] {
+export function remapWordsToEdlTimeline(
+  edl: Edl,
+  analysesByAsset: ReadonlyMap<string, AudioAnalysis>,
+  transitionDurationSec = 0,
+): ResolvedWord[] {
   const remapped: ResolvedWord[] = [];
-  let outputCursor = 0;
+  const offsets = computeSegmentStartOffsets(edl.segmentos, transitionDurationSec);
 
-  for (const segment of edl.segmentos) {
-    remapped.push(...resolveSegmentWords(segment, analysesByAsset.get(segment.archivo), outputCursor));
-    outputCursor += segment.fin - segment.inicio;
-  }
+  edl.segmentos.forEach((segment, i) => {
+    remapped.push(...resolveSegmentWords(segment, analysesByAsset.get(segment.archivo), offsets[i]!));
+  });
 
   return remapped;
 }
@@ -146,8 +160,9 @@ export function buildSubtitleTrack(
   edl: Edl,
   analysesByAsset: ReadonlyMap<string, AudioAnalysis>,
   wordsPerBlock?: number,
+  transitionDurationSec = 0,
 ): SubtitleTrack {
-  const words = remapWordsToEdlTimeline(edl, analysesByAsset);
+  const words = remapWordsToEdlTimeline(edl, analysesByAsset, transitionDurationSec);
   return { videoId: edl.videoId, bloques: groupWordsIntoBlocks(words, wordsPerBlock) };
 }
 

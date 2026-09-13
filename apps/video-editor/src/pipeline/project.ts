@@ -142,7 +142,12 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
     const subtitlesPath = path.join(artifactsDir, "subtitles", `${scriptVideo.id}.json`);
     let subtitleTrack = force ? undefined : await readJsonIfExists(subtitlesPath, subtitleTrackSchema);
     if (!subtitleTrack) {
-      subtitleTrack = buildSubtitleTrack(edl as Edl, analysesByAsset, preset.subtitulos.palabrasPorBloque);
+      subtitleTrack = buildSubtitleTrack(
+        edl as Edl,
+        analysesByAsset,
+        preset.subtitulos.palabrasPorBloque,
+        preset.transiciones?.activo ? preset.transiciones.duracionSeg : 0,
+      );
       await writeJson(subtitlesPath, subtitleTrack);
     }
 

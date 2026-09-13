@@ -15,6 +15,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { renderLocal } from "@pulso/render-video/render";
 import { AppError } from "@pulso/shared/errors";
+import { computeSegmentStartOffsets, sceneKeyForFile } from "./alignment.js";
 import { denoiseAudio } from "./denoise.js";
 import { extractAudioForDenoise, FfmpegNotFoundError, InvalidMediaError } from "./ffmpeg.js";
 import { mixAudio } from "./music.js";
@@ -47,20 +48,6 @@ function edlDurationSec(edl: Edl): number {
   return edl.segmentos.reduce((total, s) => total + (s.fin - s.inicio), 0);
 }
 
-/**
- * Groups a raw take with its own retakes/parts of the SAME scene — real crews
- * commonly split one continuous scene across files ("ADS-01-ESCENA-03-PARTE-01",
- * "...-PARTE-02") when a recording gets stopped and restarted. Two segments
- * whose files share everything up to that "-PARTE-N" suffix are the same
- * scene; anything else (a different scene, a different take with no PARTE
- * suffix at all) gets its own key. Best-effort: a tenant with a different
- * naming convention just gets every segment treated as its own scene, which
- * is the same behavior as before this existed.
- */
-function sceneKeyForFile(filePath: string): string {
-  const base = path.basename(filePath).replace(/\.[^.]+$/, "");
-  return base.replace(/-parte-?\d+$/i, "");
-}
 
 /**
  * One ffmpeg invocation: every segment gets its own trim+(LUT)+scale+pad+fps
@@ -99,7 +86,12 @@ async function concatenateSegments(
     filterParts.push(
       `[${inputIdx}:v]trim=start=${segment.inicio}:end=${segment.fin},setpts=PTS-STARTPTS${colorLut},` +
         `scale=${spec.width}:${spec.height}:force_original_aspect_ratio=decrease,` +
-        `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps}[v${i}]`,
+        // concat requires every input on the same sample aspect ratio, not
+        // just the same pixel dimensions — two real source files can scale
+        // to the identical WxH here and still disagree on SAR by a rounding
+        // hair (confirmed on real footage: 1:1 vs 1520:1521), which concat
+        // refuses outright ("do not match") rather than silently misrendering.
+        `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps},setsar=1[v${i}]`,
     );
     filterParts.push(`[${inputIdx}:a]atrim=start=${segment.inicio}:end=${segment.fin},asetpts=PTS-STARTPTS[a${i}]`);
     concatRefs.push(`[v${i}][a${i}]`);
@@ -139,27 +131,27 @@ export interface TransitionOptions {
 }
 
 /**
- * Same job as concatenateSegments, but joins consecutive segments with a
- * transition instead of a hard cut — a quick native ffmpeg zoom-in between
- * two DIFFERENT scenes, and a bright flash (xfade's own "fadewhite") between
- * two parts of the SAME scene (see sceneKeyForFile: a real crew's own
- * retake/continuation split, e.g. "-PARTE-01"/"-PARTE-02"). Both are a
- * SINGLE xfade — real overlapping dissolves, not an inserted clip — so
- * neither one adds any duration: the transition happens ON TOP of the last D
- * seconds of the outgoing take and the first D seconds of the incoming one,
- * exactly at the cut, never as its own extra shot. (An earlier version tried
- * the light-leak as two chained xfades through an inserted color clip — that
- * DID add real screen time, which is exactly the "toma aparte" this is
- * built to avoid.) The very first segment also gets a brief opening zoom-in.
+ * Same job as concatenateSegments, but joins consecutive DIFFERENT scenes
+ * with a quick native ffmpeg zoom-in (xfade) instead of a hard cut. Parts of
+ * the SAME scene (see sceneKeyForFile: a real crew's own retake/continuation
+ * split, e.g. "-PARTE-01"/"-PARTE-02") stay a plain hard cut — no transition
+ * at all — on purpose: an xfade/acrossfade overlaps the last D seconds of
+ * the outgoing clip with the first D seconds of the incoming one, and a
+ * same-scene join is exactly where that overlap lands ON somebody's actual
+ * words. Confirmed on real footage: a light-leak-style xfade there faded out
+ * the tail of "ochocientos" mid-word while the next take's audio was
+ * already fading in underneath it, and the same D applied to zoom-in joins
+ * risks the same thing at scene boundaries. Kept short by default for
+ * exactly that reason — long enough to read as a quick visual flourish,
+ * short enough to rarely land squarely on a spoken word.
  *
- * ffmpeg's xfade/acrossfade only join TWO streams at a time, so this chains
- * them pairwise left to right, tracking the combined timeline's duration so
- * far to compute each next `offset`.
- *
- * Returns the ACTUAL output duration — shorter than the naive sum of segment
- * durations, since every xfade/acrossfade overlaps D seconds of the two
- * clips it joins. Callers that need the real length for anything downstream
- * (music fades, audio trimming) must use this, not edlDurationSec.
+ * ffmpeg's xfade/acrossfade/concat only join TWO streams at a time, so this
+ * chains them pairwise left to right. computeSegmentStartOffsets (shared
+ * with subtitles.ts — the two MUST agree on this or subtitle timing drifts
+ * later and later after every transition) gives each join's exact offset
+ * and the actual final duration, shorter than the naive sum of segment
+ * durations by D per real transition (same-scene hard cuts don't shorten
+ * anything).
  */
 async function concatenateSegmentsWithTransitions(
   edl: Edl,
@@ -189,6 +181,7 @@ async function concatenateSegmentsWithTransitions(
   const sameSceneAsPrev = edl.segmentos.map(
     (s, i) => i > 0 && sceneKeyForFile(s.archivo) === sceneKeyForFile(edl.segmentos[i - 1]!.archivo),
   );
+  const offsets = computeSegmentStartOffsets(edl.segmentos, D);
 
   const filterParts: string[] = [];
 
@@ -201,30 +194,41 @@ async function concatenateSegmentsWithTransitions(
     filterParts.push(
       `[${inputIdx}:v]trim=start=${segment.inicio}:end=${segment.fin},setpts=PTS-STARTPTS${colorLut},` +
         `scale=${spec.width}:${spec.height}:force_original_aspect_ratio=decrease,` +
-        // xfade requires both sides on the same timebase — mismatched
-        // timebases across separately-decoded/filtered inputs fail loud
-        // ("do not match") rather than silently misbehaving.
-        `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps}${openingZoom},settb=1/${spec.fps}[v${i}]`,
+        // xfade/concat require every input on the same timebase AND the same
+        // sample aspect ratio — mismatched timebases fail loud ("do not
+        // match"), but a mismatched SAR (confirmed on real footage: one
+        // source's rounding left it at 1520:1521 instead of 1:1) fails
+        // exactly the same way on `concat` even though `xfade` tolerated it,
+        // so setsar=1 is non-negotiable here, not just cosmetic.
+        `pad=${spec.width}:${spec.height}:(ow-iw)/2:(oh-ih)/2,fps=${spec.fps}${openingZoom},setsar=1,settb=1/${spec.fps}[v${i}]`,
     );
     filterParts.push(`[${inputIdx}:a]atrim=start=${segment.inicio}:end=${segment.fin},asetpts=PTS-STARTPTS[a${i}]`);
   });
 
   let videoLabel = "v0";
   let audioLabel = "a0";
-  let accumulated = edl.segmentos[0]!.fin - edl.segmentos[0]!.inicio;
 
   for (let i = 1; i < edl.segmentos.length; i++) {
-    const segDur = edl.segmentos[i]!.fin - edl.segmentos[i]!.inicio;
     const nextVideoLabel = `vx${i}`;
-    const offset = accumulated - D;
-    const transitionType = sameSceneAsPrev[i] ? "fadewhite" : "zoomin";
-    filterParts.push(
-      `[${videoLabel}][v${i}]xfade=transition=${transitionType}:duration=${D}:offset=${offset}[${nextVideoLabel}]`,
-    );
-    accumulated = accumulated + segDur - D;
-
     const nextAudioLabel = `ax${i}`;
-    filterParts.push(`[${audioLabel}][a${i}]acrossfade=d=${D}[${nextAudioLabel}]`);
+
+    if (sameSceneAsPrev[i]) {
+      // Plain hard cut — same as concatenateSegments, no overlap to eat
+      // into either side's audio. concat's own output lands on a DIFFERENT
+      // timebase than the settb=1/fps every segment was normalized to
+      // (confirmed on real footage: 1/1000000 vs 1/30) — a later xfade
+      // chained onto this label fails the same "do not match" way a raw
+      // unnormalized input would, so it needs re-normalizing here too, not
+      // just once at the very start of the chain.
+      filterParts.push(`[${videoLabel}][v${i}]concat=n=2:v=1:a=0[vc${i}]`);
+      filterParts.push(`[vc${i}]settb=1/${spec.fps}[${nextVideoLabel}]`);
+      filterParts.push(`[${audioLabel}][a${i}]concat=n=2:v=0:a=1[${nextAudioLabel}]`);
+    } else {
+      filterParts.push(
+        `[${videoLabel}][v${i}]xfade=transition=zoomin:duration=${D}:offset=${offsets[i]}[${nextVideoLabel}]`,
+      );
+      filterParts.push(`[${audioLabel}][a${i}]acrossfade=d=${D}[${nextAudioLabel}]`);
+    }
 
     videoLabel = nextVideoLabel;
     audioLabel = nextAudioLabel;
@@ -252,7 +256,8 @@ async function concatenateSegmentsWithTransitions(
     throw new InvalidMediaError(edl.videoId, "no se pudieron unir los segmentos de la EDL con transiciones", err);
   }
 
-  return accumulated;
+  const last = edl.segmentos[edl.segmentos.length - 1]!;
+  return offsets[offsets.length - 1]! + (last.fin - last.inicio);
 }
 
 function buildOverlayProps(

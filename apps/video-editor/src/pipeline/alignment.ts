@@ -8,6 +8,7 @@
 // enough for "does this clip's speech resemble this script," which is a
 // much coarser question than "align these two strings precisely."
 
+import path from "node:path";
 import type { AudioAnalysis, Edl, EdlSegment, ScriptVideo, Silence, TranscriptWord } from "./types.js";
 
 export function normalizeText(text: string): string {
@@ -525,4 +526,50 @@ export function buildEdl(
   }));
 
   return { videoId: scriptVideo.id, segmentos };
+}
+
+// --- Escenas y línea de tiempo de salida (2.8, render.ts + 2.6, subtitles.ts) ---
+
+/**
+ * Groups a raw take with its own retakes/parts of the SAME scene — real crews
+ * commonly split one continuous scene across files ("ADS-01-ESCENA-03-PARTE-01",
+ * "...-PARTE-02") when a recording gets stopped and restarted. Two segments
+ * whose files share everything up to that "-PARTE-N" suffix are the same
+ * scene; anything else (a different scene, a different take with no PARTE
+ * suffix at all) gets its own key. Best-effort: a tenant with a different
+ * naming convention just gets every segment treated as its own scene, which
+ * is the same behavior as before this existed.
+ */
+export function sceneKeyForFile(filePath: string): string {
+  const base = path.basename(filePath).replace(/\.[^.]+$/, "");
+  return base.replace(/-parte-?\d+$/i, "");
+}
+
+/**
+ * Where each EDL segment actually starts on the OUTPUT timeline once
+ * transitions are in play — needed by BOTH the renderer (to place each
+ * xfade) and the subtitle timer (buildSubtitleTrack), which must agree on
+ * this or subtitles drift later and later after every transition. A
+ * transition between two DIFFERENT scenes overlaps (and so shortens the
+ * timeline by) `transitionDurationSec`; a hard cut between parts of the SAME
+ * scene (see sceneKeyForFile) doesn't shorten anything. Pass 0 for a preset
+ * that doesn't use transitions at all — every segment then starts exactly
+ * where the naive sum of prior durations would put it, matching
+ * concatenateSegments' plain hard-cut behavior.
+ */
+export function computeSegmentStartOffsets(
+  segmentos: readonly Pick<EdlSegment, "archivo" | "inicio" | "fin">[],
+  transitionDurationSec: number,
+): number[] {
+  const offsets: number[] = new Array(segmentos.length).fill(0);
+  let cursor = 0;
+  for (let i = 0; i < segmentos.length; i++) {
+    offsets[i] = cursor;
+    if (i + 1 < segmentos.length) {
+      const sameScene = sceneKeyForFile(segmentos[i + 1]!.archivo) === sceneKeyForFile(segmentos[i]!.archivo);
+      const reduction = sameScene ? 0 : transitionDurationSec;
+      cursor += segmentos[i]!.fin - segmentos[i]!.inicio - reduction;
+    }
+  }
+  return offsets;
 }
