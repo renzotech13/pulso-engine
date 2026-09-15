@@ -38,3 +38,8 @@ apps/video-editor/config/luts/
 # Binario nativo de DeepFilterNet (~27 MB, descargado de GitHub releases) —
 # ver DEEP_FILTER_BIN_PATH / apps/video-editor/README.md.
 apps/video-editor/bin/
+
+# Tomas de apoyo ya recortadas (b-roll) — video del cliente, no del repo. El
+# manifiesto en config/b-roll/*.json sí se versiona; los .mp4 que referencia
+# no.
+apps/video-editor/assets/b-roll/

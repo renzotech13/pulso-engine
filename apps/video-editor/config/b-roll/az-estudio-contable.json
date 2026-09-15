@@ -1,0 +1,65 @@
+{
+  "cliente": "az-estudio-contable",
+  "tomas": [
+    {
+      "id": "sunat-clientes-caminando",
+      "archivo": "assets/b-roll/az-estudio-contable/sunat-clientes-caminando.mp4",
+      "duracionSeg": 4,
+      "listo": true,
+      "escena": "sunat",
+      "etiquetas": [
+        "sunat",
+        "clientes",
+        "calle",
+        "fondo-video"
+      ],
+      "descripcion": "Alexis caminando frente a SUNAT con clientes. Candidato a fondo de video (reemplaza el ejemplo estático sunat-fondo.png) en tomas con corte de fondo tipo 'detrás del logo'. Falta elegir los segundos exactos a recortar.",
+      "conAudio": false,
+      "correccionColorAplicada": false,
+      "fuente": {
+        "archivoOriginal": "/Users/renzo/AZ Estudio Contable/ELEGIDAS/TOMAS DE APOYO/ALEXIS DE ESPALDA ENTRANDO A LA SUNAT.MP4",
+        "inicioSeg": 2,
+        "finSeg": 6
+      }
+    },
+    {
+      "id": "sunat-espalda-entrando",
+      "archivo": "assets/b-roll/az-estudio-contable/sunat-espalda-entrando.mp4",
+      "listo": false,
+      "escena": "sunat",
+      "etiquetas": [
+        "sunat",
+        "calle",
+        "fondo-video"
+      ],
+      "descripcion": "Alexis de espalda entrando a SUNAT. Mismo uso candidato que sunat-clientes-caminando. Falta elegir los segundos exactos a recortar.",
+      "conAudio": false,
+      "correccionColorAplicada": false,
+      "fuente": {
+        "archivoOriginal": "/Users/renzo/AZ Estudio Contable/ELEGIDAS/ALEXIS DE ESPALDA ENTRANDO A LA SUNAT.MP4",
+        "inicioSeg": 0,
+        "finSeg": 18.5185
+      }
+    },
+    {
+      "id": "oficina-zoom-logo",
+      "archivo": "assets/b-roll/az-estudio-contable/oficina-zoom-logo.mp4",
+      "duracionSeg": 6,
+      "listo": false,
+      "escena": "oficina",
+      "etiquetas": [
+        "oficina",
+        "logo",
+        "zoom-in"
+      ],
+      "descripcion": "Toma de frente con zoom in hacia el logo AZ en la oficina. Ya viene en un solo take de 6s completo; falta confirmar si se usa entero o recortado y pasarlo por el LUT.",
+      "conAudio": false,
+      "correccionColorAplicada": false,
+      "fuente": {
+        "archivoOriginal": "/Users/renzo/AZ Estudio Contable/ELEGIDAS/oficina-toma-frente-zoom-in-hacia-logo.mp4",
+        "inicioSeg": 0,
+        "finSeg": 6
+      }
+    }
+  ]
+}
