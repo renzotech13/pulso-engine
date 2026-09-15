@@ -177,11 +177,16 @@ export async function detectSilences(path: string, options: SilenceDetectOptions
  * speech model (whisper.cpp included) expects, and much smaller than
  * shipping the source video into the transcription step.
  */
-export async function extractAudioForTranscription(path: string, outputWavPath: string): Promise<void> {
+export async function extractAudioForTranscription(
+  path: string,
+  outputWavPath: string,
+  range?: { startSec: number; durationSec: number },
+): Promise<void> {
+  const rangeArgs = range ? ["-ss", String(range.startSec), "-t", String(range.durationSec)] : [];
   try {
     await run(
       "ffmpeg",
-      ["-y", "-i", path, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", outputWavPath],
+      ["-y", ...rangeArgs, "-i", path, "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", outputWavPath],
       { maxBuffer: MAX_BUFFER },
     );
   } catch (err) {
