@@ -32,7 +32,10 @@ export interface CreativeCopy {
   priceLabel?: string | undefined;
   productName?: string | undefined;
   slides?: string[] | undefined;
+  /** Facebook's text — the full caption, no hashtags. */
   caption?: string | undefined;
+  /** Instagram's shorter version with hashtags; absent → Instagram falls back to `caption`. */
+  captionInstagram?: string | undefined;
   videoEffects?: VideoEffects | undefined;
   /** 3-6 loose scene words the copywriter suggests for the background photo. Advisory only. */
   imageKeywords?: string[] | undefined;
@@ -99,6 +102,7 @@ export function buildBriefForComponentRef(
     const brief: Record<string, unknown> = { message };
     if (photoUrl) brief.photoUrl = photoUrl;
     if (copy.caption) brief.caption = copy.caption;
+    if (copy.captionInstagram) brief.captionInstagram = copy.captionInstagram;
     if (colorOverride) Object.assign(brief, colorOverride);
     stampPhotoMeta(brief, photoMeta);
     return brief;
@@ -118,6 +122,7 @@ export function buildBriefForComponentRef(
     if (carouselPhotoUrls?.some(Boolean)) brief.photoUrls = carouselPhotoUrls;
     if (colorOverride) Object.assign(brief, colorOverride);
     if (copy.caption) brief.caption = copy.caption;
+    if (copy.captionInstagram) brief.captionInstagram = copy.captionInstagram;
     stampPhotoMeta(brief, photoMeta);
     return brief;
   }
@@ -127,6 +132,7 @@ export function buildBriefForComponentRef(
   if (copy.priceLabel) brief.priceLabel = copy.priceLabel;
   if (photoUrl) brief.photoUrl = photoUrl;
   if (copy.caption) brief.caption = copy.caption;
+  if (copy.captionInstagram) brief.captionInstagram = copy.captionInstagram;
   if (colorOverride) Object.assign(brief, colorOverride);
   // Only the reel composition (Remotion) actually reads these — social-post's
   // HTML template has no notion of "effects", so they're scoped to avoid
@@ -526,4 +532,41 @@ export function findEmDash(copy: Record<string, unknown>): { field: string } | n
     }
   }
   return null;
+}
+
+const HASHTAG = /#[\p{L}\p{N}_]+/gu;
+
+/**
+ * Facebook's caption goes out without hashtags, but the prompt asking for
+ * that is a request, not a guarantee — a local model often still closes with
+ * a hashtag line out of habit. Only a TRAILING run of hashtags is removed (the
+ * closing line, or hashtags tacked onto the end of the last sentence): a
+ * hashtag in the middle of a sentence is part of what it says.
+ */
+export function stripTrailingHashtags(text: string): string {
+  const lines = text.trimEnd().split("\n");
+  while (lines.length > 0) {
+    const last = lines.at(-1)!;
+    const withoutTrailing = last.replace(/(?:\s*#[\p{L}\p{N}_]+)+\s*$/u, "");
+    if (withoutTrailing === last) break;
+    if (withoutTrailing.trim() === "") {
+      lines.pop();
+      continue;
+    }
+    lines[lines.length - 1] = withoutTrailing;
+    break;
+  }
+  return lines.join("\n").trimEnd();
+}
+
+const MAX_INSTAGRAM_HASHTAGS = 8;
+
+/** Keeps the first MAX_INSTAGRAM_HASHTAGS hashtags and drops the rest — past that a caption reads as spam. */
+export function limitHashtags(text: string, max = MAX_INSTAGRAM_HASHTAGS): string {
+  let seen = 0;
+  return text
+    .replace(HASHTAG, (tag) => (++seen <= max ? tag : ""))
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+$/gm, "")
+    .trimEnd();
 }

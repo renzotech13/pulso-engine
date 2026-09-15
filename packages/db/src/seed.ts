@@ -159,11 +159,12 @@ Catálogo de productos/servicios:
 {{VIDEO_EFFECTS_INSTRUCTION}}
 {{BRAND_TRAINING}}
 
-Escribe DOS cosas distintas para esta pieza:
-1. El texto que va IMPRESO en la imagen (headline/subheadline/priceLabel) — corto, es lo primero que se ve.
-2. El campo "caption": el texto real que acompaña la publicación en Facebook/Instagram, debajo de la imagen (nunca va impreso en la imagen). Este SÍ puede ser más largo: 1 a 3 párrafos breves que expliquen la idea, cierra con 3 a 5 hashtags relevantes en español. Si hay una fuente o dato externo real de por medio (una noticia, una cifra citada), menciónala ahí, nunca en el headline.
+Escribe TRES cosas distintas para esta pieza:
+1. El texto que va IMPRESO en la imagen (headline/subheadline/priceLabel) — corto, es lo primero que se ve. Sin emojis.
+2. El campo "caption": el texto de la publicación en Facebook, debajo de la imagen (nunca va impreso en la imagen). Este SÍ puede ser más largo: 1 a 3 párrafos breves que expliquen la idea. Usa 2 a 4 emojis que aporten algo (para marcar un beneficio, un dato clave o el llamado a la acción), nunca uno por frase ni al inicio de cada línea. Sin hashtags. Si hay una fuente o dato externo real de por medio (una noticia, una cifra citada), menciónala ahí, nunca en el headline.
+3. El campo "captionInstagram": el mismo mensaje resumido para Instagram, en 2 a 3 líneas cortas con 2 a 3 emojis bien ubicados y el mismo llamado a la acción, y al final una línea aparte con 5 a 8 hashtags relevantes en español (mezcla del rubro y locales de Perú, ej. #Lima).
 Sé concreto y usa precios/promociones reales del catálogo cuando calce con el tema.
-Reglas de estilo, siempre, para AMBOS campos:
+Reglas de estilo, siempre, para TODOS los campos:
 - El headline es un gancho corto (máximo 8-10 palabras) que engancha, no una descripción. Nunca escribas la palabra "carrusel", "post", "publicación" ni nombres del formato — el lector no necesita saber qué tipo de pieza está viendo.
 - Nunca uses la raya "—" (em dash) en ningún texto — separa ideas con punto seguido o coma. Es la marca más obvia de que un texto lo escribió una IA.
 - Escribe como una persona real le hablaría a otra, no como un anuncio genérico.
@@ -171,7 +172,7 @@ Si hay una instrucción adicional del cliente arriba, respétala por encima de t
 Si el tema se refiere claramente a un producto específico del catálogo de arriba, incluye su nombre EXACTO tal como aparece ahí en el campo "productName" (así se puede usar su foto real en la pieza). Si no aplica a ningún producto puntual, omite ese campo.
 Agrega también "imageKeywords": 3 a 6 palabras sueltas en español que describan la escena ideal para la FOTO DE FONDO de esta pieza (personas, lugar, objetos; ej. "emprendedora", "tienda", "laptop", "documentos"). Solo palabras, nunca frases ni texto para la imagen.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
-{"headline": "string corto y llamativo", "subheadline": "string breve opcional", "priceLabel": "string tipo 'Desde S/ 96', opcional", "productName": "nombre exacto del producto del catálogo, opcional", "caption": "string, el texto real de la publicación, 1 a 3 párrafos más hashtags", "imageKeywords": ["palabra", "palabra"], "videoEffects": {"hideLogo": "boolean, opcional", "zoomOutBackground": "boolean, opcional", "fadeInOverlay": "boolean, opcional"}}`;
+{"headline": "string corto y llamativo", "subheadline": "string breve opcional", "priceLabel": "string tipo 'Desde S/ 96', opcional", "productName": "nombre exacto del producto del catálogo, opcional", "caption": "string, texto para Facebook, 1 a 3 párrafos con emojis y sin hashtags", "captionInstagram": "string, versión corta para Instagram con emojis y 5 a 8 hashtags al final", "imageKeywords": ["palabra", "palabra"], "videoEffects": {"hideLogo": "boolean, opcional", "zoomOutBackground": "boolean, opcional", "fadeInOverlay": "boolean, opcional"}}`;
 
 const CREATIVE_CAROUSEL_PROMPT_V1 = `Eres el redactor de un carrusel de Instagram/Facebook para un negocio local peruano. Los carruseles con este formato convierten mejor que los reels en el algoritmo actual, especialmente cuando invitan a comentar.
 
@@ -186,16 +187,17 @@ Catálogo de productos/servicios:
 {{INSTRUCTION}}
 {{BRAND_TRAINING}}
 
-Escribe DOS cosas distintas:
-1. Entre 5 y 7 slides (frases cortas, una idea por slide, van IMPRESAS en cada imagen) con esta estructura exacta:
+Escribe TRES cosas distintas:
+1. Entre 4 y 5 slides (frases cortas, una idea por slide, van IMPRESAS en cada imagen) con esta estructura exacta:
    a. Primer slide: un gancho corto (máximo 8-10 palabras) o pregunta llamativa relacionada al tema, que dé ganas de seguir deslizando. Nunca escribas la palabra "carrusel", "post" ni nombres del formato.
-   b. Slides del medio (3 a 5): un tip, dato o idea concreta cada uno, cortos, una sola frase, fáciles de leer de un vistazo.
+   b. Slides del medio (2 a 3): un tip, dato o idea concreta cada uno, cortos, una sola frase, fáciles de leer de un vistazo.
    c. Último slide: SIEMPRE una pregunta directa invitando explícitamente a comentar (ej. "¿Cuál de estos usas tú? Cuéntanos 👇").
-2. El campo "caption": el texto real que acompaña la publicación en Facebook/Instagram, debajo de las imágenes (nunca va impreso en ninguna imagen). 1 a 3 párrafos breves resumiendo de qué trata el carrusel y por qué le sirve al lector, cierra con 3 a 5 hashtags relevantes en español. Si hay una fuente o dato externo real de por medio, menciónala ahí.
-Reglas de estilo, siempre, para AMBOS campos: nunca uses la raya "—" (em dash), separa ideas con punto seguido o coma en su lugar (es la marca más obvia de que un texto lo escribió una IA); escribe como una persona real le hablaría a otra, no como un anuncio genérico.
+2. El campo "caption": el texto de la publicación en Facebook, debajo de las imágenes (nunca va impreso en ninguna imagen). 1 a 3 párrafos breves resumiendo de qué trata y por qué le sirve al lector. Usa 2 a 4 emojis que aporten algo (para marcar un beneficio, un dato clave o el llamado a la acción), nunca uno por frase ni al inicio de cada línea. Sin hashtags. Si hay una fuente o dato externo real de por medio, menciónala ahí.
+3. El campo "captionInstagram": el mismo mensaje resumido para Instagram, en 2 a 3 líneas cortas con 2 a 3 emojis bien ubicados y la misma invitación a comentar, y al final una línea aparte con 5 a 8 hashtags relevantes en español (mezcla del rubro y locales de Perú, ej. #Lima).
+Reglas de estilo, siempre, para TODOS los campos: nunca uses la raya "—" (em dash), separa ideas con punto seguido o coma en su lugar (es la marca más obvia de que un texto lo escribió una IA); escribe como una persona real le hablaría a otra, no como un anuncio genérico.
 Si hay una instrucción adicional del cliente arriba, respétala por encima de tu propio criterio de estilo.
 Responde SOLO con un JSON con esta forma exacta, sin texto adicional ni markdown:
-{"slides": ["string corto", "string corto", "..."], "caption": "string, el texto real de la publicación, 1 a 3 párrafos más hashtags"}`;
+{"slides": ["string corto", "string corto", "..."], "caption": "string, texto para Facebook, 1 a 3 párrafos con emojis y sin hashtags", "captionInstagram": "string, versión corta para Instagram con emojis y 5 a 8 hashtags al final"}`;
 
 const NEWS_PROMPT_V1 = `Eres el agente de noticias de Pulso Engine. Tu trabajo es revisar los titulares del día y decidir cuáles le sirven a este negocio para crear contenido en redes sociales.
 

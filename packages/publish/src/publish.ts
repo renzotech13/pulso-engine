@@ -8,7 +8,7 @@ import type { Json } from "@pulso/db/types";
 // extension at an unbuilt ".ts" file does not (confirmed the hard way on
 // @pulso/shared/image-gen — see apps/web/next.config.ts).
 import { executeAgentRun } from "@pulso/publish/base-agent";
-import { buildCaption } from "@pulso/publish/caption";
+import { buildCaption, buildInstagramCaption } from "@pulso/publish/caption";
 import { limaHour, limaToday } from "@pulso/shared/time";
 
 const META_GRAPH_API_VERSION = "v21.0";
@@ -336,6 +336,7 @@ export async function runPublishAgentForCreative(
       // and goes out as one instead of an ephemeral Story.
       const isStory = slot?.slot_type === "story";
       const caption = buildCaption(creative.brief as Record<string, unknown>);
+      const instagramCaption = buildInstagramCaption(creative.brief as Record<string, unknown>);
 
       // A still-to-come slot means "schedule what Meta lets us schedule, wait
       // on the rest" — Facebook can be handed to Meta right now (real
@@ -413,7 +414,7 @@ export async function runPublishAgentForCreative(
                   connection.instagram_business_account_id!,
                   connection.access_token,
                   creative.asset_urls,
-                  caption,
+                  instagramCaption,
                 )
             : platform === "facebook"
               ? await publishToFacebook(
@@ -429,7 +430,7 @@ export async function runPublishAgentForCreative(
                   connection.access_token,
                   assetUrl,
                   isVideo,
-                  caption,
+                  instagramCaption,
                   isStory,
                 );
 

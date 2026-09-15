@@ -1249,17 +1249,20 @@ async function regenerateCarouselSlideActionImpl(formData: FormData): Promise<vo
 }
 
 /**
- * Edits the real post caption — the text that accompanies the publication on
- * Facebook/Instagram, below the image(s) (never printed on the image itself).
- * Applies to every creative type (post, carousel, story, reel): the caption
- * lives at brief.caption regardless of type, and editing it never touches
- * any rendered asset, so there's no re-render to trigger.
+ * Edits the real post captions — the text that accompanies the publication,
+ * below the image(s) (never printed on the image itself): brief.caption for
+ * Facebook, brief.captionInstagram for Instagram's shorter version. Clearing
+ * the Instagram one removes the key, so publishing falls back to the Facebook
+ * caption instead of sending an empty post. Applies to every creative type
+ * (post, carousel, story, reel), and editing never touches any rendered
+ * asset, so there's no re-render to trigger.
  */
 async function updateCreativeCaptionActionImpl(formData: FormData): Promise<void> {
   const tenantId = String(formData.get("tenantId") ?? "");
   const date = String(formData.get("date") ?? "");
   const creativeId = String(formData.get("creativeId") ?? "");
   const caption = String(formData.get("caption") ?? "").trim();
+  const captionInstagram = String(formData.get("captionInstagram") ?? "").trim();
   if (!tenantId || !date || !creativeId) return;
 
   const supabase = await createSupabaseServerClient();
@@ -1273,10 +1276,11 @@ async function updateCreativeCaptionActionImpl(formData: FormData): Promise<void
     .maybeSingle();
   if (!creative || creative.tenant_id !== tenantId) throw new Error("creative not found");
 
-  const brief = creative.brief as Record<string, unknown>;
+  const { captionInstagram: _previousInstagram, ...brief } = creative.brief as Record<string, unknown>;
+  const nextBrief = captionInstagram ? { ...brief, caption, captionInstagram } : { ...brief, caption };
   const { error: updateError } = await service
     .from("creatives")
-    .update({ brief: { ...brief, caption } })
+    .update({ brief: nextBrief })
     .eq("id", creativeId);
   if (updateError) throw new Error(updateError.message);
 

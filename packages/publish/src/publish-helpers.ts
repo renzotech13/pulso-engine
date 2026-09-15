@@ -34,3 +34,15 @@ export function buildCaption(brief: Record<string, unknown>): string {
 
   return [headline, subheadline, priceLabel].filter((part): part is string => Boolean(part)).join("\n\n");
 }
+
+/**
+ * Instagram gets its own shorter copy with hashtags (brief.captionInstagram,
+ * written by the Creative agent next to the Facebook caption). Anything
+ * without one — pieces generated before that field existed, or photo-frame
+ * posts the tenant typed by hand — falls back to the same caption Facebook
+ * gets, so no post ever goes out to Instagram empty.
+ */
+export function buildInstagramCaption(brief: Record<string, unknown>): string {
+  const instagram = typeof brief.captionInstagram === "string" ? brief.captionInstagram.trim() : "";
+  return instagram || buildCaption(brief);
+}

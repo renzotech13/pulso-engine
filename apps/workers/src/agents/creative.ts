@@ -14,8 +14,10 @@ import {
   decidePhotoSource,
   findBannedPhrase,
   findEmDash,
+  limitHashtags,
   pickProductPhoto,
   rankBankPhotos,
+  stripTrailingHashtags,
   templateNameForSlotType,
   type BankPhotoLookup,
   type CreativeCopy,
@@ -48,6 +50,13 @@ const videoEffectsSchema = z
   .nullable()
   .optional();
 
+/** Facebook's caption never carries hashtags and Instagram's carries at most 8 — enforced here, not just asked for in the prompt. */
+function splitCaptions(caption: string | null | undefined, captionInstagram: string | null | undefined) {
+  const facebook = caption ? stripTrailingHashtags(caption) : "";
+  const instagram = captionInstagram ? limitHashtags(captionInstagram) : "";
+  return { caption: facebook || undefined, captionInstagram: instagram || undefined };
+}
+
 const creativeCopySchema = z
   .object({
     headline: z.string().min(1),
@@ -55,6 +64,7 @@ const creativeCopySchema = z
     priceLabel: z.string().nullable().optional(),
     productName: z.string().nullable().optional(),
     caption: z.string().nullable().optional(),
+    captionInstagram: z.string().nullable().optional(),
     videoEffects: videoEffectsSchema,
     // Advisory scene words for the background photo — never required, never
     // retried on: the ranking works from theme + headline without them.
@@ -65,7 +75,7 @@ const creativeCopySchema = z
     subheadline: data.subheadline ?? undefined,
     priceLabel: data.priceLabel ?? undefined,
     productName: data.productName ?? undefined,
-    caption: data.caption ?? undefined,
+    ...splitCaptions(data.caption, data.captionInstagram),
     imageKeywords: (data.imageKeywords ?? []).map((k) => k.trim()).filter(Boolean).slice(0, 6),
     videoEffects: data.videoEffects
       ? {
@@ -81,10 +91,11 @@ const creativeCopySchema = z
 // comment-CTA (enforced by the creative.brief.carousel prompt, not here).
 const carouselCopySchema = z
   .object({
-    slides: z.array(z.string().min(1)).min(5).max(7),
+    slides: z.array(z.string().min(1)).min(4).max(5),
     caption: z.string().nullable().optional(),
+    captionInstagram: z.string().nullable().optional(),
   })
-  .transform((data) => ({ slides: data.slides, caption: data.caption ?? undefined }));
+  .transform((data) => ({ slides: data.slides, ...splitCaptions(data.caption, data.captionInstagram) }));
 
 // Rejecting a banned phrase at the SCHEMA layer is what makes it a real
 // guard: callLlmStructured treats a failed parse exactly like malformed
@@ -449,11 +460,16 @@ export async function runCreativeAgentForSlot(
       let photoReason = "Degradado: sin foto";
 
       if (isCarousel) {
-        // Cover and closing slide are always generated for the theme; a
-        // middle slide takes a real bank photo when one clearly matches its
-        // own text (tenant opted in via gemini_share) — real people inside
-        // the carousel and one Gemini call fewer. Sequential, not parallel:
-        // the image endpoint has hit real per-minute rate limits before.
+        // Only the cover (the scroll-stopping hook) is Gemini-first — it's
+        // the slide least likely to have a matching bank photo and the one
+        // that most needs a bespoke image. Every other slide (middle tips
+        // AND the closing CTA) tries the bank first regardless of whether
+        // gemini_share is configured: a tenant that never touched that
+        // setting should still get bank photos in carousels, not an
+        // unconditional Gemini call per slide (gemini_share only widens how
+        // often Gemini steps in when the bank has nothing, same as the
+        // single-post path). Sequential, not parallel: the image endpoint
+        // has hit real per-minute rate limits before.
         const slides = copy.slides ?? [];
         const usedInCarousel: string[] = [];
         const urls: Array<string | undefined> = [];
@@ -461,7 +477,7 @@ export async function runCreativeAgentForSlot(
         const assetIds: Array<string | undefined> = [];
 
         for (const [i, slideText] of slides.entries()) {
-          const isMiddle = i > 0 && i < slides.length - 1;
+          const isCover = i === 0;
           const best = rankBankPhotos(bankAssets, {
             texts: [slot.theme],
             hints: [slideText],
@@ -472,7 +488,7 @@ export async function runCreativeAgentForSlot(
           let source: PhotoSource = "gradient";
           let assetId: string | undefined;
 
-          if (isMiddle && geminiShare !== null && best && best.score >= BANK_STRONG_MATCH) {
+          if (!isCover && best && best.score >= BANK_STRONG_MATCH) {
             url = best.asset.url;
             source = "bank";
             assetId = best.asset.id;

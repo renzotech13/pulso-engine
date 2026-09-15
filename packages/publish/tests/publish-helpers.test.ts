@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCaption } from "../src/publish-helpers.js";
+import { buildCaption, buildInstagramCaption } from "../src/publish-helpers.js";
 
 describe("buildCaption", () => {
   it("joins headline/subheadline/priceLabel with blank lines", () => {
@@ -33,5 +33,18 @@ describe("buildCaption", () => {
   it("uses caption as-is for photo-frame briefs", () => {
     const caption = buildCaption({ caption: "Sub-13 vs Academia Los Leones", photoUrls: ["https://x/a.jpg"] });
     expect(caption).toBe("Sub-13 vs Academia Los Leones");
+  });
+});
+
+describe("buildInstagramCaption", () => {
+  it("uses the shorter Instagram caption when the brief has one", () => {
+    const brief = { caption: "Texto largo para Facebook 📌", captionInstagram: "Corto ✅\n#Lima #RUC" };
+    expect(buildInstagramCaption(brief)).toBe("Corto ✅\n#Lima #RUC");
+    expect(buildCaption(brief)).toBe("Texto largo para Facebook 📌");
+  });
+
+  it("falls back to the Facebook caption when there is no Instagram version, so Instagram never gets an empty post", () => {
+    expect(buildInstagramCaption({ caption: "Sub-13 vs Academia Los Leones" })).toBe("Sub-13 vs Academia Los Leones");
+    expect(buildInstagramCaption({ caption: "Texto", captionInstagram: "   " })).toBe("Texto");
   });
 });

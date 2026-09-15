@@ -6,6 +6,8 @@ import {
   templateNameForSlotType,
   findBannedPhrase,
   findEmDash,
+  limitHashtags,
+  stripTrailingHashtags,
   BANK_STRONG_MATCH,
   BANK_WEAK_MATCH,
   decidePhotoSource,
@@ -46,6 +48,15 @@ describe("buildBriefForComponentRef", () => {
       subheadline: "Por Fiestas Patrias",
       priceLabel: "Desde S/ 96",
     });
+  });
+
+  it("keeps both captions on the brief — Facebook's and Instagram's — for every template", () => {
+    const copy = { headline: "Tu RUC en 7 días", caption: "Texto largo 📌", captionInstagram: "Corto ✅\n#Lima #RUC" };
+    for (const ref of ["social-post", "story-promo", "carousel"]) {
+      const brief = buildBriefForComponentRef(ref, { ...copy, slides: ["a", "b", "c", "d"] });
+      expect(brief.caption).toBe("Texto largo 📌");
+      expect(brief.captionInstagram).toBe("Corto ✅\n#Lima #RUC");
+    }
   });
 
   it("omits absent optional fields instead of writing them as undefined", () => {
@@ -461,5 +472,34 @@ describe("buildBriefForComponentRef — story-promo message", () => {
       subheadline: "sin sorpresas",
     });
     expect(brief.message).toBe("Tu contabilidad al día. sin sorpresas");
+  });
+});
+
+describe("stripTrailingHashtags", () => {
+  it("removes a closing hashtag line from the Facebook caption", () => {
+    expect(stripTrailingHashtags("Formaliza tu negocio hoy 🚀\n\nEscríbenos por WhatsApp 👇\n\n#Emprendedores #Lima #RUC")).toBe(
+      "Formaliza tu negocio hoy 🚀\n\nEscríbenos por WhatsApp 👇",
+    );
+  });
+
+  it("removes hashtags tacked onto the end of the last sentence", () => {
+    expect(stripTrailingHashtags("Escríbenos hoy 👇 #AZConta #Lima")).toBe("Escríbenos hoy 👇");
+  });
+
+  it("keeps a hashtag that is part of a sentence", () => {
+    expect(stripTrailingHashtags("Usa #AZConta cuando nos escribas, te respondemos hoy.")).toBe(
+      "Usa #AZConta cuando nos escribas, te respondemos hoy.",
+    );
+  });
+});
+
+describe("limitHashtags", () => {
+  it("keeps the first 8 hashtags and drops the rest", () => {
+    const text = "Tu RUC en 7 días ✅\n#a #b #c #d #e #f #g #h #i #j";
+    expect(limitHashtags(text)).toBe("Tu RUC en 7 días ✅\n#a #b #c #d #e #f #g #h");
+  });
+
+  it("leaves a caption within the limit untouched", () => {
+    expect(limitHashtags("Hola 👋\n#Lima #RUC")).toBe("Hola 👋\n#Lima #RUC");
   });
 });

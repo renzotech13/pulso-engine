@@ -59,7 +59,7 @@ const STUDENT_COUNTRIES = [
 
 // Brief keys that are plumbing for the render service, not content the
 // user wrote or wants to review — never shown.
-const HIDDEN_BRIEF_KEYS = new Set(["photoUrl", "photoUrls", "photoAssetId", "photoAssetIds", "photoSource", "photoSources", "caption"]);
+const HIDDEN_BRIEF_KEYS = new Set(["photoUrl", "photoUrls", "photoAssetId", "photoAssetIds", "photoSource", "photoSources", "caption", "captionInstagram"]);
 const isColourKey = (key: string) => /colou?r/i.test(key);
 
 interface CreativePublication {
@@ -271,12 +271,25 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   // Turns are driven by the tenant's schedule, with any extra slot that
   // exists beyond it (a manually created one) appended, so nothing is
   // hidden. An empty turn is still a turn you can open.
+  const hourForIndex = (index: number): number | null | undefined =>
+    slots.find((s) => s.slot_index === index)?.publish_hour ?? publishHours[index];
+  // Sorted by actual hour, not by slot_index — a tenant whose publish_hours
+  // are configured [18, 9] has slot_index 0 (the Planner's own slot) at 6pm
+  // and slot_index 1 (the news slot) at 9am, and index order alone showed
+  // the 6pm tab before the 9am one.
   const turnIndexes = [
     ...new Set([...publishHours.map((_, index) => index), ...slots.map((s) => s.slot_index)]),
-  ].sort((a, b) => a - b);
+  ].sort((a, b) => {
+    const hourA = hourForIndex(a);
+    const hourB = hourForIndex(b);
+    if (hourA == null && hourB == null) return a - b;
+    if (hourA == null) return 1;
+    if (hourB == null) return -1;
+    return hourA - hourB;
+  });
   const turns = turnIndexes.map((index) => {
     const filled = slots.find((s) => s.slot_index === index);
-    const hour = filled?.publish_hour ?? publishHours[index];
+    const hour = hourForIndex(index);
     return {
       index,
       filled: Boolean(filled),
@@ -314,6 +327,8 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
   const isGenerating = creative?.status === "pending" || creative?.status === "rendering";
   const caption = asRecord(creative?.brief)?.caption;
   const captionText = typeof caption === "string" ? caption : "";
+  const captionInstagram = asRecord(creative?.brief)?.captionInstagram;
+  const captionInstagramText = typeof captionInstagram === "string" ? captionInstagram : "";
 
   const backHref = `/calendar?month=${backMonth}&view=${backView}${backFilterQuery}`;
   const title =
@@ -542,7 +557,13 @@ export default async function CalendarDetailPage({ params, searchParams }: Detai
                 <div className="space-y-4">
                   <BriefRows brief={creative.brief} />
                   <div className="border-t border-line pt-4">
-                    <CaptionForm tenantId={ctx.tenantId} creativeId={creative.id} date={date} caption={captionText} />
+                    <CaptionForm
+                      tenantId={ctx.tenantId}
+                      creativeId={creative.id}
+                      date={date}
+                      caption={captionText}
+                      captionInstagram={captionInstagramText}
+                    />
                   </div>
                 </div>
               </Card>
