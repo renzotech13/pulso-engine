@@ -6,7 +6,7 @@ import { replaceBackgroundSplit } from "./pipeline/background-replace.js";
 
 function usageError(): never {
   console.error(
-    "uso: tsx src/bg-replace-cli.ts <video-origen> <imagen-fondo> <video-salida> " +
+    "uso: tsx src/bg-replace-cli.ts <video-origen> <imagen-o-video-fondo> <video-salida> " +
       "[--corte 0.5] [--difuminado 0.15] [--ancho 1080] [--fps 30] [--modelo ruta.onnx]",
   );
   process.exit(1);

@@ -1,8 +1,8 @@
 // Optional pre-processing step, run on a raw take BEFORE it ever reaches
 // alignment/EDL/render: replaces the upper portion of a shot's background
-// with a different still image, blending down into the shot's OWN original
-// background lower in the frame — a "split background" that reads as a
-// visual cutaway without literally cutting the shot. Uses Robust Video
+// with a different still image OR video, blending down into the shot's OWN
+// original background lower in the frame — a "split background" that reads
+// as a visual cutaway without literally cutting the shot. Uses Robust Video
 // Matting (RVM, github.com/PeterL1n/RobustVideoMatting) for the person
 // cutout: unlike an image background remover run frame-by-frame, RVM is
 // built for VIDEO and carries its own recurrent state across frames
@@ -33,6 +33,41 @@ export class BackgroundReplaceError extends AppError {
 
 function isEnoent(err: unknown): boolean {
   return typeof err === "object" && err !== null && "code" in err && err.code === "ENOENT";
+}
+
+const VIDEO_EXTENSIONS = new Set([".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"]);
+
+function isVideoPath(filePath: string): boolean {
+  return VIDEO_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
+
+/**
+ * Either a static image or a video used as the replacement background. When
+ * it's a video, its frames are extracted once (matching the source's own
+ * fps/width) and looped by index if it's shorter than the source shot.
+ */
+interface BackgroundFrameSource {
+  /** Path to read a given 1-based source-frame index's background frame from. */
+  framePathFor(sourceFrameIndex: number): string;
+}
+
+async function prepareBackgroundFrameSource(
+  backgroundPath: string,
+  workDir: string,
+  workWidth: number,
+  fps: number,
+): Promise<BackgroundFrameSource> {
+  if (!isVideoPath(backgroundPath)) {
+    return { framePathFor: () => backgroundPath };
+  }
+  const bgFramesDir = path.join(workDir, "bg-frames");
+  const bgFrameCount = await extractFrames(backgroundPath, bgFramesDir, workWidth, fps);
+  return {
+    framePathFor: (sourceFrameIndex: number) => {
+      const loopedIndex = ((sourceFrameIndex - 1) % bgFrameCount) + 1;
+      return path.join(bgFramesDir, `frame-${String(loopedIndex).padStart(5, "0")}.png`);
+    },
+  };
 }
 
 export interface BackgroundReplaceOptions {
@@ -99,7 +134,7 @@ async function extractFrames(videoPath: string, framesDir: string, workWidth: nu
 async function runMattingAndComposite(
   framesDir: string,
   frameCount: number,
-  backgroundImagePath: string,
+  background: BackgroundFrameSource,
   outDir: string,
   options: BackgroundReplaceOptions,
 ): Promise<void> {
@@ -112,7 +147,10 @@ async function runMattingAndComposite(
   let r4i = zeroRecurrentState();
   const downsampleRatio = new ort.Tensor("float32", new Float32Array([downsampleRatioFor(options.workWidth)]), [1]);
 
-  let backgroundResized: { data: Buffer; width: number; height: number } | undefined;
+  // Cached by source-background path, not just by size — a video background
+  // supplies a different frame path each iteration, so the cache must be
+  // invalidated whenever the underlying image changes, not only on resize.
+  let backgroundResized: { data: Buffer; width: number; height: number; sourcePath: string } | undefined;
 
   for (let i = 1; i <= frameCount; i++) {
     const frameName = `frame-${String(i).padStart(5, "0")}.png`;
@@ -121,12 +159,18 @@ async function runMattingAndComposite(
     const { data: srcData, info } = await sharp(framePath).raw().toBuffer({ resolveWithObject: true });
     const { width, height, channels } = info;
 
-    if (!backgroundResized || backgroundResized.width !== width || backgroundResized.height !== height) {
-      const resized = await sharp(backgroundImagePath)
+    const bgFramePath = background.framePathFor(i);
+    if (
+      !backgroundResized ||
+      backgroundResized.width !== width ||
+      backgroundResized.height !== height ||
+      backgroundResized.sourcePath !== bgFramePath
+    ) {
+      const resized = await sharp(bgFramePath)
         .resize(width, height, { fit: "cover" })
         .raw()
         .toBuffer({ resolveWithObject: true });
-      backgroundResized = { data: resized.data, width, height };
+      backgroundResized = { data: resized.data, width, height, sourcePath: bgFramePath };
     }
 
     const chw = new Float32Array(3 * width * height);
@@ -213,24 +257,27 @@ async function encodeWithOriginalAudio(
 
 /**
  * Produces a new MP4 at `outputVideoPath`: the same shot, with its upper
- * portion's background replaced by `backgroundImagePath` and a soft
- * vertical blend down into the shot's own original background. Safe to
- * feed straight into the normal --videos pipeline afterward — same audio,
- * same content, just a different background in the frame.
+ * portion's background replaced by `backgroundPath` (a still image OR a
+ * video — a video is looped by frame index if it's shorter than the shot)
+ * and a soft vertical blend down into the shot's own original background.
+ * Safe to feed straight into the normal --videos pipeline afterward — same
+ * audio, same content, just a different background in the frame.
  */
 export async function replaceBackgroundSplit(
   sourceVideoPath: string,
-  backgroundImagePath: string,
+  backgroundPath: string,
   options: BackgroundReplaceOptions,
   outputVideoPath: string,
 ): Promise<void> {
   const workDir = await mkdtemp(path.join(tmpdir(), "pulso-bg-replace-"));
   const fps = options.outputFps ?? 30;
   try {
+    await mkdir(path.dirname(outputVideoPath), { recursive: true });
     const framesDir = path.join(workDir, "frames");
     const outDir = path.join(workDir, "out");
     const frameCount = await extractFrames(sourceVideoPath, framesDir, options.workWidth, fps);
-    await runMattingAndComposite(framesDir, frameCount, backgroundImagePath, outDir, options);
+    const background = await prepareBackgroundFrameSource(backgroundPath, workDir, options.workWidth, fps);
+    await runMattingAndComposite(framesDir, frameCount, background, outDir, options);
     await encodeWithOriginalAudio(outDir, fps, sourceVideoPath, outputVideoPath);
   } finally {
     await rm(workDir, { recursive: true, force: true });
