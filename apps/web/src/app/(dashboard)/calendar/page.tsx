@@ -102,6 +102,13 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     if (daySlots) daySlots.push(slot);
     else slotsByDate.set(slot.date, [slot]);
   }
+  // Display order is chronological (by publish_hour), not slot_index — a
+  // tenant whose publish_hours are configured [18, 9] has slot_index 0 (the
+  // Planner's own slot) landing at 6pm and slot_index 1 (the news slot) at
+  // 9am, and sorting by slot_index alone showed the 6pm piece first.
+  for (const daySlots of slotsByDate.values()) {
+    daySlots.sort((a, b) => (a.publish_hour ?? 0) - (b.publish_hour ?? 0));
+  }
   const grid = buildMonthGrid(monthParam);
   const listDates = grid.filter((cell) => cell.inMonth).map((cell) => cell.date);
 
