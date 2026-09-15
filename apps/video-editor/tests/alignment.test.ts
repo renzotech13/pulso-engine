@@ -48,6 +48,22 @@ describe("alignWordSequences", () => {
     expect(alignment[0]).toBeNull();
     expect(alignment.slice(1)).toEqual([0, 1, 2]);
   });
+
+  it("prefers substituting a genuinely similar word over one that's merely positionally convenient", () => {
+    // Real case from ADS-01-ESCENA-05: talent said "diremos", the approved
+    // script says "decimos hoy" — one extra script word either way costs
+    // the same edit distance, so a flat substitution cost let the DP land
+    // on "hoy" (0 letters in common with "diremos") instead of "decimos"
+    // (shares almost every letter), silently dropping "decimos" from the
+    // subtitle entirely.
+    const transcript = ["escribenos", "al", "whatsapp", "y", "te", "diremos", "que", "tipo", "de", "empresa"];
+    const script = ["whatsapp", "y", "te", "decimos", "hoy", "que", "tipo", "de", "empresa"];
+
+    const alignment = alignWordSequences(transcript, script);
+
+    expect(alignment[5]).toBe(3); // "diremos" -> "decimos", not -> "hoy" (index 4)
+    expect(alignment.slice(6)).toEqual([5, 6, 7, 8]);
+  });
 });
 
 describe("normalizeText", () => {
@@ -294,6 +310,35 @@ describe("buildEdl", () => {
     expect(edl.segmentos).toHaveLength(1);
     expect(edl.segmentos[0]!.lineaGuion).toContain("como sacar tu ruc");
     expect(edl.segmentos[0]!.archivo).toBe("clip1.mp4");
+  });
+
+  it("recovers the script's opening word when whisper mis-hears it, instead of leaving guionTexto starting a word late — real ADS-01-ESCENA-01 audio", () => {
+    // Whisper heard "¿Sigues" as "Sigueis" — one edit away, but the n-gram
+    // window search still finds a slightly better bigram score starting one
+    // word later at "vendiendo", since "sigueis" shares no bigram with
+    // "sigues" at all. Without the fix, guionTexto is missing "¿Sigues"
+    // entirely and the subtitle would show whisper's misspelling for it.
+    const s: ScriptVideo = { ...script, guion: "¿Sigues vendiendo con tu DNI? En 7 días hábiles puedes tener tu empresa." };
+    const words: TranscriptWord[] = [
+      word("Sigueis", 0, 0.3),
+      word("vendiendo", 0.3, 0.8),
+      word("con", 0.8, 0.95),
+      word("tu", 0.95, 1.1),
+      word("DNI", 1.1, 1.4),
+      word("en", 1.4, 1.55),
+      word("7", 1.55, 1.7),
+      word("días", 1.7, 1.9),
+      word("sábiles.", 1.9, 2.3),
+      word("Puedes", 2.3, 2.6),
+      word("tener", 2.6, 2.85),
+      word("tu", 2.85, 3.0),
+      word("empresa.", 3.0, 3.4),
+    ];
+    const analysis: AudioAnalysis = { assetPath: "clip1.mp4", provider: "test", language: "es", words, silences: [] };
+
+    const edl = buildEdl(s, [analysis]);
+
+    expect(edl.segmentos[0]!.guionTexto).toBe("¿Sigues vendiendo con tu DNI? En 7 días hábiles puedes tener tu empresa.");
   });
 
   it("keeps the cleaner earlier take over a stumbled retake left in the file afterward", () => {

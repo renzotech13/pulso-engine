@@ -39,11 +39,63 @@ export function normalizeToken(token: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
+/** Two whisper passes (or a mis-transcription vs. the script's own spelling) for what's really the same spoken word — "Sigueis"/"Sigues", "Escríbenos"/"escribenos". Guarded to length >= 3 (normalized) since a short function word ("y"/"yo", "tu"/"su") is one edit apart from plenty of unrelated words. */
+export function sameSpokenWord(a: string, b: string): boolean {
+  const x = normalizeToken(a);
+  const y = normalizeToken(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  if (x.length < 3 || y.length < 3) return false;
+  const longest = Math.max(x.length, y.length);
+  return 1 - levenshteinDistance(x, y) / longest >= 0.7;
+}
+
 function ngrams(tokens: string[], n: number): Set<string> {
   if (tokens.length < n) return new Set(tokens.length > 0 ? [tokens.join(" ")] : []);
   const result = new Set<string>();
   for (let i = 0; i <= tokens.length - n; i++) result.add(tokens.slice(i, i + n).join(" "));
   return result;
+}
+
+export function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  let prevRow = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const currentRow = [i];
+    for (let j = 1; j <= b.length; j++) {
+      currentRow[j] =
+        a[i - 1] === b[j - 1]
+          ? prevRow[j - 1]!
+          : 1 + Math.min(prevRow[j - 1]!, prevRow[j]!, currentRow[j - 1]!);
+    }
+    prevRow = currentRow;
+  }
+  return prevRow[b.length]!;
+}
+
+/**
+ * Cost of substituting token `a` for token `b` in alignWordSequences below:
+ * 0 for an exact match, otherwise the normalized edit distance (0,1] rather
+ * than a flat 1. A flat substitution cost made a REAL word-count mismatch
+ * (the script says one extra/different word than what was actually said)
+ * resolve by tie-breaking order alone — confirmed on real AZ footage: with
+ * transcript "...te diremos qué..." against script "...te decimos hoy
+ * qué...", a flat cost aligned "diremos" to "hoy" (total edit cost is
+ * identical either way) and silently dropped "decimos" from the subtitle
+ * entirely. Weighting by similarity makes the DP prefer the substitution
+ * that's actually plausible ("diremos"/"decimos" share most of their
+ * letters) over one that just happens to be positionally convenient
+ * ("diremos"/"hoy" share none) — capped at 1 so a wildly different
+ * substitution never costs MORE than deleting and inserting separately
+ * would.
+ */
+function substitutionCost(a: string, b: string): number {
+  if (a === b) return 0;
+  const maxLen = Math.max(a.length, b.length);
+  return maxLen === 0 ? 0 : Math.min(1, levenshteinDistance(a, b) / maxLen);
 }
 
 /**
@@ -73,7 +125,7 @@ export function alignWordSequences(a: readonly string[], b: readonly string[]): 
   for (let j = 0; j <= m; j++) dp[0]![j] = j;
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      const cost = substitutionCost(a[i - 1]!, b[j - 1]!);
       dp[i]![j] = Math.min(
         dp[i - 1]![j - 1]! + cost, // match or substitute
         dp[i - 1]![j]! + 1, // delete a[i-1] (no script counterpart)
@@ -86,16 +138,19 @@ export function alignWordSequences(a: readonly string[], b: readonly string[]): 
   // cell — same three cases as the recurrence above, preferring a
   // match/substitute (diagonal) whenever it's tied with an insert/delete,
   // since that's the one that actually assigns a[i-1] to a script word.
+  // Fractional substitution costs mean an exact === can miss a genuine tie
+  // to floating-point rounding, so comparisons use a small epsilon.
+  const FLOAT_EPS = 1e-9;
   const alignment: Array<number | null> = new Array(n).fill(null);
   let i = n;
   let j = m;
   while (i > 0 || j > 0) {
-    const cost = i > 0 && j > 0 && a[i - 1] === b[j - 1] ? 0 : 1;
-    if (i > 0 && j > 0 && dp[i]![j] === dp[i - 1]![j - 1]! + cost) {
+    const cost = i > 0 && j > 0 ? substitutionCost(a[i - 1]!, b[j - 1]!) : 0;
+    if (i > 0 && j > 0 && Math.abs(dp[i]![j]! - (dp[i - 1]![j - 1]! + cost)) < FLOAT_EPS) {
       alignment[i - 1] = j - 1;
       i--;
       j--;
-    } else if (i > 0 && dp[i]![j] === dp[i - 1]![j]! + 1) {
+    } else if (i > 0 && Math.abs(dp[i]![j]! - (dp[i - 1]![j]! + 1)) < FLOAT_EPS) {
       alignment[i - 1] = null; // a[i-1] deleted — no script word for it
       i--;
     } else {
@@ -339,10 +394,12 @@ export interface BuildEdlOptions {
 // each EDL segment here is already a single continuous run with no long
 // silence left inside it (segmentIntoRuns breaks runs at every detected
 // silence), so there's nothing left to cap at this stage.
+export const DEFAULT_EDL_MARGIN_SEC = 0.2;
+
 const DEFAULT_OPTIONS: Required<BuildEdlOptions> = {
   minRunScore: 0.15,
   duplicateThreshold: 0.7,
-  marginSec: 0.2,
+  marginSec: DEFAULT_EDL_MARGIN_SEC,
   guionTextConfidence: 0.35,
 };
 
@@ -435,6 +492,44 @@ function bestScriptPosition(
  * of the problem: junk sits at one end, not scattered through the middle of
  * an otherwise-clean take.
  */
+/**
+ * The n-gram window search picks whichever start/size scores best on shared
+ * BIGRAMS — a run's own first or last word being a near-miss mis-transcription
+ * of the script word right outside the window (rather than an exact match)
+ * doesn't cost the window anything to exclude, since that word's bigrams
+ * never overlap the script's anyway. Confirmed on real AZ footage: whisper
+ * heard "Sigues" as "Sigueis," and the best-scoring window started at
+ * "vendiendo," leaving "¿Sigues" out of guionWords entirely — the segment
+ * then displayed whisper's misspelling for that word forever, script or not.
+ * This extends the window by exactly one word on either edge when that edge
+ * word is a close-enough match (sameSpokenWord) to the script word sitting
+ * immediately outside it.
+ */
+function extendForNearMissEdges(
+  trimmedWords: readonly TranscriptWord[],
+  position: number,
+  guionWords: readonly string[],
+  scriptWordsOriginal: readonly string[],
+): { position: number; guionWords: string[] } {
+  let start = position;
+  const result = [...guionWords];
+
+  const firstWord = trimmedWords[0];
+  const before = scriptWordsOriginal[start - 1];
+  if (firstWord && before && result[0] !== before && sameSpokenWord(firstWord.text, before)) {
+    start -= 1;
+    result.unshift(before);
+  }
+
+  const lastWord = trimmedWords.at(-1);
+  const after = scriptWordsOriginal[position + guionWords.length];
+  if (lastWord && after && result.at(-1) !== after && sameSpokenWord(lastWord.text, after)) {
+    result.push(after);
+  }
+
+  return { position: start, guionWords: result };
+}
+
 function trimRunToBestMatch(
   words: readonly TranscriptWord[],
   scriptTokensNormalized: string[],
@@ -462,7 +557,8 @@ function trimRunToBestMatch(
   // broke a passing test before this threshold was added) for no actual
   // gain.
   if (best.score >= 0.5) {
-    return { words, position: best.position, score: best.score, guionWords: best.guionWords };
+    const extended = extendForNearMissEdges(words, best.position, best.guionWords, scriptWordsOriginal);
+    return { words, position: extended.position, score: best.score, guionWords: extended.guionWords };
   }
 
   let improved = true;
@@ -481,7 +577,9 @@ function trimRunToBestMatch(
     }
   }
 
-  return { words: words.slice(lo, hi), position: best.position, score: best.score, guionWords: best.guionWords };
+  const trimmedWords = words.slice(lo, hi);
+  const extended = extendForNearMissEdges(trimmedWords, best.position, best.guionWords, scriptWordsOriginal);
+  return { words: trimmedWords, position: extended.position, score: best.score, guionWords: extended.guionWords };
 }
 
 /**
