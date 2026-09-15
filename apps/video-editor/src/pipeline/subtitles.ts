@@ -13,6 +13,8 @@ const DEFAULT_WORDS_PER_BLOCK = 6;
 interface ResolvedWord extends TranscriptWord {
   /** True when this word's text is the raw transcript guess, not the script's own wording — either guionTexto was absent or its word count didn't line up with the audio. */
   bajaConfianza: boolean;
+  /** Which EDL segment this word came from — groupWordsIntoBlocks never merges two segments into the same subtitle card, even mid-count, since that reads as one escena's line bleeding into the next. */
+  segmentIndex: number;
 }
 
 /**
@@ -86,6 +88,7 @@ function resolveSegmentWords(
   segment: Edl["segmentos"][number],
   analysis: AudioAnalysis | undefined,
   outputCursor: number,
+  segmentIndex: number,
 ): ResolvedWord[] {
   if (!analysis) return [];
 
@@ -112,6 +115,7 @@ function resolveSegmentWords(
       // when the rest of the segment trusted the script's spelling, since
       // this word specifically didn't get that benefit.
       bajaConfianza: !useGuionText || guionIndex === null,
+      segmentIndex,
     };
   });
 
@@ -165,17 +169,27 @@ export function remapWordsToEdlTimeline(
   const offsets = computeSegmentStartOffsets(edl.segmentos, transitionDurationSec);
 
   edl.segmentos.forEach((segment, i) => {
-    remapped.push(...resolveSegmentWords(segment, analysesByAsset.get(segment.archivo), offsets[i]!));
+    remapped.push(...resolveSegmentWords(segment, analysesByAsset.get(segment.archivo), offsets[i]!, i));
   });
 
   return remapped;
 }
 
+/**
+ * Chunks into groups of `wordsPerBlock`, but a chunk NEVER crosses an EDL
+ * segment boundary — even if that leaves a short trailing chunk. Confirmed
+ * on real output: without this, a fixed word count blended the last words
+ * of one escena ("...contable incluida.") with the first words of the NEXT
+ * one ("Soy Alexis...") into a single subtitle card, reading as one
+ * sentence when they're two different cuts, possibly with a transition
+ * between them.
+ */
 export function groupWordsIntoBlocks(words: readonly ResolvedWord[], wordsPerBlock = DEFAULT_WORDS_PER_BLOCK): SubtitleBlock[] {
   const blocks: SubtitleBlock[] = [];
-  for (let i = 0; i < words.length; i += wordsPerBlock) {
-    const chunk = words.slice(i, i + wordsPerBlock);
-    if (chunk.length === 0) continue;
+  let chunk: ResolvedWord[] = [];
+
+  const flush = () => {
+    if (chunk.length === 0) return;
     blocks.push({
       startSec: chunk[0]!.startSec,
       endSec: chunk[chunk.length - 1]!.endSec,
@@ -187,7 +201,16 @@ export function groupWordsIntoBlocks(words: readonly ResolvedWord[], wordsPerBlo
       // the same granularity a reviewer would want anyway.
       bajaConfianza: chunk.some((w) => w.bajaConfianza),
     });
+    chunk = [];
+  };
+
+  for (const word of words) {
+    const crossesSegment = chunk.length > 0 && chunk[0]!.segmentIndex !== word.segmentIndex;
+    if (chunk.length >= wordsPerBlock || crossesSegment) flush();
+    chunk.push(word);
   }
+  flush();
+
   return blocks;
 }
 

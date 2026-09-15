@@ -6,8 +6,8 @@ function word(text: string, startSec: number, endSec: number): TranscriptWord {
   return { text, startSec, endSec };
 }
 
-function resolvedWord(text: string, startSec: number, endSec: number, bajaConfianza = false) {
-  return { text, startSec, endSec, bajaConfianza };
+function resolvedWord(text: string, startSec: number, endSec: number, bajaConfianza = false, segmentIndex = 0) {
+  return { text, startSec, endSec, bajaConfianza, segmentIndex };
 }
 
 function segment(partial: Partial<EdlSegment> & Pick<EdlSegment, "archivo" | "inicio" | "fin">): EdlSegment {
@@ -273,6 +273,20 @@ describe("groupWordsIntoBlocks", () => {
     const words = [resolvedWord("hola", 0, 0.3), resolvedWord("mundo", 0.3, 0.6)];
     const blocks = groupWordsIntoBlocks(words, 3);
     expect(blocks[0]!.bajaConfianza).toBe(false);
+  });
+
+  it("never blends words from two different EDL segments into the same block, even mid-count", () => {
+    // Real case: "...contable incluida." closes one escena and "Soy
+    // Alexis..." opens the next — with wordsPerBlock=6 a plain count would
+    // have merged the tail of one with the head of the other into one card.
+    const words = [
+      resolvedWord("contable", 0, 0.3, false, 0),
+      resolvedWord("incluida.", 0.3, 0.6, false, 0),
+      resolvedWord("Soy", 0.6, 0.9, false, 1),
+      resolvedWord("Alexis", 0.9, 1.2, false, 1),
+    ];
+    const blocks = groupWordsIntoBlocks(words, 6);
+    expect(blocks.map((b) => b.text)).toEqual(["contable incluida.", "Soy Alexis"]);
   });
 });
 
