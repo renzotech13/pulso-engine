@@ -36,4 +36,48 @@ describe("parseByHeadings", () => {
     expect(doc.videos).toHaveLength(2);
     expect(doc.videos[1]!.titulo).toBe("Dos");
   });
+
+  it("reads a 'Carpeta:' line and keeps escenas empty when there are no 'Escena N:' headers", () => {
+    const doc = parseByHeadings("Video 1\nTítulo: Uno\nCarpeta: ADS-01\nContenido sin escenas explícitas.");
+    expect(doc.videos[0]!.carpetaTomas).toBe("ADS-01");
+    expect(doc.videos[0]!.escenas).toEqual([]);
+    expect(doc.videos[0]!.guion).toContain("Contenido sin escenas");
+    expect(doc.videos[0]!.guion).not.toContain("Carpeta");
+  });
+
+  it("splits into escenas with their visual requisitos from bracket tags", () => {
+    const doc = parseByHeadings(
+      "Video 1\nTítulo: Uno\nCarpeta: ADS-01\n\n" +
+        "Escena 1:\n¡Sigues viniendo con tu DNI a hacer filas en la SUNAT?\n\n" +
+        "Escena 2: [fondo: sunat]\nNosotros lo hacemos por ti, sin que salgas de tu casa.\n\n" +
+        "Escena 3: [apoyo: oficina]\nEn AZ Estudio Contable llevamos años ayudando a negocios.",
+    );
+
+    const escenas = doc.videos[0]!.escenas;
+    expect(escenas).toHaveLength(3);
+    expect(escenas[0]).toMatchObject({ numero: 1, requisitos: [] });
+    expect(escenas[0]!.texto).toContain("hacer filas en la SUNAT");
+    expect(escenas[1]).toMatchObject({
+      numero: 2,
+      requisitos: [{ tipo: "fondo", referencia: "sunat" }],
+    });
+    expect(escenas[2]).toMatchObject({
+      numero: 3,
+      requisitos: [{ tipo: "apoyo", referencia: "oficina" }],
+    });
+    // El guion plano sigue sin los encabezados/corchetes, para no romper el
+    // matching de transcripción existente.
+    expect(doc.videos[0]!.guion).not.toContain("Escena");
+    expect(doc.videos[0]!.guion).not.toContain("[fondo");
+  });
+
+  it("supports more than one requisito on the same escena header", () => {
+    const doc = parseByHeadings(
+      "Video 1\nTítulo: Uno\nEscena 1: [fondo: sunat] [apoyo: oficina]\nAlgo se dice acá.",
+    );
+    expect(doc.videos[0]!.escenas[0]!.requisitos).toEqual([
+      { tipo: "fondo", referencia: "sunat" },
+      { tipo: "apoyo", referencia: "oficina" },
+    ]);
+  });
 });

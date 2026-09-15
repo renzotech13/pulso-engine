@@ -23,11 +23,40 @@ export type AssetProbe = z.infer<typeof assetProbeSchema>;
 
 // --- 2.2 Guion ---------------------------------------------------------------
 
+// A scene's visual requirement — "fondo" asks for a background-replace
+// (background-replace.ts) behind the talking head, "apoyo" asks for a
+// full-frame b-roll cutaway. `tipo` is a plain string, not an enum, on
+// purpose: a typo or a not-yet-supported value in a hand-written script
+// shouldn't fail parsing (same reasoning as animacion in preset.ts) — a
+// future consumer decides what to do with a value it doesn't recognize.
+// `referencia` is a tag/id looked up against a b-roll library (b-roll.ts),
+// not necessarily an exact toma id.
+export const requisitoVisualSchema = z.object({
+  tipo: z.string().min(1),
+  referencia: z.string().min(1),
+});
+export type RequisitoVisual = z.infer<typeof requisitoVisualSchema>;
+
+export const escenaGuionSchema = z.object({
+  numero: z.number().int().positive(),
+  texto: z.string(),
+  requisitos: z.array(requisitoVisualSchema).default([]),
+});
+export type EscenaGuion = z.infer<typeof escenaGuionSchema>;
+
 export const scriptVideoSchema = z.object({
   id: z.string(),
   titulo: z.string().nullable(),
   mostrarTitulo: z.boolean(),
   guion: z.string(),
+  /** Carpeta con las tomas crudas de este guion (de una línea "Carpeta: ..."). Null cuando el documento no la indica. */
+  carpetaTomas: z.string().nullable().default(null),
+  /**
+   * Desglose explícito en escenas (de encabezados "Escena N: [...]") — vacío
+   * cuando el guion no usa esa convención, en cuyo caso todo sigue
+   * funcionando igual que antes a partir de `guion` solo.
+   */
+  escenas: z.array(escenaGuionSchema).default([]),
   /**
    * Set by the heading-based fallback parser when it isn't confident this
    * block was split correctly — never set by the LLM path, which either

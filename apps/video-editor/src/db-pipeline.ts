@@ -175,6 +175,11 @@ export async function renderVideoJob({ projectId, tenantId, videoId }: RenderVid
       titulo: video.titulo,
       mostrarTitulo: video.mostrar_titulo,
       guion: video.guion,
+      // La fila del video project todavía no guarda carpetaTomas/escenas —
+      // esta reconstrucción es solo para re-renderizar con el EDL/subtítulos
+      // ya generados, que no dependen de ninguno de los dos.
+      carpetaTomas: null,
+      escenas: [],
       necesitaRevision: video.necesita_revision,
     };
 

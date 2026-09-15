@@ -13,7 +13,7 @@
 import { AppError } from "@pulso/shared/errors";
 import { callLlmStructured } from "@pulso/shared/llm";
 import pdfParse from "pdf-parse";
-import { scriptDocumentSchema, type ScriptDocument } from "./types.js";
+import { scriptDocumentSchema, type EscenaGuion, type RequisitoVisual, type ScriptDocument } from "./types.js";
 
 export class PdfScriptError extends AppError {
   constructor(message: string, cause?: unknown) {
@@ -45,12 +45,21 @@ export async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
 }
 
 const STRUCTURING_PROMPT_HEADER = `Convierte el siguiente guion de video (uno o más videos en el mismo documento) a JSON.
-Para cada video identifica: un id corto (video-1, video-2...), el título si lo indica (o null si no lleva),
-si el título debe mostrarse en pantalla (mostrarTitulo: true/false — asumí true si hay un título indicado
-y no dice lo contrario), y el guion hablado completo tal como está escrito, sin resumir ni corregir.
+Para cada video identifica:
+- id: corto (video-1, video-2...)
+- titulo: si lo indica, o null si no lleva
+- mostrarTitulo: true/false — asumí true si hay un título indicado y no dice lo contrario
+- carpetaTomas: el valor de una línea "Carpeta: <valor>" si el video la tiene, o null si no
+- guion: el guion hablado completo tal como está escrito, sin resumir ni corregir — SIN incluir las
+  líneas "Carpeta:" ni los encabezados "Escena N:" ni sus corchetes
+- escenas: si el guion está dividido con encabezados "Escena N:" (opcionalmente seguidos de corchetes
+  como "[fondo: sunat]" o "[apoyo: oficina]"), una lista con un objeto por escena:
+  { numero: number, texto: string (el texto hablado de esa escena, sin el encabezado ni los corchetes),
+  requisitos: [{ tipo: string, referencia: string }] por cada corchete "[tipo: referencia]" en su encabezado }.
+  Si el guion de ese video NO usa encabezados "Escena N:", escenas debe ser una lista vacía.
 
 Responde SOLO con el JSON, sin explicación ni markdown, con esta forma exacta:
-{ "videos": [{ "id": string, "titulo": string | null, "mostrarTitulo": boolean, "guion": string }] }
+{ "videos": [{ "id": string, "titulo": string | null, "mostrarTitulo": boolean, "carpetaTomas": string | null, "guion": string, "escenas": [{ "numero": number, "texto": string, "requisitos": [{ "tipo": string, "referencia": string }] }] }] }
 
 Documento:
 `;
@@ -77,7 +86,19 @@ async function structureWithLlm(rawText: string): Promise<ScriptDocument | undef
 // start of a line — free-form beyond that, per the ticket's requirement
 // that the parser tolerate loose formatting rather than a strict template.
 const VIDEO_HEADER = /^\s*(?:video|guion|gui[oó]n)\s*(\d+)\s*[:.-]?\s*$/im;
-const TITLE_LINE = /^\s*t[ií]tulo\s*:\s*(.*)$/im;
+// The whitespace right around ":" is deliberately [ \t]*, not \s* — \s
+// matches newlines too, so a header with nothing after the colon on its own
+// line (e.g. "Escena 1:" followed by the scene's text on the NEXT line)
+// would otherwise let the capture group swallow that following line
+// whole, mistaking real script content for header metadata.
+const TITLE_LINE = /^\s*t[ií]tulo[ \t]*:[ \t]*(.*)$/im;
+const CARPETA_LINE = /^\s*carpeta[ \t]*:[ \t]*(.*)$/im;
+// "Escena 2: [fondo: sunat] [apoyo: oficina]" — the rest of the header line
+// (group 2) is free-form; parseRequisitos below pulls the bracket tags out
+// of it. A header with no brackets at all is a perfectly normal scene with
+// no special visual requirement.
+const ESCENA_HEADER = /^\s*escena[ \t]*(\d+)[ \t]*:?[ \t]*(.*)$/im;
+const REQUISITO_BRACKET = /\[\s*([^[\]:]+?)\s*:\s*([^[\]]+?)\s*\]/g;
 
 function splitIntoVideoBlocks(text: string): string[] {
   const matches = [...text.matchAll(new RegExp(VIDEO_HEADER.source, "gim"))];
@@ -92,6 +113,29 @@ function splitIntoVideoBlocks(text: string): string[] {
   return blocks;
 }
 
+function parseRequisitos(headerRest: string): RequisitoVisual[] {
+  return [...headerRest.matchAll(REQUISITO_BRACKET)].map((m) => ({
+    tipo: m[1]!.trim().toLowerCase(),
+    referencia: m[2]!.trim(),
+  }));
+}
+
+/** Empty when the block doesn't use "Escena N:" headers at all — the caller falls back to treating `guion` as one untouched blob, same as before this existed. */
+function splitIntoScenes(block: string): EscenaGuion[] {
+  const matches = [...block.matchAll(new RegExp(ESCENA_HEADER.source, "gim"))];
+  if (matches.length === 0) return [];
+
+  return matches.map((match, i) => {
+    const start = match.index! + match[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1]!.index! : block.length;
+    return {
+      numero: Number(match[1]),
+      texto: block.slice(start, end).trim(),
+      requisitos: parseRequisitos(match[2] ?? ""),
+    };
+  });
+}
+
 /**
  * Tolerant of free-form writing, but honest about it: a block with no
  * recognizable "Título:" line still gets a script (mostrarTitulo defaults
@@ -104,13 +148,22 @@ export function parseByHeadings(rawText: string): ScriptDocument {
   const videos = blocks.map((block, index) => {
     const titleMatch = TITLE_LINE.exec(block);
     const titulo = titleMatch?.[1]?.trim() || null;
-    const guion = block.replace(TITLE_LINE, "").trim();
+    const carpetaMatch = CARPETA_LINE.exec(block);
+    const carpetaTomas = carpetaMatch?.[1]?.trim() || null;
+    const escenas = splitIntoScenes(block);
+    const guion = block
+      .replace(TITLE_LINE, "")
+      .replace(CARPETA_LINE, "")
+      .replace(new RegExp(ESCENA_HEADER.source, "gim"), "")
+      .trim();
 
     return {
       id: `video-${index + 1}`,
       titulo,
       mostrarTitulo: Boolean(titulo),
       guion,
+      carpetaTomas,
+      escenas,
       // No título line found at all is the ambiguous case worth a human
       // look; an explicitly-absent title ("sin título") is not.
       necesitaRevision: !titleMatch,

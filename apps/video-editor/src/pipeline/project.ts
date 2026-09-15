@@ -11,8 +11,10 @@ import { createLogger } from "@pulso/shared/logger";
 import { probeAsset, detectSilences } from "./ffmpeg.js";
 import { parseScriptPdf } from "./script-pdf.js";
 import { getConfiguredProvider, analyzeAudio } from "./transcription.js";
-import { assignAssetToScript, buildEdl } from "./alignment.js";
+import { DEFAULT_EDL_MARGIN_SEC, assignAssetToScript, buildEdl } from "./alignment.js";
+import { anchorSegmentOpenings } from "./segment-anchor.js";
 import { buildSubtitleTrack, toSrt } from "./subtitles.js";
+import { applyEscenaTreatments, type ApplyEscenaTreatmentsOptions } from "./escena-treatment.js";
 import { renderProject } from "./render.js";
 import { loadDefaultPreset, loadPreset, resolveOutputSpec, type Preset } from "./preset.js";
 import {
@@ -29,13 +31,26 @@ import {
 const logger = createLogger({ agent: "video-editor" });
 
 export interface ProcessProjectOptions {
-  videoPaths: string[];
+  /**
+   * Tomas a procesar. Opcional cuando el guion trae "Carpeta:" en algún
+   * video Y se pasa `tomasBaseDir` — en ese caso se resuelven solas (ver
+   * resolveVideoPathsForScript). Lo que sí se pase acá se procesa igual,
+   * además de lo resuelto automáticamente.
+   */
+  videoPaths?: string[] | undefined;
   pdfPath: string;
   outDir: string;
   language?: string | undefined;
   presetPath?: string | undefined;
   musicPath?: string | undefined;
   force?: boolean | undefined;
+  /** Carpeta raíz donde viven las tomas crudas de todos los guiones — ver resolveVideoPathsForScript. */
+  tomasBaseDir?: string | undefined;
+  /** Manifiesto de b-roll (b-roll.ts) — necesario solo si alguna escena trae un requisito "[fondo: ...]"/"[apoyo: ...]". */
+  bRollLibraryPath?: string | undefined;
+  /** Necesario solo si algún requisito es "fondo" — por defecto usa RVM_MODEL_PATH del entorno. */
+  rvmModelPath?: string | undefined;
+  backgroundReplace?: ApplyEscenaTreatmentsOptions["backgroundReplace"] | undefined;
 }
 
 export interface ProcessProjectResult {
@@ -65,6 +80,47 @@ async function writeJson(filePath: string, value: unknown): Promise<void> {
   await writeFile(filePath, JSON.stringify(value, null, 2), "utf8");
 }
 
+/** "ADS 01", "ads_01" and "ADS-01" are the same folder name to a person — and to this. */
+function normalizeFolderName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Resuelve la línea "Carpeta: <valor>" de un guion contra las tomas
+ * realmente en disco. Dos modos, según lo que haya en `tomasBaseDir`:
+ *  - una subcarpeta cuyo nombre sea el mismo ignorando mayúsculas y
+ *    separadores ("Carpeta: ADS-01" encuentra "ADS 01" — confirmado con la
+ *    reorganización real de AZ), y se listan sus mp4 (organización "una
+ *    carpeta por anuncio").
+ *  - si no hay, se buscan en `tomasBaseDir` (sin subcarpetas) los mp4 cuyo
+ *    NOMBRE contenga "<valor>-" — no solo como prefijo: el metraje real de
+ *    AZ mezcla "ADS-04-ESCENA-02.MP4" con retakes tipo
+ *    "BLOQUE-02-ADS-04-ESCENA-02.MP4", y un filtro de prefijo estricto
+ *    dejaría afuera esos segundos silenciosamente.
+ */
+export async function resolveVideoPathsForScript(carpetaTomas: string, tomasBaseDir: string): Promise<string[]> {
+  const wanted = normalizeFolderName(carpetaTomas);
+  const entries = await readdir(tomasBaseDir, { withFileTypes: true });
+  const subdir = entries.find((e) => e.isDirectory() && normalizeFolderName(e.name) === wanted);
+  if (subdir) {
+    return listMp4sInDir(path.join(tomasBaseDir, subdir.name));
+  }
+
+  const needle = `${wanted}-`;
+  const enCarpetaBase = await listMp4sInDir(tomasBaseDir);
+  const matched = enCarpetaBase.filter((p) => normalizeFolderName(path.basename(p)).includes(needle));
+  if (matched.length === 0) {
+    throw new Error(
+      `no se encontró ninguna toma para "Carpeta: ${carpetaTomas}" en "${tomasBaseDir}" ` +
+        `(ni como subcarpeta ni como parte de un nombre de archivo)`,
+    );
+  }
+  return matched;
+}
+
 export async function processProject(options: ProcessProjectOptions): Promise<ProcessProjectResult[]> {
   const artifactsDir = path.join(options.outDir, "artifacts");
   const outputDir = path.join(options.outDir, "output");
@@ -72,18 +128,7 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
   const force = options.force ?? false;
   const preset: Preset = options.presetPath ? await loadPreset(options.presetPath) : await loadDefaultPreset();
 
-  // --- 2.1 Ingesta -----------------------------------------------------------
-  const probesByAsset = new Map<string, AssetProbe>();
-  for (const videoPath of options.videoPaths) {
-    const probe = await probeAsset(videoPath);
-    if (!probe.hasAudio) {
-      throw new Error(`"${videoPath}" no tiene pista de audio — no se puede usar en el editor de video.`);
-    }
-    probesByAsset.set(videoPath, probe);
-    logger.info({ videoPath, probe }, "asset validado");
-  }
-
-  // --- 2.2 Guion ---------------------------------------------------------------
+  // --- 2.2 Guion (antes de la ingesta: "Carpeta:" decide qué tomas se procesan) ---
   const scriptPath = path.join(artifactsDir, "script.json");
   let script = force ? undefined : await readJsonIfExists(scriptPath, scriptDocumentSchema);
   if (!script) {
@@ -99,10 +144,48 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
     );
   }
 
+  // --- Resolución automática de tomas + tratamiento de escenas (fondo/apoyo) ---
+  const videoPaths = [...(options.videoPaths ?? [])];
+  if (options.tomasBaseDir) {
+    for (const scriptVideo of script.videos) {
+      if (!scriptVideo.carpetaTomas) continue;
+      const raw = await resolveVideoPathsForScript(scriptVideo.carpetaTomas, options.tomasBaseDir);
+      const treated =
+        scriptVideo.escenas.length > 0 && options.bRollLibraryPath
+          ? await applyEscenaTreatments(raw, scriptVideo.escenas, {
+              bRollLibraryPath: options.bRollLibraryPath,
+              workDir: path.join(artifactsDir, "tratadas"),
+              rvmModelPath: options.rvmModelPath ?? process.env.RVM_MODEL_PATH,
+              backgroundReplace: options.backgroundReplace,
+              force,
+            })
+          : raw;
+      videoPaths.push(...treated);
+    }
+  }
+  const uniqueVideoPaths = [...new Set(videoPaths)];
+  if (uniqueVideoPaths.length === 0) {
+    throw new Error(
+      "no hay tomas para procesar — pasá videoPaths explícito, o asegurate de que el guion tenga una línea " +
+        '"Carpeta:" junto con tomasBaseDir.',
+    );
+  }
+
+  // --- 2.1 Ingesta -----------------------------------------------------------
+  const probesByAsset = new Map<string, AssetProbe>();
+  for (const videoPath of uniqueVideoPaths) {
+    const probe = await probeAsset(videoPath);
+    if (!probe.hasAudio) {
+      throw new Error(`"${videoPath}" no tiene pista de audio — no se puede usar en el editor de video.`);
+    }
+    probesByAsset.set(videoPath, probe);
+    logger.info({ videoPath, probe }, "asset validado");
+  }
+
   // --- 2.3 Transcripción + silencios (por archivo, cacheado) ------------------
   const provider = getConfiguredProvider();
   const analyses: AudioAnalysis[] = [];
-  for (const videoPath of options.videoPaths) {
+  for (const videoPath of uniqueVideoPaths) {
     const audioArtifactPath = path.join(artifactsDir, "audio", `${assetArtifactName(videoPath)}.json`);
     let analysis = force ? undefined : await readJsonIfExists(audioArtifactPath, audioAnalysisSchema);
     if (!analysis) {
@@ -130,11 +213,16 @@ export async function processProject(options: ProcessProjectOptions): Promise<Pr
     const edlPath = path.join(artifactsDir, "edl", `${scriptVideo.id}.json`);
     let edl = force ? undefined : await readJsonIfExists(edlPath, edlSchema);
     if (!edl) {
-      edl = buildEdl(
-        scriptVideo,
-        assigned,
-        preset.transiciones ? { marginSec: preset.transiciones.margenSilencioSeg } : {},
-      );
+      const marginSec = preset.transiciones?.margenSilencioSeg ?? DEFAULT_EDL_MARGIN_SEC;
+      const built = buildEdl(scriptVideo, assigned, { marginSec });
+      // Each segment must open on its first script word — see segment-anchor.ts
+      // for why the full-file timings aren't trusted for that.
+      const anchored = await anchorSegmentOpenings(built, analysesByAsset, provider, language, marginSec);
+      edl = anchored.edl;
+      for (const assetPath of anchored.retimedAssets) {
+        const audioArtifactPath = path.join(artifactsDir, "audio", `${assetArtifactName(assetPath)}.json`);
+        await writeJson(audioArtifactPath, analysesByAsset.get(assetPath));
+      }
       await writeJson(edlPath, edl);
     }
 
