@@ -1,9 +1,15 @@
 import { Plug } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant-context";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { retestSocialConnectionAction, upsertSocialConnectionAction } from "@/lib/actions";
+import {
+  cancelMetaPendingAction,
+  retestSocialConnectionAction,
+  selectMetaPageAction,
+  upsertSocialConnectionAction,
+} from "@/lib/actions";
 import { formatDateTime, formatRelative } from "@/lib/labels";
 import { META_OAUTH_REDIRECT_URI } from "@/lib/meta-oauth";
+import { readMetaPending } from "@/lib/meta-pending";
 import { SubmitButton } from "@/components/submit-button";
 import { buttonClass } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
@@ -39,6 +45,12 @@ export default async function ConnectionsPage() {
 
   const isActive = connection?.status === "active";
 
+  // Only trust a pending selection made for THIS tenant — if it was left
+  // over from switching businesses mid-flow, showing it here would be
+  // exactly the cross-tenant mix-up this picker exists to prevent.
+  const pending = await readMetaPending();
+  const pendingPages = pending && pending.tenantId === ctx.tenantId ? pending.pages : null;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -51,6 +63,40 @@ export default async function ConnectionsPage() {
           </a>
         }
       />
+
+      {pendingPages && (
+        <Card>
+          <CardHeader title="¿Cuál de estas páginas es la de este negocio?" />
+          <p className="text-sm text-fg-2">
+            Tu cuenta de Facebook administra {pendingPages.length} páginas. Elige la que corresponde a{" "}
+            {ctx.tenantName} — las demás no se tocan.
+          </p>
+          <div className="mt-4 space-y-2">
+            {pendingPages.map((page) => (
+              <form
+                key={page.id}
+                action={selectMetaPageAction}
+                className="flex items-center justify-between gap-4 rounded-lg border border-line p-3"
+              >
+                <input type="hidden" name="tenantId" value={ctx.tenantId} />
+                <input type="hidden" name="pageId" value={page.id} />
+                <div>
+                  <p className="text-sm font-medium text-fg">{page.name}</p>
+                  {page.hasInstagram && <p className="text-xs text-fg-3">Con cuenta de Instagram vinculada</p>}
+                </div>
+                <SubmitButton variant="secondary" size="sm" pendingText="Conectando…">
+                  Elegir
+                </SubmitButton>
+              </form>
+            ))}
+          </div>
+          <form action={cancelMetaPendingAction} className="mt-3">
+            <SubmitButton variant="subtle" size="sm" pendingText="Cancelando…">
+              Cancelar
+            </SubmitButton>
+          </form>
+        </Card>
+      )}
 
       {connection ? (
         <Card>

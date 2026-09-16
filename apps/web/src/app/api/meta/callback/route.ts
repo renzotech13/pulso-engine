@@ -1,18 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { META_OAUTH_REDIRECT_URI } from "@/lib/meta-oauth";
-import { FLASH_COOKIE } from "@/lib/flash";
+import { FLASH_COOKIE, type Flash } from "@/lib/flash";
+import { fetchInstagramUsername, fetchManagedPages } from "@/lib/meta-graph";
+import { setMetaPending } from "@/lib/meta-pending";
 
 const META_GRAPH_API_VERSION = "v21.0";
 const META_APP_ID = process.env.META_APP_ID ?? "1550590863219497";
 const META_APP_SECRET = process.env.META_APP_SECRET ?? "";
-
-type MetaPage = {
-  id: string;
-  name: string;
-  access_token: string;
-  instagram_business_account?: { id: string };
-};
 
 async function exchangeCodeForUserToken(code: string): Promise<string> {
   const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/oauth/access_token`);
@@ -45,29 +40,6 @@ async function extendUserToken(shortLivedToken: string): Promise<string> {
   return data.access_token;
 }
 
-async function fetchManagedPages(longLivedUserToken: string): Promise<MetaPage[]> {
-  const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/me/accounts`);
-  url.searchParams.set("fields", "id,name,access_token,instagram_business_account");
-  url.searchParams.set("access_token", longLivedUserToken);
-
-  const response = await fetch(url);
-  const data = (await response.json()) as { data?: MetaPage[]; error?: { message: string } };
-  if (!response.ok || data.error) {
-    throw new Error(data.error?.message ?? "no se pudieron listar las páginas de Facebook");
-  }
-  return data.data ?? [];
-}
-
-async function fetchInstagramUsername(igUserId: string, accessToken: string): Promise<string | null> {
-  const url = new URL(`https://graph.facebook.com/${META_GRAPH_API_VERSION}/${igUserId}`);
-  url.searchParams.set("fields", "username");
-  url.searchParams.set("access_token", accessToken);
-
-  const response = await fetch(url);
-  const data = (await response.json()) as { username?: string };
-  return data.username ?? null;
-}
-
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -76,7 +48,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // The outcome travels in the same one-shot flash cookie every server
   // action uses (shown by FlashToast) — the old ?meta_connected / ?meta_error
   // query flags kept re-showing the message on every refresh.
-  const back = (flash: { tone: "success" | "error"; message: string }): NextResponse => {
+  const back = (flash: Flash): NextResponse => {
     const response = NextResponse.redirect(`${url.origin}/connections`);
     response.cookies.set(FLASH_COOKIE, JSON.stringify(flash), { path: "/", maxAge: 30, sameSite: "lax" });
     return response;
@@ -114,7 +86,26 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       .eq("tenant_id", tenantId)
       .maybeSingle();
 
-    const page = pages.find((p) => p.id === existing?.page_id) ?? pages[0]!;
+    const matchedExisting = pages.find((p) => p.id === existing?.page_id);
+
+    // An account managing several pages (common for an agency user across
+    // tenants) has no way to tell us which one belongs to THIS tenant on a
+    // first-time connection — guessing pages[0] previously meant whichever
+    // page Meta happened to list first got attached, silently, regardless
+    // of tenant. Ask instead, unless we already know which page is theirs.
+    if (pages.length > 1 && !matchedExisting) {
+      await setMetaPending({
+        tenantId,
+        userToken: longLivedUserToken,
+        pages: pages.map((p) => ({ id: p.id, name: p.name, hasInstagram: Boolean(p.instagram_business_account) })),
+      });
+      return back({
+        tone: "info",
+        message: `Tu cuenta de Facebook administra ${pages.length} páginas — elige cuál es la de este negocio abajo.`,
+      });
+    }
+
+    const page = matchedExisting ?? pages[0]!;
     const igAccountId = page.instagram_business_account?.id ?? null;
     const instagramUsername = igAccountId
       ? await fetchInstagramUsername(igAccountId, page.access_token)

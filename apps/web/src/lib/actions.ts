@@ -14,6 +14,8 @@ import { createSupabaseServerClient } from "./supabase/server";
 import { ACTIVE_TENANT_COOKIE } from "./tenant-context";
 import { requireAdmin } from "./admin";
 import { isValidImportRow, parseCalendarImportHtml, type ImportRow, type ImportRowError } from "./calendar-import";
+import { fetchInstagramUsername, fetchManagedPages } from "./meta-graph";
+import { clearMetaPending, readMetaPending } from "./meta-pending";
 
 async function createTenantActionImpl(formData: FormData): Promise<void> {
   const name = String(formData.get("name") ?? "").trim();
@@ -1731,6 +1733,56 @@ async function retestSocialConnectionActionImpl(formData: FormData): Promise<voi
 }
 
 /**
+ * Finishes the OAuth flow after the user picks a page from the "your
+ * account manages several pages" prompt (see /api/meta/callback). The page
+ * token isn't carried in the pending cookie, only the user token, so it's
+ * re-derived here from a fresh call — the pending selection can't be reused
+ * to connect a page that token no longer manages.
+ */
+async function selectMetaPageActionImpl(formData: FormData): Promise<void> {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const pageId = String(formData.get("pageId") ?? "");
+  if (!tenantId || !pageId) return;
+
+  const pending = await readMetaPending();
+  if (!pending || pending.tenantId !== tenantId) {
+    throw new Error("La selección expiró — vuelve a conectar con Facebook.");
+  }
+
+  const pages = await fetchManagedPages(pending.userToken);
+  const page = pages.find((p) => p.id === pageId);
+  if (!page) throw new Error("Esa página ya no está disponible — vuelve a conectar con Facebook.");
+
+  const igAccountId = page.instagram_business_account?.id ?? null;
+  const instagramUsername = igAccountId ? await fetchInstagramUsername(igAccountId, page.access_token) : null;
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("social_connections").upsert(
+    {
+      tenant_id: tenantId,
+      page_id: page.id,
+      page_name: page.name,
+      access_token: page.access_token,
+      instagram_business_account_id: igAccountId,
+      instagram_username: instagramUsername,
+      status: "active",
+      last_verified_at: new Date().toISOString(),
+      last_error: null,
+    },
+    { onConflict: "tenant_id" },
+  );
+  if (error) throw new Error(error.message);
+
+  await clearMetaPending();
+  revalidatePath("/connections");
+}
+
+async function cancelMetaPendingActionImpl(): Promise<void> {
+  await clearMetaPending();
+  revalidatePath("/connections");
+}
+
+/**
  * Converts a pending news suggestion into a real content_calendar slot for
  * the chosen date — the News agent itself never touches content_calendar
  * (see apps/workers/src/agents/news.ts), this action is the one
@@ -1901,4 +1953,6 @@ export const updateTenantLimitsAction = withFeedback("Límites guardados.", upda
 export const createPromotionAction = withFeedback("Promoción creada.", createPromotionActionImpl);
 export const upsertSocialConnectionAction = withFeedback("Conexión guardada y verificada.", upsertSocialConnectionActionImpl);
 export const retestSocialConnectionAction = withFeedback("Conexión verificada.", retestSocialConnectionActionImpl);
+export const selectMetaPageAction = withFeedback("Página conectada correctamente.", selectMetaPageActionImpl);
+export const cancelMetaPendingAction = withFeedback(null, cancelMetaPendingActionImpl);
 export const dismissNewsSuggestionAction = withFeedback("Idea descartada.", dismissNewsSuggestionActionImpl);
