@@ -1130,6 +1130,7 @@ export type Database = {
           created_at: string
           gemini_daily_image_budget: number | null
           gemini_share: number | null
+          generation_paused: boolean
           hitl_mode: string
           id: string
           max_weekly_carousels: number | null
@@ -1148,6 +1149,7 @@ export type Database = {
           created_at?: string
           gemini_daily_image_budget?: number | null
           gemini_share?: number | null
+          generation_paused?: boolean
           hitl_mode?: string
           id?: string
           max_weekly_carousels?: number | null
@@ -1166,6 +1168,7 @@ export type Database = {
           created_at?: string
           gemini_daily_image_budget?: number | null
           gemini_share?: number | null
+          generation_paused?: boolean
           hitl_mode?: string
           id?: string
           max_weekly_carousels?: number | null

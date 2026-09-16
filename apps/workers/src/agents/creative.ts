@@ -213,6 +213,18 @@ export async function runCreativeAgentForSlot(
 
       const tenant = await ctx.db.getTenant();
 
+      // "hasta nuevo aviso" switch (tenants.generation_paused) — unlike
+      // `status` (a global kill switch that also stops publish-tick from
+      // sending out already-ready creatives) this only stops NEW ones from
+      // being made; whatever's already generated for this tenant still
+      // publishes on schedule.
+      if (tenant.generation_paused) {
+        await skip("Generación de creatives en pausa para este tenant (tenants.generation_paused).", {
+          calendar_slot_id: calendarSlotId,
+        });
+        return;
+      }
+
       // "hasta nuevo aviso" switch (tenants.reels_paused) — real reel bugs
       // are still open, so instead of leaving these slots stuck forever
       // (they were already approved as 'reel' weeks out by the Planner, not
