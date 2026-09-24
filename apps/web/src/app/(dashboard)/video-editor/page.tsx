@@ -36,10 +36,15 @@ export default async function VideoEditorPage() {
         title="Editor de Video"
         description="Subí tomas en crudo y un guion en PDF — el sistema transcribe, arma el corte, pone título y subtítulos con tu línea gráfica, y mezcla música. Vos solo revisás y aprobás."
         actions={
-          <Link href="/video-editor/new" className={buttonClass()}>
-            <Plus size={16} aria-hidden="true" />
-            Nuevo proyecto
-          </Link>
+          <>
+            <Link href="/video-editor/ugc" className={buttonClass("secondary")}>
+              Fábrica de video UGC
+            </Link>
+            <Link href="/video-editor/new" className={buttonClass()}>
+              <Plus size={16} aria-hidden="true" />
+              Nuevo proyecto
+            </Link>
+          </>
         }
       />
 

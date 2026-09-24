@@ -14,7 +14,8 @@
     "./image-describe": "./src/image-describe.ts",
     "./image-prompts": "./src/image-prompts.ts",
     "./article-gen": "./src/article-gen.ts",
-    "./article-html": "./src/article-html.ts"
+    "./article-html": "./src/article-html.ts",
+    "./ugc": "./src/ugc.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

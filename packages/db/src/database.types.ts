@@ -1357,6 +1357,80 @@ export type Database = {
           },
         ]
       }
+      video_ugc_jobs: {
+        Row: {
+          batch_id: string | null
+          cost_usd: number
+          created_at: string
+          elementos: Json
+          error_message: string | null
+          escena: string
+          frame_path: string
+          guion_a: string
+          guion_b: string
+          id: string
+          model: string
+          nombre: string
+          output_path: string | null
+          progress: number
+          saldo_apimart: number | null
+          status: string
+          task_ids: Json
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          batch_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          elementos?: Json
+          error_message?: string | null
+          escena: string
+          frame_path: string
+          guion_a: string
+          guion_b: string
+          id?: string
+          model?: string
+          nombre: string
+          output_path?: string | null
+          progress?: number
+          saldo_apimart?: number | null
+          status?: string
+          task_ids?: Json
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          elementos?: Json
+          error_message?: string | null
+          escena?: string
+          frame_path?: string
+          guion_a?: string
+          guion_b?: string
+          id?: string
+          model?: string
+          nombre?: string
+          output_path?: string | null
+          progress?: number
+          saldo_apimart?: number | null
+          status?: string
+          task_ids?: Json
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_ugc_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_projects: {
         Row: {
           created_at: string
@@ -1468,6 +1542,10 @@ export type Database = {
       }
       request_creative_publish: {
         Args: { target_creative_id: string }
+        Returns: undefined
+      }
+      request_video_ugc: {
+        Args: { target_job_id: string }
         Returns: undefined
       }
       request_video_project_processing: {
