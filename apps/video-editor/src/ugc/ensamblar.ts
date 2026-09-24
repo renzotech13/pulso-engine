@@ -69,8 +69,10 @@ function norm(s: string): string {
 
 const fit = (text: string, size: number, maxW: number, k = 0.62) => Math.floor(Math.min(size, maxW / (k * Math.max(text.length, 1))));
 
+let ALTO = 1920; // alto del lienzo de salida (1920 en 9:16, 1350 en 4:5)
+
 async function renderRemotion(props: Record<string, unknown>, outPath: string, composicion: string): Promise<void> {
-  const full = { ...props, fps: 30, width: 1080, height: 1920 };
+  const full = { ...props, fps: 30, width: 1080, height: ALTO };
   await run("npx", ["tsx", "src/precio-card-cli.ts", JSON.stringify(full), outPath, composicion], { cwd: RENDER_VIDEO_DIR });
 }
 
@@ -84,6 +86,8 @@ export interface EnsamblarOpts {
 
 export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
   const { workDir, elementos: el } = o;
+  const f45 = el.formato === "4:5";
+  ALTO = f45 ? 1350 : 1920;
   const paso = o.onPaso ?? (async () => undefined);
   const W = (f: string) => path.join(workDir, f);
 
@@ -122,7 +126,7 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
 
   // 5) Base a 1080x1920 y elementos.
   await paso("Renderizando títulos, precio y CTA", 78);
-  await ff(["-i", fuente, "-vf", "scale=1080:1920:flags=lanczos,fps=30", "-t", String(dur), "-an", ...ENC, W("base.mp4")]);
+  await ff(["-i", fuente, "-vf", `scale=1080:1920:flags=lanczos,fps=30${f45 ? ",crop=1080:1350:0:120" : ""}`, "-t", String(dur), "-an", ...ENC, W("base.mp4")]);
 
   const inputs: string[] = ["-i", W("base.mp4")];
   const cadena: string[] = [];
@@ -151,17 +155,17 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
     const zs = el.zonaSegura;
     if (t.clave === "movistar-titulo-ola") {
       await renderRemotion(
-        { durationSec: dTit, linea1: l1, linea2: l2, linea3: l3 ?? "", posicionYFrac: zs ? 0.55 : 0.74, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5", colorLinea3: "#FFFFFF",
+        { durationSec: dTit, linea1: l1, linea2: l2, linea3: l3 ?? "", posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.74, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5", colorLinea3: "#FFFFFF",
           tamano1: fit(l1!, zs ? 84 : 112, zs ? 860 : 960), tamano2: fit(l2!, zs ? 128 : 170, zs ? 860 : 960), tamano3: fit(l3 ?? "", zs ? 54 : 70, zs ? 860 : 960), amplitudPx: 7, cicloSeg: 6, escalonSeg: 0.04 },
         W("titulo.mov"), "titulo-olas");
     } else if (t.clave === "movistar-titulo-ola-pill") {
       await renderRemotion(
-        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: zs ? 0.55 : 0.0885, colorTexto1: "#FFFFFF", colorTexto2: "#FFFFFF", colorPill: "#3B86E6",
+        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.0885, colorTexto1: "#FFFFFF", colorTexto2: "#FFFFFF", colorPill: "#3B86E6",
           tamano1: fit(l1!, zs ? 80 : 110, zs ? 860 : 960), tamano2: fit(l2!, zs ? 58 : 78, zs ? 740 : 800), amplitudPx: 7, cicloSeg: 6, escalonSeg: 0.04, entradaPillSeg: 0.7 },
         W("titulo.mov"), "titulo-ola-pill");
     } else {
       await renderRemotion(
-        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: zs ? 0.55 : 0.0916, desplazamientoXPx: 0, colorFondo: "#2050B9", colorTexto1: "#FFFFFF", colorTexto2: "#4FE3D6",
+        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.0916, desplazamientoXPx: 0, colorFondo: "#2050B9", colorTexto1: "#FFFFFF", colorTexto2: "#4FE3D6",
           colorChispas: "#4FE3D6", tamano1: fit(l1!, zs ? 50 : 64, zs ? 740 : 800, 0.55), tamano2: fit(l2!, zs ? 66 : 84, zs ? 740 : 800, 0.55), chispaArribaPct: 16, chispaAbajoPct: 72 },
         W("titulo.mov"), "titulo-pill");
     }
@@ -173,7 +177,7 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
       const cat = JSON.parse(await readFile(path.join(CATALOGO_DIR, "movistar-pill-stack.json"), "utf8")) as { props: Record<string, unknown> };
       const logo = await readFile(path.join(ASSETS_DIR, "logo-m.png"));
       await renderRemotion(
-        { ...cat.props, logoMUrl: `data:image/png;base64,${logo.toString("base64")}`, posicionYFrac: el.zonaSegura ? 0.5664 : 0.87, durationSec: Number((tCta - tMid - 0.1).toFixed(3)) },
+        { ...cat.props, logoMUrl: `data:image/png;base64,${logo.toString("base64")}`, posicionYFrac: f45 ? 0.587 : el.zonaSegura ? 0.5664 : 0.87, durationSec: Number((tCta - tMid - 0.1).toFixed(3)) },
         W("precio.mov"), "pill-stack");
       superponer(capa(añadir(W("precio.mov")), tMid, "scale=950:-1,"), "65:43");
     } else {
@@ -190,16 +194,16 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
         capa(
           añadir(W("pr-largo.mp4")),
           tMid,
-          `colorkey=0x202020:0.12:0.08,format=yuva420p,${el.zonaSegura ? "scale=iw*0.85:ih*0.85," : ""}fade=t=out:st=${(cardLen - 0.4).toFixed(2)}:d=0.4:alpha=1,`,
+          `colorkey=0x202020:0.12:0.08,format=yuva420p,${el.zonaSegura || f45 ? "scale=iw*0.85:ih*0.85," : ""}fade=t=out:st=${(cardLen - 0.4).toFixed(2)}:d=0.4:alpha=1,`,
         ),
-        el.zonaSegura ? "80:296" : "0:600",
+        f45 ? "80:32" : el.zonaSegura ? "80:296" : "0:600",
       );
     }
   }
 
   if (el.cta) {
     await renderRemotion(
-      { durationSec: Number((dur - tCta + 1).toFixed(3)), linea1: el.cta.linea1, linea2: el.cta.linea2, posicionYFrac: el.zonaSegura ? 0.2 : 0.075, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5",
+      { durationSec: Number((dur - tCta + 1).toFixed(3)), linea1: el.cta.linea1, linea2: el.cta.linea2, posicionYFrac: f45 ? 0.15 : el.zonaSegura ? 0.2 : 0.075, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5",
         tamano1: el.zonaSegura ? 72 : 88, tamano2: el.zonaSegura ? 84 : 100, amplitudPx: 7, cicloSeg: 6, escalonSeg: 0.04, colorFlecha: "#3EC6FF",
         tamanoFlecha: el.zonaSegura ? 64 : 80, retrasoFlechaSeg: 1.1, distanciaFlechaPx: el.zonaSegura ? 105 : 130 },
       W("cta.mov"), "cta-ola");
@@ -207,7 +211,7 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
   }
 
   if (el.whatsapp) {
-    await renderRemotion({ durationSec: Number((dur - tWa + 0.5).toFixed(3)), posicionYFrac: el.zonaSegura ? 0.6 : 0.87, anchoPx: el.zonaSegura ? 600 : 720, ...(el.zonaSegura ? { alturaPx: 150 } : {}) }, W("wa.mov"), "whatsapp-pill");
+    await renderRemotion({ durationSec: Number((dur - tWa + 0.5).toFixed(3)), posicionYFrac: f45 ? 0.655 : el.zonaSegura ? 0.6 : 0.87, anchoPx: el.zonaSegura ? 600 : 720, ...(el.zonaSegura ? { alturaPx: 150 } : {}) }, W("wa.mov"), "whatsapp-pill");
     superponer(capa(añadir(W("wa.mov")), tWa));
   }
 

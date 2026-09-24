@@ -30,7 +30,7 @@ export default async function UgcFactoryPage() {
 
   const { data: jobs } = await supabase
     .from("video_ugc_jobs")
-    .select("id, nombre, batch_id, status, progress, output_path, error_message, cost_usd, saldo_apimart, created_at")
+    .select("id, nombre, batch_id, status, progress, output_path, task_ids, error_message, cost_usd, saldo_apimart, created_at")
     .eq("tenant_id", ctx.tenantId)
     .order("created_at", { ascending: false })
     .limit(60);
@@ -47,11 +47,13 @@ export default async function UgcFactoryPage() {
   const conUrls = await Promise.all(
     lista.map(async (job) => {
       if (job.status !== "listo" || !job.output_path) return { job };
-      const [preview, download] = await Promise.all([
+      const salida45 = (job.task_ids as { salida45?: string } | null)?.salida45;
+      const [preview, download, download45] = await Promise.all([
         bucket.createSignedUrl(job.output_path, SIGNED_URL_TTL_SECONDS),
-        bucket.createSignedUrl(job.output_path, SIGNED_URL_TTL_SECONDS, { download: `${job.nombre}.mp4` }),
+        bucket.createSignedUrl(job.output_path, SIGNED_URL_TTL_SECONDS, { download: `${job.nombre}-9x16.mp4` }),
+        salida45 ? bucket.createSignedUrl(salida45, SIGNED_URL_TTL_SECONDS, { download: `${job.nombre}-4x5.mp4` }) : Promise.resolve(null),
       ]);
-      return { job, previewUrl: preview.data?.signedUrl, downloadUrl: download.data?.signedUrl };
+      return { job, previewUrl: preview.data?.signedUrl, downloadUrl: download.data?.signedUrl, download45Url: download45?.data?.signedUrl };
     }),
   );
 
@@ -99,7 +101,7 @@ export default async function UgcFactoryPage() {
           <EmptyState icon={<Film size={28} />} title="Todavía no hay videos" description="Completa el formulario de arriba para generar el primero." />
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {conUrls.map(({ job, previewUrl, downloadUrl }) => {
+            {conUrls.map(({ job, previewUrl, downloadUrl, download45Url }) => {
               const status = JOB_STATUS[job.status] ?? { label: job.status, tone: "grey" as const };
               return (
                 <div key={job.id} className="space-y-3 rounded-card border border-line bg-surface p-3">
@@ -125,9 +127,16 @@ export default async function UgcFactoryPage() {
                   {job.status === "error" && job.error_message && <p className="text-xs text-danger">{job.error_message}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     {downloadUrl ? (
-                      <a href={downloadUrl} className={buttonClass("secondary", "sm")}>
-                        <Download size={14} aria-hidden="true" /> Descargar
-                      </a>
+                      <div className="flex flex-wrap gap-2">
+                        <a href={downloadUrl} className={buttonClass("secondary", "sm")}>
+                          <Download size={14} aria-hidden="true" /> 9:16
+                        </a>
+                        {download45Url && (
+                          <a href={download45Url} className={buttonClass("secondary", "sm")}>
+                            <Download size={14} aria-hidden="true" /> 4:5
+                          </a>
+                        )}
+                      </div>
                     ) : (
                       <span />
                     )}

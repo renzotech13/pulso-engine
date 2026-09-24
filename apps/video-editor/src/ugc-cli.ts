@@ -51,8 +51,15 @@ async function hacer(item: Item, salida: string): Promise<void> {
     console.log(`[${tag}] extendiendo…`);
     const b = await conReintentos(tag, () => extenderTramo("veo3.1-fast", construirPromptUgc(item.escena, normalizarGuionUgc(item.guionB), true), a.taskId, ext));
     console.log(`[${tag}] armando… (costo ${(a.costoUsd + b.costoUsd).toFixed(2)})`);
-    const final = await ensamblarUgc({ workDir: work, tramo1: t1, extension: ext, elementos });
-    await copyFile(final, path.join(salida, `${tag}.mp4`));
+    // Desde ahora cada video sale en dos versiones: 9:16 con zona segura y 4:5.
+    const w916 = path.join(work, "v916");
+    const w45 = path.join(work, "v45");
+    await mkdir(w916, { recursive: true });
+    await mkdir(w45, { recursive: true });
+    const final916 = await ensamblarUgc({ workDir: w916, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "9:16" } });
+    const final45 = await ensamblarUgc({ workDir: w45, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "4:5" } });
+    await copyFile(final916, path.join(salida, `${tag}-9x16.mp4`));
+    await copyFile(final45, path.join(salida, `${tag}-4x5.mp4`));
     await copyFile(t1, path.join(salida, "_tramos", `${tag}-A.mp4`));
     await copyFile(ext, path.join(salida, "_tramos", `${tag}-B.mp4`));
     console.log(`[${tag}] LISTO`);
