@@ -73,6 +73,8 @@ type ArticleInsert = Database["public"]["Tables"]["articles"]["Insert"];
 type ArticleUpdate = Database["public"]["Tables"]["articles"]["Update"];
 type BrandKitRow = Database["public"]["Tables"]["brand_kits"]["Row"];
 type VideoProjectRow = Database["public"]["Tables"]["video_projects"]["Row"];
+type VideoUgcJobRow = Database["public"]["Tables"]["video_ugc_jobs"]["Row"];
+type VideoUgcJobUpdate = Database["public"]["Tables"]["video_ugc_jobs"]["Update"];
 type VideoProjectUpdate = Database["public"]["Tables"]["video_projects"]["Update"];
 type VideoAssetRow = Database["public"]["Tables"]["video_assets"]["Row"];
 type VideoAssetUpdate = Database["public"]["Tables"]["video_assets"]["Update"];
@@ -185,6 +187,8 @@ export interface TenantScopedClient {
   listVideoProjectVideos(projectId: string): Promise<VideoProjectVideoRow[]>;
   insertVideoProjectVideo(row: Omit<VideoProjectVideoInsert, "tenant_id">): Promise<VideoProjectVideoRow>;
   updateVideoProjectVideo(id: string, patch: Omit<VideoProjectVideoUpdate, "tenant_id">): Promise<void>;
+  getVideoUgcJob(id: string): Promise<VideoUgcJobRow | null>;
+  updateVideoUgcJob(id: string, patch: Omit<VideoUgcJobUpdate, "tenant_id">): Promise<void>;
   /** Tenant's own preset if the id belongs to them, else the global one (tenant_id null) — same "override or global" shape as getAgentRegistration. */
   getVideoPreset(id: string): Promise<VideoPresetRow | null>;
 }
@@ -798,6 +802,21 @@ export function createTenantScopedClient(
         throw new TenantIsolationError(`failed to insert video_project_video for tenant ${tenantId}`, error);
       }
       return data;
+    },
+
+    async getVideoUgcJob(id) {
+      const { data, error } = await client.from("video_ugc_jobs").select("*").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+      if (error) {
+        throw new TenantIsolationError(`failed to get video_ugc_job ${id} for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async updateVideoUgcJob(id, patch) {
+      const { error } = await client.from("video_ugc_jobs").update(patch).eq("id", id).eq("tenant_id", tenantId);
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_ugc_job ${id} for tenant ${tenantId}`, error);
+      }
     },
 
     async updateVideoProjectVideo(id, patch) {

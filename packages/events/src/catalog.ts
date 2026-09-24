@@ -59,6 +59,10 @@ export const eventCatalog = {
     payload: z.object({ projectId: z.string().uuid(), videoId: z.string().uuid() }),
     queue: "video-editor",
   },
+  "video.ugc.requested": {
+    payload: z.object({ jobId: z.string().uuid() }),
+    queue: "video-editor",
+  },
 } as const;
 
 export type EventType = keyof typeof eventCatalog;
