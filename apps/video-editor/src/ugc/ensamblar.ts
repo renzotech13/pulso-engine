@@ -25,8 +25,12 @@ const WHISPER_MODEL = process.env.WHISPER_MODEL_PATH ?? path.join(VIDEO_EDITOR_D
 
 const ENC = ["-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-r", "30"];
 
+// El servicio corre bajo launchd con PATH mínimo (/usr/bin:/bin): ffmpeg, whisper-cli, python3 y npx
+// viven en Homebrew, así que se antepone a mano para los procesos hijos (incluido flare-transicion.sh).
+const PATH_HERRAMIENTAS = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ""}`;
+
 async function run(cmd: string, args: string[], opts: { cwd?: string } = {}): Promise<string> {
-  const { stdout } = await exec(cmd, args, { maxBuffer: 64 * 1024 * 1024, ...opts });
+  const { stdout } = await exec(cmd, args, { maxBuffer: 64 * 1024 * 1024, env: { ...process.env, PATH: PATH_HERRAMIENTAS }, ...opts });
   return stdout;
 }
 const ff = (args: string[]) => run("ffmpeg", ["-y", "-loglevel", "error", ...args]);
