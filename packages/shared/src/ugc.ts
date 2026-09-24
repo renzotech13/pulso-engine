@@ -44,6 +44,11 @@ export const ugcElementosSchema = z.object({
    * chico y hacia el centro, y el título inicial al centro (0.55) en vez de arriba.
    */
   zonaSegura: z.boolean().default(true),
+  /**
+   * Formato de salida: 9:16 (1080x1920) o 4:5 (1080x1350, recorte de la toma vertical). En 4:5
+   * la zona segura es la que queda al ver el 4:5 centrado dentro de Reels: x 68–1017, y 40–970.
+   */
+  formato: z.enum(["9:16", "4:5"]).default("9:16"),
 });
 export type UgcElementos = z.infer<typeof ugcElementosSchema>;
 
@@ -76,6 +81,7 @@ export const ELEMENTOS_POR_DEFECTO: UgcElementos = {
   whatsapp: true,
   destello: { paleta: "frio" },
   zonaSegura: true,
+  formato: "9:16",
 };
 
 /**

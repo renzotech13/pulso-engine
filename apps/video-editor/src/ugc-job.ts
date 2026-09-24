@@ -3,7 +3,7 @@
 // arma el video con los elementos elegidos y lo sube al bucket de salida.
 // Los task_id y el costo real de APIMart quedan guardados en la fila.
 
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServiceRoleClient, createTenantScopedClient } from "@pulso/db/worker";
@@ -36,7 +36,7 @@ export async function ugcJob({ jobId, tenantId }: UgcJobData): Promise<void> {
   // Cada corrida parte de cero (regenerar = video nuevo): el costo acumulado de
   // corridas anteriores queda en cost_usd para no perder la cuenta del gasto.
   let costo = Number(job.cost_usd);
-  const taskIds: { primer?: string; extension?: string } = {};
+  const taskIds: { primer?: string; extension?: string; salida45?: string } = {};
 
   try {
     const elementos = ugcElementosSchema.parse(job.elementos);
@@ -69,23 +69,34 @@ export async function ugcJob({ jobId, tenantId }: UgcJobData): Promise<void> {
     await db.updateVideoUgcJob(jobId, { progress: 58, task_ids: taskIds, cost_usd: costo });
 
     await db.updateVideoUgcJob(jobId, { status: "armando", progress: 60 });
+    // Cada video sale en dos versiones: 9:16 con zona segura y 4:5 (recorte con su propia zona segura).
+    const w916 = path.join(workDir, "v916");
+    const w45 = path.join(workDir, "v45");
+    await mkdir(w916, { recursive: true });
+    await mkdir(w45, { recursive: true });
     const final = await ensamblarUgc({
-      workDir,
+      workDir: w916,
       tramo1,
       extension: ext,
-      elementos,
+      elementos: { ...elementos, formato: "9:16" },
       onPaso: async (_p, progreso) => {
-        await db.updateVideoUgcJob(jobId, { progress: progreso });
+        await db.updateVideoUgcJob(jobId, { progress: Math.min(progreso, 85) });
       },
     });
+    await db.updateVideoUgcJob(jobId, { progress: 88 });
+    const final45 = await ensamblarUgc({ workDir: w45, tramo1, extension: ext, elementos: { ...elementos, formato: "4:5" } });
 
     const outputPath = `${tenantId}/ugc/${jobId}.mp4`;
+    const output45 = `${tenantId}/ugc/${jobId}-4x5.mp4`;
     await uploadFile(service, OUTPUT_BUCKET, outputPath, final, "video/mp4");
+    await uploadFile(service, OUTPUT_BUCKET, output45, final45, "video/mp4");
+    taskIds.salida45 = output45;
     const saldoFinal = await saldoApimart().catch(() => null);
     await db.updateVideoUgcJob(jobId, {
       status: "listo",
       progress: 100,
       output_path: outputPath,
+      task_ids: taskIds,
       cost_usd: costo,
       ...(saldoFinal !== null ? { saldo_apimart: saldoFinal } : {}),
     });
