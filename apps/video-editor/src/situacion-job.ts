@@ -57,7 +57,7 @@ export async function situacionJob({ jobId, tenantId }: { jobId: string; tenantI
 
     // 1) Voz en off
     const vozCruda = path.join(workDir, "voz-cruda.mp3");
-    if (sit.voz.origen === "elevenlabs") await ttsElevenLabs(sit.guion, sit.voz.voiceId, vozCruda);
+    if (sit.voz.origen === "elevenlabs") await ttsElevenLabs(sit.guion, sit.voz.voiceId, vozCruda, sit.voz.modelo);
     else await downloadToFile(service, ASSETS_BUCKET, sit.voz.audioPath, vozCruda);
     const voz = path.join(workDir, "voz.mp3");
     await ajustarVelocidad(vozCruda, voz, sit.velocidad);

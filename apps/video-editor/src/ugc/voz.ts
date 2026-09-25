@@ -1,4 +1,4 @@
-// Voz en off del preset "situación": ElevenLabs v3 por voice_id, o un audio ya generado que se subió.
+// Voz en off del preset "situación": ElevenLabs (v3 o v2) por voice_id, o un audio ya generado que se subió.
 // En los dos casos se puede acelerar sin cambiar el tono (atempo) para calzar el audio con el video.
 
 import { execFile } from "node:child_process";
@@ -8,13 +8,17 @@ import { promisify } from "node:util";
 const exec = promisify(execFile);
 const PATH_HERRAMIENTAS = `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ""}`;
 
-export async function ttsElevenLabs(texto: string, voiceId: string, outPath: string): Promise<void> {
+export async function ttsElevenLabs(texto: string, voiceId: string, outPath: string, modelo: "v3" | "v2" = "v3"): Promise<void> {
   const key = process.env.ELEVENLABS_API_KEY;
   if (!key) throw new Error("Falta ELEVENLABS_API_KEY en el .env del worker del editor de video");
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
     method: "POST",
     headers: { "xi-api-key": key, "Content-Type": "application/json" },
-    body: JSON.stringify({ text: texto, model_id: "eleven_v3" }),
+    body: JSON.stringify(
+      modelo === "v2"
+        ? { text: texto.replace(/\[[^\]]*\]\s*/g, ""), model_id: "eleven_multilingual_v2" } // v2 leería las etiquetas en voz alta
+        : { text: texto, model_id: "eleven_v3" },
+    ),
   });
   if (!res.ok) {
     const detalle = (await res.text()).slice(0, 200);

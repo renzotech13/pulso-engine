@@ -49,6 +49,7 @@ interface Fila {
   vozModo: "conocida" | "id" | "audio";
   vozConocida: string;
   vozId: string;
+  modeloVoz: "v3" | "v2";
   audio: File | null;
   velocidad: number; // en % (100 = tal cual, 110 = +10 %)
   colaSeg: number;
@@ -70,6 +71,7 @@ const filaVacia = (): Fila => ({
   vozModo: "conocida",
   vozConocida: VOCES_CONOCIDAS[0].id,
   vozId: "",
+  modeloVoz: "v3",
   audio: null,
   velocidad: 100,
   colaSeg: 0.5,
@@ -252,7 +254,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
           const voz =
             f.vozModo === "audio"
               ? { origen: "audio" as const, audioPath: await subir(f.audio!, "voces") }
-              : { origen: "elevenlabs" as const, voiceId: (f.vozModo === "id" ? f.vozId : f.vozConocida).trim() };
+              : { origen: "elevenlabs" as const, voiceId: (f.vozModo === "id" ? f.vozId : f.vozConocida).trim(), modelo: f.modeloVoz };
           jobs.push({
             preset: "situacion" as const,
             nombre: f.nombre.trim(),
@@ -520,6 +522,14 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
                     {f.vozModo === "id" && (
                       <Field id={`vi-${f.id}`} label="ID de voz (voice_id)">
                         <input id={`vi-${f.id}`} className={inputClass} maxLength={40} value={f.vozId} onChange={(e) => setFila(f.id, { vozId: e.target.value })} placeholder="Ej. aYQAm4rWuigkeuRA5i92" />
+                      </Field>
+                    )}
+                    {f.vozModo !== "audio" && (
+                      <Field id={`vmo-${f.id}`} label="Modelo de ElevenLabs" hint="v3 = expresivo (etiquetas); v2 = más estable, ignora las etiquetas">
+                        <select id={`vmo-${f.id}`} className={selectClass} value={f.modeloVoz} onChange={(e) => setFila(f.id, { modeloVoz: e.target.value as Fila["modeloVoz"] })}>
+                          <option value="v3">v3 (expresivo)</option>
+                          <option value="v2">v2 (multilingual, estable)</option>
+                        </select>
                       </Field>
                     )}
                     {f.vozModo === "audio" && (
