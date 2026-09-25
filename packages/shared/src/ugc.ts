@@ -141,16 +141,23 @@ export function construirPromptUgc(escena: string, texto: string, continuacion: 
   );
 }
 
-export const ugcJobInputSchema = z.object({
-  preset: z.literal("ugc").default("ugc"),
-  nombre: z.string().trim().min(1).max(120),
-  escena: z.string().trim().min(3).max(300),
-  guionA: z.string().trim().min(5).max(300),
-  guionB: z.string().trim().min(5).max(300),
-  framePath: z.string().min(1),
-  elementos: ugcElementosSchema,
-  model: z.enum(["veo3.1-fast"]).default("veo3.1-fast"),
-});
+export const ugcJobInputSchema = z
+  .object({
+    preset: z.literal("ugc").default("ugc"),
+    nombre: z.string().trim().min(1).max(120),
+    escena: z.string().trim().min(3).max(300),
+    guionA: z.string().trim().min(5).max(300),
+    guionB: z.string().trim().min(5).max(300),
+    /** Primer cuadro ya hecho (se anima tal cual)… */
+    framePath: z.string().min(1).optional(),
+    /** …o una foto de REFERENCIA de la persona: el worker genera el primer cuadro (misma persona, otra ropa/escena) antes del video. */
+    referenciaPath: z.string().min(1).optional(),
+    /** Ropa/apariencia del primer cuadro generado (inglés). Vacío = la misma que en la referencia. */
+    ropa: z.string().trim().max(200).optional(),
+    elementos: ugcElementosSchema,
+    model: z.enum(["veo3.1-fast"]).default("veo3.1-fast"),
+  })
+  .refine((j) => Boolean(j.framePath) !== Boolean(j.referenciaPath), { message: "sube el primer cuadro O una foto de referencia, no ambos ni ninguno" });
 export type UgcJobInput = z.infer<typeof ugcJobInputSchema>;
 
 // ───────────────────────── Preset "Situación con voz en off" ─────────────────────────
@@ -261,3 +268,20 @@ export const situacionJobInputSchema = z.object({
 export type SituacionJobInput = z.infer<typeof situacionJobInputSchema>;
 
 export const jobInputSchema = z.union([ugcJobInputSchema, situacionJobInputSchema]);
+
+export const COSTO_PRIMER_CUADRO_USD = 0.03;
+
+/**
+ * Primer cuadro de un video UGC generado desde una foto de referencia (gpt-image-2, con la referencia como imagen de entrada):
+ * misma persona, ropa/escena nuevas, selfie de hombros hacia arriba, sin manos (las manos deformadas fueron un defecto recurrente).
+ */
+export function promptPrimerCuadroUgc(escena: string, ropa: string | undefined): string {
+  const vestimenta = ropa && ropa.trim() ? `wearing ${ropa.trim()}` : "wearing exactly the same outfit as in the reference photo";
+  return (
+    "Use the person in the reference photo as the SAME person: identical face, age, skin tone, hair and any glasses or accessories. " +
+    `New photo of them ${vestimenta}, ${escena}. ` +
+    "UGC selfie-style vertical video frame, shot from arm's length: head and shoulders with a little space above the head, they look straight at the front camera with the mouth slightly open mid-sentence, natural skin, candid smartphone look. " +
+    "Only head, shoulders and chest are visible; NO hands visible in the frame. Exactly one person, no other people in the foreground. " +
+    "No money, no legible text other than a logo already present on the clothing, no watermarks. Photorealistic, natural light, Lima Peru."
+  );
+}

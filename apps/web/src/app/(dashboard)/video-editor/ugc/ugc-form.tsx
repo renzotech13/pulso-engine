@@ -9,6 +9,7 @@ import {
   SITUACION_COSTO_ESTIMADO_USD,
   TIPOS_TOMA,
   UGC_COSTO_ESTIMADO_USD,
+  COSTO_PRIMER_CUADRO_USD,
   UGC_ELEMENTOS_CATALOGO,
   VOCES_CONOCIDAS,
   normalizarGuionUgc,
@@ -41,6 +42,7 @@ interface Fila {
   guionA: string;
   guionB: string;
   foto: File | null;
+  ropa: string;
   // preset situación
   personaje: string;
   guion: string;
@@ -62,6 +64,7 @@ const filaVacia = (): Fila => ({
   guionA: "",
   guionB: "",
   foto: null,
+  ropa: "",
   personaje: "",
   guion: "",
   vozModo: "conocida",
@@ -82,7 +85,7 @@ const GRUPOS: { id: string; titulo: string; soloUgc?: boolean }[] = [
   { id: "subtitulos", titulo: "Subtítulos por palabra (elige uno)" },
 ];
 
-function FotoPicker({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
+function FotoPicker({ file, onChange, texto }: { file: File | null; onChange: (f: File | null) => void; texto?: string }) {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -92,7 +95,7 @@ function FotoPicker({ file, onChange }: { file: File | null; onChange: (f: File 
         className="flex w-full items-center justify-center gap-2 rounded-btn border border-dashed border-line-2 px-4 py-6 text-sm text-fg-2 hover:border-accent/60"
       >
         <ImagePlus size={18} aria-hidden="true" />
-        <span className="truncate">{file ? file.name : "Elegir la foto de la protagonista (primer cuadro)"}</span>
+        <span className="truncate">{file ? file.name : (texto ?? "Elegir la foto de la protagonista (primer cuadro)")}</span>
       </button>
       <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
     </>
@@ -121,6 +124,9 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
   const [lote, setLote] = useState(false);
   const [filas, setFilas] = useState<Fila[]>([filaVacia()]);
   const [elementos, setElementos] = useState<UgcElementos>(ELEMENTOS_POR_DEFECTO);
+  // UGC: el primer cuadro puede subirse ya hecho (por video) o generarse desde UNA foto de referencia compartida por todo el lote.
+  const [frameModo, setFrameModo] = useState<"listo" | "referencia">("listo");
+  const [referencia, setReferencia] = useState<File | null>(null);
   const [pegar, setPegar] = useState("");
   const [estado, setEstado] = useState<{ texto: string; error?: boolean } | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -131,7 +137,8 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
   const lineasTitulo = tituloDef?.lineas ?? 0;
   const activos = [elementos.titulo, elementos.precio, elementos.cta, elementos.whatsapp || null, esSit ? null : elementos.destello, elementos.subtitulos].filter(Boolean).length;
   const visibles = lote ? filas : filas.slice(0, 1);
-  const costoUnidad = esSit ? SITUACION_COSTO_ESTIMADO_USD : UGC_COSTO_ESTIMADO_USD;
+  const generaFrame = !esSit && frameModo === "referencia";
+  const costoUnidad = esSit ? SITUACION_COSTO_ESTIMADO_USD : UGC_COSTO_ESTIMADO_USD + (generaFrame ? COSTO_PRIMER_CUADRO_USD : 0);
 
   const setFila = (id: string, patch: Partial<Fila>) => setFilas((fs) => fs.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const setLinea = (id: string, i: number, v: string) =>
@@ -188,7 +195,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
     if (!f.nombre.trim()) return `Falta el nombre del ${v}.`;
     if (elementos.titulo && f.lineas.slice(0, lineasTitulo).some((l) => !l.trim())) return `El ${v} necesita las ${lineasTitulo} líneas del título.`;
     if (!esSit) {
-      if (!f.escena.trim() || !f.guionA.trim() || !f.guionB.trim() || !f.foto) return `Falta completar el ${v}: escena, guion A, guion B y la foto de la protagonista.`;
+      if (!f.escena.trim() || !f.guionA.trim() || !f.guionB.trim() || (!generaFrame && !f.foto)) return `Falta completar el ${v}: escena, guion A, guion B${generaFrame ? "" : " y la foto de la protagonista"}.`;
       return null;
     }
     if (f.personaje.trim().length < 5) return `El ${v} necesita la descripción del personaje.`;
@@ -203,6 +210,10 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
   async function enviar(e: FormEvent) {
     e.preventDefault();
     if (ocupado) return;
+    if (generaFrame && !referencia) {
+      setEstado({ texto: "Sube la foto de referencia de la persona (o cambia a “Ya tengo el primer cuadro”).", error: true });
+      return;
+    }
     for (const [i, f] of visibles.entries()) {
       const err = validar(f, i + 1);
       if (err) {
@@ -221,6 +232,8 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
     };
     try {
       const jobs = [];
+      // La referencia se sube UNA vez y la usan todos los videos del lote.
+      const refPath = generaFrame && referencia ? await subir(referencia, "ugc-ref") : null;
       for (const [i, f] of visibles.entries()) {
         setEstado({ texto: `Preparando el video ${i + 1} de ${visibles.length}…` });
         const els = { ...elementos, titulo: elementos.titulo ? { ...elementos.titulo, lineas: f.lineas.slice(0, lineasTitulo).map((l) => l.trim()) } : null, destello: esSit ? null : elementos.destello };
@@ -231,7 +244,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
             escena: f.escena.trim(),
             guionA: normalizarGuionUgc(f.guionA),
             guionB: normalizarGuionUgc(f.guionB),
-            framePath: await subir(f.foto!, "ugc"),
+            ...(refPath ? { referenciaPath: refPath, ropa: f.ropa.trim() } : { framePath: await subir(f.foto!, "ugc") }),
             model: "veo3.1-fast" as const,
             elementos: els,
           });
@@ -396,6 +409,32 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
       </div>
 
       {/* Videos */}
+      {!esSit && (
+        <div className="space-y-3 rounded-btn border border-line p-3">
+          <span className={labelClass}>Primer cuadro del video</span>
+          <div className="inline-flex rounded-btn border border-line p-0.5" role="group" aria-label="Origen del primer cuadro">
+            {[
+              { v: "listo" as const, l: "Ya tengo el primer cuadro" },
+              { v: "referencia" as const, l: "Generarlo desde una foto de referencia" },
+            ].map((o) => (
+              <button key={o.v} type="button" aria-pressed={frameModo === o.v} onClick={() => setFrameModo(o.v)} className={`rounded-md px-3 py-1.5 text-sm transition-colors duration-200 ${frameModo === o.v ? "bg-surface-2 text-fg" : "text-fg-2 hover:text-fg"}`}>
+                {o.l}
+              </button>
+            ))}
+          </div>
+          {generaFrame ? (
+            <>
+              <FotoPicker file={referencia} onChange={setReferencia} texto="Elegir la foto de referencia de la persona (una para todo el lote)" />
+              <p className="text-xs text-fg-3">
+                Se genera un primer cuadro por video con la misma persona (misma cara, pelo y accesorios) en la escena y ropa de cada uno, de hombros hacia arriba y sin manos. Suma ≈ US${COSTO_PRIMER_CUADRO_USD.toFixed(2)} por video; el primer cuadro generado queda guardado junto al video.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-fg-3">Cada video usa la imagen que subas tal cual como primer cuadro: la persona ya en su escena, en vertical, de hombros hacia arriba y mirando a cámara.</p>
+          )}
+        </div>
+      )}
+
       {!esSit && lote && (
         <details className="rounded-btn border border-line bg-surface">
           <summary className="cursor-pointer px-3 py-2 text-sm text-fg-2">Pegar una tabla (nombre ; escena ; guion A ; guion B ; línea 1 ; línea 2 ; línea 3)</summary>
@@ -428,7 +467,13 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
 
             {!esSit ? (
               <>
-                <FotoPicker file={f.foto} onChange={(x) => setFila(f.id, { foto: x })} />
+                {generaFrame ? (
+                  <Field id={`r-${f.id}`} label="Ropa de este video (en inglés, opcional)" hint="Ej.: a plain light-grey hoodie. Vacío = la misma ropa que en la referencia. La escena de abajo también cambia el fondo.">
+                    <input id={`r-${f.id}`} className={inputClass} maxLength={200} value={f.ropa} onChange={(e) => setFila(f.id, { ropa: e.target.value })} />
+                  </Field>
+                ) : (
+                  <FotoPicker file={f.foto} onChange={(x) => setFila(f.id, { foto: x })} />
+                )}
                 <Field id={`e-${f.id}`} label="Escena (en inglés, para el modelo)" hint="Dónde está y cómo se siente. Ej.: in her bedroom with photos on the wall, warm and nostalgic" required>
                   <input id={`e-${f.id}`} className={inputClass} value={f.escena} onChange={(e) => setFila(f.id, { escena: e.target.value })} />
                 </Field>

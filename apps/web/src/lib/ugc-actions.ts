@@ -26,7 +26,7 @@ export async function createUgcJobsAction(input: z.input<typeof createUgcInput>)
   const ajeno = parsed.jobs.some((j) =>
     j.preset === "situacion"
       ? j.situacion.voz.origen === "audio" && !j.situacion.voz.audioPath.startsWith(prefix)
-      : !j.framePath.startsWith(prefix),
+      : ![j.framePath, j.referenciaPath].every((r) => r === undefined || r.startsWith(prefix)),
   );
   if (ajeno) throw new Error("un archivo subido no pertenece a este negocio");
 
@@ -53,7 +53,9 @@ export async function createUgcJobsAction(input: z.input<typeof createUgcInput>)
               nombre: j.nombre,
               preset: "ugc",
               model: j.model,
-              frame_path: j.framePath,
+              // Con referencia, frame_path guarda la foto de referencia y `situacion` marca que hay que generar el primer cuadro.
+              frame_path: (j.framePath ?? j.referenciaPath)!,
+              ...(j.referenciaPath ? { situacion: { generarPrimerCuadro: true, ropa: j.ropa ?? "" } as unknown as Json } : {}),
               escena: j.escena,
               guion_a: j.guionA,
               guion_b: j.guionB,
