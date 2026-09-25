@@ -4,7 +4,7 @@
 // lote.json: [{ nombre, frame, escena, guionA, guionB, elementos }]  (frame = ruta local)
 // Los clips bloqueados por la política de contenido de Veo no cobran: se reintenta hasta 3 veces.
 
-import { mkdir, mkdtemp, readFile, copyFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, copyFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { construirPromptUgc, normalizarGuionUgc, ugcElementosSchema } from "@pulso/shared/ugc";
@@ -32,7 +32,7 @@ async function conReintentos<T>(etiqueta: string, fn: () => Promise<T>): Promise
       return await fn();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      if (intento >= 3 || !/content policy|Blocked/i.test(msg)) throw e;
+      if (intento >= 3 || !/content policy|Blocked|isn't supported by the upstream/i.test(msg)) throw e;
       console.log(`[${etiqueta}] bloqueado por la política de contenido (no cobra), reintento ${intento}…`);
     }
   }
@@ -48,16 +48,21 @@ async function hacer(item: Item, salida: string): Promise<void> {
     const url = await subirImagen(item.frame);
     console.log(`[${tag}] generando el primer tramo…`);
     const a = await conReintentos(tag, () => generarPrimerTramo("veo3.1-fast", construirPromptUgc(item.escena, normalizarGuionUgc(item.guionA), false), url, t1));
+    // El task_id del primer tramo se guarda YA: si la extensión falla, se reintenta sin pagar de nuevo el primer tramo.
+    await writeFile(path.join(salida, "_tramos", `${tag}-tareas.json`), JSON.stringify({ primer: a.taskId }));
+    await copyFile(t1, path.join(salida, "_tramos", `${tag}-A.mp4`));
     console.log(`[${tag}] extendiendo…`);
     const b = await conReintentos(tag, () => extenderTramo("veo3.1-fast", construirPromptUgc(item.escena, normalizarGuionUgc(item.guionB), true), a.taskId, ext));
+    // Guarda los task_id: con ellos se puede volver a pedir SOLO la extensión (US$0.14) sin regenerar el primer tramo.
+    await writeFile(path.join(salida, "_tramos", `${tag}-tareas.json`), JSON.stringify({ primer: a.taskId, extension: b.taskId }));
     console.log(`[${tag}] armando… (costo ${(a.costoUsd + b.costoUsd).toFixed(2)})`);
     // Desde ahora cada video sale en dos versiones: 9:16 con zona segura y 4:5.
     const w916 = path.join(work, "v916");
     const w45 = path.join(work, "v45");
     await mkdir(w916, { recursive: true });
     await mkdir(w45, { recursive: true });
-    const final916 = await ensamblarUgc({ workDir: w916, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "9:16" } });
-    const final45 = await ensamblarUgc({ workDir: w45, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "4:5" } });
+    const final916 = await ensamblarUgc({ workDir: w916, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "9:16" }, guionSubtitulos: `${item.guionA} ${item.guionB}` });
+    const final45 = await ensamblarUgc({ workDir: w45, tramo1: t1, extension: ext, elementos: { ...elementos, formato: "4:5" }, guionSubtitulos: `${item.guionA} ${item.guionB}` });
     await copyFile(final916, path.join(salida, `${tag}-9x16.mp4`));
     await copyFile(final45, path.join(salida, `${tag}-4x5.mp4`));
     await copyFile(t1, path.join(salida, "_tramos", `${tag}-A.mp4`));

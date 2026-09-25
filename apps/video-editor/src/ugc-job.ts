@@ -88,12 +88,13 @@ export async function ugcJob({ jobId, tenantId }: UgcJobData): Promise<void> {
       tramo1,
       extension: ext,
       elementos: { ...elementos, formato: "9:16" },
+      guionSubtitulos: `${guionA} ${guionB}`,
       onPaso: async (_p, progreso) => {
         await db.updateVideoUgcJob(jobId, { progress: Math.min(progreso, 85) });
       },
     });
     await db.updateVideoUgcJob(jobId, { progress: 88 });
-    const final45 = await ensamblarUgc({ workDir: w45, tramo1, extension: ext, elementos: { ...elementos, formato: "4:5" } });
+    const final45 = await ensamblarUgc({ workDir: w45, tramo1, extension: ext, elementos: { ...elementos, formato: "4:5" }, guionSubtitulos: `${guionA} ${guionB}` });
 
     const outputPath = `${tenantId}/ugc/${jobId}.mp4`;
     const output45 = `${tenantId}/ugc/${jobId}-4x5.mp4`;

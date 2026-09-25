@@ -14,6 +14,15 @@ export const UGC_COSTO_ESTIMADO_USD = 0.28;
 
 export const TITULO_CLAVES = ["movistar-titulo-ola-pill", "movistar-titulo-ola", "movistar-titulo-pill-bitel"] as const;
 export const PRECIO_CLAVES = ["movistar-precio-ilimitado", "movistar-pill-stack"] as const;
+/**
+ * Estilos de subtítulos (karaoke por palabra, alineados al guion exacto), tomados de los presets ya aprobados en
+ * apps/video-editor/config/estilos/subtitulos: black-centro = AZ Black (una fila, Grift Black en mayúsculas, centrada,
+ * con la firma de la marca debajo); abajo-az = el primero de AZ (Georgia, abajo, palabra activa celeste);
+ * aura = Aura Studio (Georgia, palabra activa sobre pastilla naranja).
+ */
+export const SUBTITULO_ESTILOS = ["black-centro", "abajo-az", "aura"] as const;
+export type SubtituloEstilo = (typeof SUBTITULO_ESTILOS)[number];
+
 export const PALETAS_DESTELLO = ["frio", "calido", "blanco"] as const;
 
 export const ugcElementosSchema = z.object({
@@ -38,6 +47,20 @@ export const ugcElementosSchema = z.object({
     .default(null),
   whatsapp: z.boolean().default(false),
   destello: z.object({ paleta: z.enum(PALETAS_DESTELLO) }).nullable().default(null),
+  /** Subtítulos por palabra. `marca` = firma fija bajo el subtítulo (solo estilo black-centro): texto editable y, opcional, el trozo en color de acento. */
+  subtitulos: z
+    .object({
+      estilo: z.enum(SUBTITULO_ESTILOS),
+      marca: z
+        .object({
+          texto: z.string().trim().max(40).default(""),
+          acento: z.string().trim().max(20).default(""),
+          colorAcento: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#E3B341"),
+        })
+        .default({ texto: "", acento: "", colorAcento: "#E3B341" }),
+    })
+    .nullable()
+    .default(null),
   /**
    * Zona segura de Reels (1080x1920): x 68–1017, y 268–1255. Arriba queda la
    * cabecera de Reels y abajo la descripción y el botón; todo elemento va más
@@ -55,7 +78,7 @@ export type UgcElementos = z.infer<typeof ugcElementosSchema>;
 export interface UgcElementoDef {
   /** Clave del catálogo (config/estilos/elementos/<clave>.json). */
   clave: string;
-  grupo: "titulo" | "precio" | "cta" | "whatsapp" | "destello";
+  grupo: "titulo" | "precio" | "cta" | "whatsapp" | "destello" | "subtitulos";
   etiqueta: string;
   descripcion: string;
   /** Cantidad de líneas de texto editables (0 si no lleva texto). */
@@ -71,6 +94,9 @@ export const UGC_ELEMENTOS_CATALOGO: UgcElementoDef[] = [
   { clave: "movistar-cta-ola", grupo: "cta", etiqueta: "CTA con flecha", descripcion: "Dos filas en ola lenta y la flecha hacia abajo. Va arriba del video.", lineas: 2 },
   { clave: "movistar-pill-whatsapp", grupo: "whatsapp", etiqueta: "Pill de WhatsApp", descripcion: "Pill verde con el ícono, abajo, desde que se dice el CTA hasta el final.", lineas: 0 },
   { clave: "movistar-transicion-destello", grupo: "destello", etiqueta: "Destello en el empalme", descripcion: "Lens flare con pico en el corte entre el tramo de 8 s y la extensión.", lineas: 0 },
+  { clave: "black-centro", grupo: "subtitulos", etiqueta: "Subtítulos Black al centro + marca debajo", descripcion: "Una fila, máx. 3 palabras, Grift Black en mayúsculas, palabra activa en celeste, con el nombre de la marca debajo (editable).", lineas: 0 },
+  { clave: "abajo-az", grupo: "subtitulos", etiqueta: "Subtítulos abajo (estilo AZ)", descripcion: "Georgia blanca con contorno, hasta 2 líneas, palabra activa en celeste. Sin nombre de marca.", lineas: 0 },
+  { clave: "aura", grupo: "subtitulos", etiqueta: "Subtítulos Aura Studio", descripcion: "Georgia blanca con contorno; la palabra activa va amarilla sobre pastilla naranja.", lineas: 0 },
 ];
 
 export const ELEMENTOS_POR_DEFECTO: UgcElementos = {
@@ -80,6 +106,7 @@ export const ELEMENTOS_POR_DEFECTO: UgcElementos = {
   cta: { clave: "movistar-cta-ola", linea1: "ESCRÍBENOS", linea2: "POR WHATSAPP" },
   whatsapp: true,
   destello: { paleta: "frio" },
+  subtitulos: null,
   zonaSegura: true,
   formato: "9:16",
 };
@@ -102,13 +129,15 @@ export function normalizarGuionUgc(texto: string): string {
  * voz alta) ni la palabra "subtitles" fuera de la negación; sin texto en pantalla.
  */
 export function construirPromptUgc(escena: string, texto: string, continuacion: boolean): string {
-  const cont = continuacion ? "Continue the same shot seamlessly, same woman, same framing, lighting, and EXACTLY the same voice, tone and Peruvian accent as before, without any cut. " : "";
+  const cont = continuacion ? "Continue the same shot seamlessly, same woman, same framing, lighting and voice, without any cut. " : "";
+  // Las notas de dirección (escena, acento, tono) van marcadas como NO hablables: el modelo tiende a leer en
+  // voz alta cualquier descripción (m07 dijo "habla español, acento peruano, sea amable"). El diálogo va al final, solo entre comillas.
   return (
     `${cont}UGC selfie video, clean image with NO captions and NO subtitles at all: the woman in the image talks directly to the front camera ${escena}. ` +
-    `She speaks in clear, natural Spanish with a neutral Latin American accent, saying exactly this and nothing else: "${texto}" ` +
-    "Say ONLY the quoted words, once, then stop talking and stay silent with a small smile until the end of the clip; never read any other words. " +
+    "DIRECTION NOTES, never to be spoken aloud: her voice is a young woman from Lima, Peru (Latin American accent, not a Spain accent), the same voice throughout. " +
+    "Her hands never enter the frame, no other people, absolutely no on-screen text, no captions, no subtitles, no lyrics, no watermark, no music, no logos. " +
     "Lips perfectly synchronized, expressive natural face, subtle handheld shake. " +
-    "Her hands never enter the frame, no other people, absolutely no on-screen text, no captions, no subtitles, no lyrics, no watermark, no music, no logos."
+    `The ONLY words she says, once, are exactly these: "${texto}" Then she stops talking and stays silent with a small smile until the end of the clip; she never says anything else.`
   );
 }
 
