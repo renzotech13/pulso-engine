@@ -10,6 +10,7 @@ import { createServiceRoleClient, createTenantScopedClient } from "@pulso/db/wor
 import { createLogger } from "@pulso/shared/logger";
 import { construirPromptUgc, normalizarGuionUgc, ugcElementosSchema, UGC_COSTO_ESTIMADO_USD } from "@pulso/shared/ugc";
 import { ASSETS_BUCKET, OUTPUT_BUCKET, downloadToFile, uploadFile } from "./storage.js";
+import { situacionJob } from "./situacion-job.js";
 import { extenderTramo, generarPrimerTramo, saldoApimart, subirImagen } from "./ugc/apimart.js";
 import { ensamblarUgc } from "./ugc/ensamblar.js";
 
@@ -30,6 +31,14 @@ export async function ugcJob({ jobId, tenantId }: UgcJobData): Promise<void> {
     return;
   }
   if (job.status === "listo") return; // evento repetido: ya está hecho
+  if (job.preset === "situacion") {
+    await situacionJob({ jobId, tenantId });
+    return;
+  }
+  if (!job.frame_path || !job.escena || !job.guion_a || !job.guion_b) {
+    await db.updateVideoUgcJob(jobId, { status: "error", error_message: "faltan datos del video UGC (foto, escena o guiones)" });
+    return;
+  }
 
   const workDir = await mkdtemp(path.join(tmpdir(), "pulso-ve-ugc-"));
   const startedAt = Date.now();

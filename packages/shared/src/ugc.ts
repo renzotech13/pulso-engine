@@ -113,6 +113,7 @@ export function construirPromptUgc(escena: string, texto: string, continuacion: 
 }
 
 export const ugcJobInputSchema = z.object({
+  preset: z.literal("ugc").default("ugc"),
   nombre: z.string().trim().min(1).max(120),
   escena: z.string().trim().min(3).max(300),
   guionA: z.string().trim().min(5).max(300),
@@ -122,3 +123,112 @@ export const ugcJobInputSchema = z.object({
   model: z.enum(["veo3.1-fast"]).default("veo3.1-fast"),
 });
 export type UgcJobInput = z.infer<typeof ugcJobInputSchema>;
+
+// ───────────────────────── Preset "Situación con voz en off" ─────────────────────────
+// Un comerciante en 4 tomas (imagen gpt-image-2 → video Seedance 1.0 Pro Fast 720p) con voz en off
+// (ElevenLabs v3 por ID de voz, o un audio ya generado que se sube). Todo lo aprendido en el lote
+// de comerciantes queda como reglas del prompt, no como algo que haya que recordar.
+
+export const PRESETS = [
+  { id: "ugc", label: "UGC (protagonista hablando)", detalle: "2 tomas de Veo: 8 s + extensión, destello en el empalme, voz y labios del modelo. ≈ US$0.28 por video." },
+  { id: "situacion", label: "Situación con voz en off", detalle: "4 tomas de un comerciante + voz en off (ElevenLabs o audio propio). ≈ US$0.45 por video." },
+] as const;
+export type PresetId = (typeof PRESETS)[number]["id"];
+
+export const SITUACION_COSTO_ESTIMADO_USD = 0.45;
+
+/** Voces conocidas (ElevenLabs v3). La interfaz permite además pegar cualquier voice_id o subir un audio. */
+export const VOCES_CONOCIDAS = [
+  { id: "aZilAbZ5tl8i9lA1EF02", nombre: "Luisa (mujer)" },
+  { id: "jBlmi27XRORxjPquUeCh", nombre: "Brian (hombre)" },
+  { id: "aYQAm4rWuigkeuRA5i92", nombre: "Voz de la costurera" },
+] as const;
+
+/**
+ * Tipo de cada toma: define las reglas de celular/vehículo que se agregan solas al prompt.
+ *  - normal: sin celular a la vista.
+ *  - celular-espalda: celular visto SOLO por atrás (funda de color + lentes), sin pantalla.
+ *  - foto-pantalla: alguien fotografía algo y la pantalla SÍ se ve mostrando lo fotografiado.
+ *  - vehiculo-lateral: moto/mototaxi en plano lateral de perfil, manubrio hacia adelante.
+ *  - sin-hablar: nadie mueve los labios (toma de foto o de espera).
+ */
+export const TIPOS_TOMA = [
+  { id: "normal", label: "Normal (sin celular)" },
+  { id: "celular-espalda", label: "Celular de espaldas (funda de color, sin pantalla)" },
+  { id: "foto-pantalla", label: "Toma una foto (se ve la pantalla con lo fotografiado)" },
+  { id: "vehiculo-lateral", label: "Manejando (plano lateral de perfil)" },
+] as const;
+export type TipoToma = (typeof TIPOS_TOMA)[number]["id"];
+
+export const situacionTomaSchema = z.object({
+  /** Qué se ve, en inglés (ej.: "behind the counter of her grocery store arranging products"). */
+  escena: z.string().trim().min(5).max(400),
+  /** Movimiento de la toma, en inglés (ej.: "She arranges cans and turns to the camera; slow push-in"). */
+  movimiento: z.string().trim().min(5).max(300),
+  tipo: z.enum(["normal", "celular-espalda", "foto-pantalla", "vehiculo-lateral"]).default("normal"),
+  /** true = persona distinta de la toma 1 (ej.: el pasajero del taxista): no usa la toma 1 como referencia. */
+  otraPersona: z.boolean().default(false),
+});
+export type SituacionToma = z.infer<typeof situacionTomaSchema>;
+
+export const situacionSchema = z.object({
+  /** Descripción del personaje en inglés (ej.: "a Peruvian woman in her 50s, apron, owner of a grocery store"). */
+  personaje: z.string().trim().min(5).max(300),
+  /** Texto de la voz en off, con etiquetas expresivas de ElevenLabs v3 ([worried], [excited]…). */
+  guion: z.string().trim().min(20).max(900),
+  voz: z.discriminatedUnion("origen", [
+    z.object({ origen: z.literal("elevenlabs"), voiceId: z.string().trim().min(10).max(40) }),
+    /** Audio ya generado, subido por el usuario a video-editor-assets. */
+    z.object({ origen: z.literal("audio"), audioPath: z.string().min(1) }),
+  ]),
+  /** 1 = tal cual; 1.1 = +10 % de velocidad sin cambiar el tono (para calzar el audio con el video). */
+  velocidad: z.number().min(0.8).max(1.3).default(1),
+  tomas: z.array(situacionTomaSchema).length(4),
+  /** Segundos que dura el video tras la última palabra (0.5 por defecto; 0.05 = justo al terminar). */
+  colaSeg: z.number().min(0).max(2).default(0.5),
+});
+export type Situacion = z.infer<typeof situacionSchema>;
+
+const REGLA_SIN_DINERO =
+  "No money, no coins, no banknotes, no receipts or papers with amounts anywhere in the frame.";
+
+const REGLAS_TIPO: Record<TipoToma, string> = {
+  normal: "No smartphone screen is visible anywhere.",
+  "celular-espalda":
+    "Any smartphone is seen ONLY from its back: a bright colored silicone case (teal, red or blue, never plain black) with a clearly visible camera module with two round lenses in a corner; NEVER show a screen, light or image on the phone.",
+  "foto-pantalla":
+    "The person takes a photo with the smartphone held up in front of them (medium close-up, never from far away): the phone screen faces the camera and clearly shows the camera viewfinder with the subject being photographed. Exactly two hands.",
+  "vehiculo-lateral":
+    "Side-profile view of the vehicle and rider, both hands on the handlebar in front of the rider, the handlebar pointing forward in the direction of travel, realistic vehicle geometry.",
+};
+
+const SFX_IMAGEN =
+  "Photorealistic commercial photo, candid, natural skin texture, natural light, Lima Peru, vertical composition. No legible text, no logos, no watermarks.";
+
+const SFX_ANIMACION =
+  "Image-to-video, realistic motion and physics, keep the face and identity exactly consistent with the first frame, no morphing, no extra fingers, no added text or logos, natural lighting preserved.";
+
+/** Prompt de la imagen de una toma. La toma 1 no lleva referencia; las demás usan la 1 para mantener a la misma persona. */
+export function promptImagenSituacion(s: Situacion, i: number): string {
+  const t = s.tomas[i]!;
+  const base = i === 0 || t.otraPersona
+    ? `${s.personaje}, ${t.escena}.`
+    : `Use the person in the reference photo as the SAME person: identical face, age, hair, skin tone and clothing. New photo: ${t.escena}.`;
+  return `${base} ${REGLA_SIN_DINERO} ${REGLAS_TIPO[t.tipo]} Exactly two arms and two hands. ${SFX_IMAGEN}`;
+}
+
+/** Prompt del movimiento. La voz va en off: nadie habla, salvo que la escena lo pida explícitamente. */
+export function promptAnimacionSituacion(t: SituacionToma): string {
+  const silencio = "Nobody speaks: mouths stay closed, the audio is a voice-over.";
+  return `${t.movimiento}. ${silencio} ${t.tipo === "celular-espalda" ? "The back of the phone never turns around. " : ""}${SFX_ANIMACION}`;
+}
+
+export const situacionJobInputSchema = z.object({
+  preset: z.literal("situacion"),
+  nombre: z.string().trim().min(1).max(120),
+  situacion: situacionSchema,
+  elementos: ugcElementosSchema,
+});
+export type SituacionJobInput = z.infer<typeof situacionJobInputSchema>;
+
+export const jobInputSchema = z.union([ugcJobInputSchema, situacionJobInputSchema]);

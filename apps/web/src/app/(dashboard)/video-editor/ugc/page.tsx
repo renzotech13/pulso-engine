@@ -30,7 +30,7 @@ export default async function UgcFactoryPage() {
 
   const { data: jobs } = await supabase
     .from("video_ugc_jobs")
-    .select("id, nombre, batch_id, status, progress, output_path, task_ids, error_message, cost_usd, saldo_apimart, created_at")
+    .select("id, nombre, batch_id, preset, status, progress, output_path, task_ids, error_message, cost_usd, saldo_apimart, created_at")
     .eq("tenant_id", ctx.tenantId)
     .order("created_at", { ascending: false })
     .limit(60);
@@ -62,7 +62,7 @@ export default async function UgcFactoryPage() {
       <PageHeader
         eyebrow={ctx.tenantName}
         title="Fábrica de video UGC"
-        description="Una protagonista hablando a cámara: elige el guion, los elementos de marca y genera uno o un lote completo. La voz y los labios los genera el modelo; el destello, el título, el precio y el CTA se arman aquí."
+        description="Elige el tipo de video (UGC con protagonista hablando, o situación de un comerciante con voz en off), los elementos de marca y genera uno o un lote. Todo sale en 9:16 y 4:5 con zona segura."
         actions={
           <Link href="/video-editor" className={buttonClass("secondary")}>
             Volver al editor
@@ -91,7 +91,7 @@ export default async function UgcFactoryPage() {
       </div>
 
       <Card>
-        <CardHeader title="Nueva producción" description="Un video o un lote de hasta 30. Cada video parte de su propia foto de la protagonista." />
+        <CardHeader title="Nueva producción" description="Un video o un lote de hasta 30. UGC parte de la foto de la protagonista; la situación genera sus propias imágenes." />
         <UgcForm tenantId={ctx.tenantId} />
       </Card>
 
@@ -118,12 +118,12 @@ export default async function UgcFactoryPage() {
                       <p className="text-xs text-fg-3">
                         {formatDateTime(job.created_at)}
                         {Number(job.cost_usd) > 0 && ` · US$${Number(job.cost_usd).toFixed(2)}`}
-                        {job.batch_id && " · lote"}
+                        {job.preset === "situacion" ? " · situación" : " · UGC"}{job.batch_id && " · lote"}
                       </p>
                     </div>
                     <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                   </div>
-                  <UgcStatus jobId={job.id} initialStatus={job.status} initialProgress={job.progress} />
+                  <UgcStatus jobId={job.id} initialStatus={job.status} initialProgress={job.progress} preset={job.preset} />
                   {job.status === "error" && job.error_message && <p className="text-xs text-danger">{job.error_message}</p>}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     {downloadUrl ? (

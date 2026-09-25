@@ -1364,16 +1364,18 @@ export type Database = {
           created_at: string
           elementos: Json
           error_message: string | null
-          escena: string
-          frame_path: string
-          guion_a: string
-          guion_b: string
+          escena: string | null
+          frame_path: string | null
+          guion_a: string | null
+          guion_b: string | null
           id: string
           model: string
           nombre: string
           output_path: string | null
+          preset: string
           progress: number
           saldo_apimart: number | null
+          situacion: Json | null
           status: string
           task_ids: Json
           tenant_id: string
@@ -1385,16 +1387,18 @@ export type Database = {
           created_at?: string
           elementos?: Json
           error_message?: string | null
-          escena: string
-          frame_path: string
-          guion_a: string
-          guion_b: string
+          escena?: string | null
+          frame_path?: string | null
+          guion_a?: string | null
+          guion_b?: string | null
           id?: string
           model?: string
           nombre: string
           output_path?: string | null
+          preset?: string
           progress?: number
           saldo_apimart?: number | null
+          situacion?: Json | null
           status?: string
           task_ids?: Json
           tenant_id: string
@@ -1406,16 +1410,18 @@ export type Database = {
           created_at?: string
           elementos?: Json
           error_message?: string | null
-          escena?: string
-          frame_path?: string
-          guion_a?: string
-          guion_b?: string
+          escena?: string | null
+          frame_path?: string | null
+          guion_a?: string | null
+          guion_b?: string | null
           id?: string
           model?: string
           nombre?: string
           output_path?: string | null
+          preset?: string
           progress?: number
           saldo_apimart?: number | null
+          situacion?: Json | null
           status?: string
           task_ids?: Json
           tenant_id?: string
