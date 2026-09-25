@@ -16,7 +16,7 @@ const LABEL: Record<string, string> = {
 };
 
 /** Mismo patrón que BgReplaceStatus: el avance se actualiza en sitio, solo un cambio de estado refresca la página. */
-export function UgcStatus({ jobId, initialStatus, initialProgress }: { jobId: string; initialStatus: string; initialProgress: number }) {
+export function UgcStatus({ jobId, initialStatus, initialProgress, preset }: { jobId: string; initialStatus: string; initialProgress: number; preset: string }) {
   const router = useRouter();
   const [status, setStatus] = useState(initialStatus);
   const [progress, setProgress] = useState(initialProgress);
@@ -46,7 +46,7 @@ export function UgcStatus({ jobId, initialStatus, initialProgress }: { jobId: st
     <div className="space-y-1.5" aria-busy="true">
       <div className="flex items-center gap-2 text-xs text-fg-2">
         <Loader2 size={14} className="animate-spin text-accent-ink" aria-hidden="true" />
-        {LABEL[status] ?? status} {status !== "pendiente" && `${progress}%`}
+        {(preset === "situacion" && status === "generando" ? "Generando voz, imágenes y tomas…" : LABEL[status] ?? status)} {status !== "pendiente" && `${progress}%`}
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
         <div className="h-full bg-accent transition-[width] duration-500" style={{ width: `${progress}%` }} />

@@ -1,14 +1,19 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { ChevronDown, ImagePlus, Plus, Trash2, Wand2 } from "lucide-react";
+import { ChevronDown, ImagePlus, Music, Plus, Trash2, Wand2 } from "lucide-react";
 import {
   ELEMENTOS_POR_DEFECTO,
   PALETAS_DESTELLO,
+  PRESETS,
+  SITUACION_COSTO_ESTIMADO_USD,
+  TIPOS_TOMA,
   UGC_COSTO_ESTIMADO_USD,
   UGC_ELEMENTOS_CATALOGO,
-  UGC_MODELS,
+  VOCES_CONOCIDAS,
   normalizarGuionUgc,
+  type PresetId,
+  type TipoToma,
   type UgcElementos,
 } from "@pulso/shared/ugc";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -18,52 +23,101 @@ import { Field, inputClass, labelClass, selectClass, textareaClass } from "@/com
 
 const ASSETS_BUCKET = "video-editor-assets";
 const storageSafeName = (name: string) => name.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9.-]/g, "_");
+const palabras = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
+
+interface TomaFila {
+  escena: string;
+  movimiento: string;
+  tipo: TipoToma;
+  otraPersona: boolean;
+}
 
 interface Fila {
   id: string;
   nombre: string;
+  lineas: [string, string, string];
+  // preset UGC
   escena: string;
   guionA: string;
   guionB: string;
-  lineas: [string, string, string];
   foto: File | null;
+  // preset situación
+  personaje: string;
+  guion: string;
+  vozModo: "conocida" | "id" | "audio";
+  vozConocida: string;
+  vozId: string;
+  audio: File | null;
+  velocidad: number; // en % (100 = tal cual, 110 = +10 %)
+  colaSeg: number;
+  tomas: TomaFila[];
 }
 
-const filaVacia = (): Fila => ({ id: crypto.randomUUID(), nombre: "", escena: "", guionA: "", guionB: "", lineas: ["", "", ""], foto: null });
+const tomaVacia = (): TomaFila => ({ escena: "", movimiento: "", tipo: "normal", otraPersona: false });
+const filaVacia = (): Fila => ({
+  id: crypto.randomUUID(),
+  nombre: "",
+  lineas: ["", "", ""],
+  escena: "",
+  guionA: "",
+  guionB: "",
+  foto: null,
+  personaje: "",
+  guion: "",
+  vozModo: "conocida",
+  vozConocida: VOCES_CONOCIDAS[0].id,
+  vozId: "",
+  audio: null,
+  velocidad: 100,
+  colaSeg: 0.5,
+  tomas: [tomaVacia(), tomaVacia(), tomaVacia(), tomaVacia()],
+});
 
-const GRUPOS: { id: string; titulo: string }[] = [
+const GRUPOS: { id: string; titulo: string; soloUgc?: boolean }[] = [
   { id: "titulo", titulo: "Título inicial (3 s)" },
   { id: "precio", titulo: "Precio (siempre antes del CTA)" },
   { id: "cta", titulo: "CTA con flecha (arriba)" },
   { id: "whatsapp", titulo: "Pill de WhatsApp (abajo)" },
-  { id: "destello", titulo: "Transición" },
+  { id: "destello", titulo: "Transición", soloUgc: true },
 ];
 
-/** Palabras aproximadas que caben en un tramo: ~2.5 palabras/s → 8 s ≈ 20, 7 s ≈ 17. */
-const palabras = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
-
-function FotoPicker({ file, onChange, compacto }: { file: File | null; onChange: (f: File | null) => void; compacto?: boolean }) {
+function FotoPicker({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   return (
     <>
       <button
         type="button"
         onClick={() => ref.current?.click()}
-        className={`flex w-full items-center justify-center gap-2 rounded-btn border border-dashed border-line-2 text-fg-2 hover:border-accent/60 ${
-          compacto ? "px-2 py-2 text-xs" : "px-4 py-8 text-sm"
-        }`}
+        className="flex w-full items-center justify-center gap-2 rounded-btn border border-dashed border-line-2 px-4 py-6 text-sm text-fg-2 hover:border-accent/60"
       >
-        <ImagePlus size={compacto ? 14 : 18} aria-hidden="true" />
-        <span className="truncate">{file ? file.name : compacto ? "Foto" : "Elegir la foto de la protagonista (primer cuadro)"}</span>
+        <ImagePlus size={18} aria-hidden="true" />
+        <span className="truncate">{file ? file.name : "Elegir la foto de la protagonista (primer cuadro)"}</span>
       </button>
       <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
     </>
   );
 }
 
+function AudioPicker({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        className="flex w-full items-center justify-center gap-2 rounded-btn border border-dashed border-line-2 px-4 py-3 text-sm text-fg-2 hover:border-accent/60"
+      >
+        <Music size={16} aria-hidden="true" />
+        <span className="truncate">{file ? file.name : "Subir el audio ya generado (mp3, wav, m4a)"}</span>
+      </button>
+      <input ref={ref} type="file" accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,.mp3,.wav,.m4a" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
+    </>
+  );
+}
+
 export function UgcForm({ tenantId }: { tenantId: string }) {
+  const [preset, setPreset] = useState<PresetId>("ugc");
   const [lote, setLote] = useState(false);
-  const [model, setModel] = useState<string>(UGC_MODELS[0].id);
   const [filas, setFilas] = useState<Fila[]>([filaVacia()]);
   const [elementos, setElementos] = useState<UgcElementos>(ELEMENTOS_POR_DEFECTO);
   const [pegar, setPegar] = useState("");
@@ -71,14 +125,18 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
   const [ocupado, setOcupado] = useState(false);
   const [formKey, setFormKey] = useState(0);
 
+  const esSit = preset === "situacion";
   const tituloDef = UGC_ELEMENTOS_CATALOGO.find((e) => e.clave === elementos.titulo?.clave);
   const lineasTitulo = tituloDef?.lineas ?? 0;
-  const activos = [elementos.titulo, elementos.precio, elementos.cta, elementos.whatsapp || null, elementos.destello].filter(Boolean).length;
-  const total = filas.length;
+  const activos = [elementos.titulo, elementos.precio, elementos.cta, elementos.whatsapp || null, esSit ? null : elementos.destello].filter(Boolean).length;
+  const visibles = lote ? filas : filas.slice(0, 1);
+  const costoUnidad = esSit ? SITUACION_COSTO_ESTIMADO_USD : UGC_COSTO_ESTIMADO_USD;
 
   const setFila = (id: string, patch: Partial<Fila>) => setFilas((fs) => fs.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const setLinea = (id: string, i: number, v: string) =>
     setFilas((fs) => fs.map((f) => (f.id === id ? { ...f, lineas: f.lineas.map((l, k) => (k === i ? v : l)) as Fila["lineas"] } : f)));
+  const setToma = (id: string, i: number, patch: Partial<TomaFila>) =>
+    setFilas((fs) => fs.map((f) => (f.id === id ? { ...f, tomas: f.tomas.map((t, k) => (k === i ? { ...t, ...patch } : t)) } : f)));
 
   function toggleElemento(clave: string, grupo: string) {
     setElementos((prev) => {
@@ -106,7 +164,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
     return elementos.destello !== null;
   }
 
-  /** Tabla pegada: nombre ; escena ; guion A ; guion B ; línea 1 ; línea 2 ; línea 3 (separador ; o tab). Las fotos se eligen fila por fila. */
+  /** Tabla pegada (solo UGC): nombre ; escena ; guion A ; guion B ; línea 1 ; línea 2 ; línea 3. Las fotos se eligen fila por fila. */
   function importarTabla() {
     const nuevas = pegar
       .split("\n")
@@ -119,41 +177,77 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
     setPegar("");
   }
 
+  function validar(f: Fila, n: number): string | null {
+    const v = `video ${n}`;
+    if (!f.nombre.trim()) return `Falta el nombre del ${v}.`;
+    if (elementos.titulo && f.lineas.slice(0, lineasTitulo).some((l) => !l.trim())) return `El ${v} necesita las ${lineasTitulo} líneas del título.`;
+    if (!esSit) {
+      if (!f.escena.trim() || !f.guionA.trim() || !f.guionB.trim() || !f.foto) return `Falta completar el ${v}: escena, guion A, guion B y la foto de la protagonista.`;
+      return null;
+    }
+    if (f.personaje.trim().length < 5) return `El ${v} necesita la descripción del personaje.`;
+    if (f.guion.trim().length < 20) return `El ${v} necesita el guion de la voz en off.`;
+    if (f.vozModo === "id" && f.vozId.trim().length < 10) return `El ${v} necesita el ID de voz de ElevenLabs.`;
+    if (f.vozModo === "audio" && !f.audio) return `El ${v} necesita el audio subido.`;
+    const mala = f.tomas.findIndex((t) => t.escena.trim().length < 5 || t.movimiento.trim().length < 5);
+    if (mala !== -1) return `El ${v} tiene incompleta la toma ${mala + 1} (escena y movimiento).`;
+    return null;
+  }
+
   async function enviar(e: FormEvent) {
     e.preventDefault();
     if (ocupado) return;
-    const usadas = lote ? filas : filas.slice(0, 1);
-    const falta = usadas.findIndex((f) => !f.nombre.trim() || !f.escena.trim() || !f.guionA.trim() || !f.guionB.trim() || !f.foto);
-    if (falta !== -1) {
-      setEstado({ texto: `Falta completar el video ${falta + 1}: nombre, escena, guion A, guion B y la foto de la protagonista.`, error: true });
-      return;
-    }
-    if (elementos.titulo) {
-      const mal = usadas.findIndex((f) => f.lineas.slice(0, lineasTitulo).some((l) => !l.trim()));
-      if (mal !== -1) {
-        setEstado({ texto: `El video ${mal + 1} necesita las ${lineasTitulo} líneas del título.`, error: true });
+    for (const [i, f] of visibles.entries()) {
+      const err = validar(f, i + 1);
+      if (err) {
+        setEstado({ texto: err, error: true });
         return;
       }
     }
 
     setOcupado(true);
     const supabase = createSupabaseBrowserClient();
+    const subir = async (file: File, carpeta: string) => {
+      const p = `${tenantId}/${carpeta}/${crypto.randomUUID()}/${storageSafeName(file.name)}`;
+      const { error } = await supabase.storage.from(ASSETS_BUCKET).upload(p, file);
+      if (error) throw new Error(`no se pudo subir "${file.name}": ${error.message}`);
+      return p;
+    };
     try {
       const jobs = [];
-      for (const [i, f] of usadas.entries()) {
-        setEstado({ texto: `Subiendo la foto ${i + 1} de ${usadas.length}…` });
-        const framePath = `${tenantId}/ugc/${crypto.randomUUID()}/${storageSafeName(f.foto!.name)}`;
-        const { error } = await supabase.storage.from(ASSETS_BUCKET).upload(framePath, f.foto!);
-        if (error) throw new Error(`no se pudo subir "${f.foto!.name}": ${error.message}`);
-        jobs.push({
-          nombre: f.nombre.trim(),
-          escena: f.escena.trim(),
-          guionA: normalizarGuionUgc(f.guionA),
-          guionB: normalizarGuionUgc(f.guionB),
-          framePath,
-          model: "veo3.1-fast" as const,
-          elementos: { ...elementos, titulo: elementos.titulo ? { ...elementos.titulo, lineas: f.lineas.slice(0, lineasTitulo).map((l) => l.trim()) } : null },
-        });
+      for (const [i, f] of visibles.entries()) {
+        setEstado({ texto: `Preparando el video ${i + 1} de ${visibles.length}…` });
+        const els = { ...elementos, titulo: elementos.titulo ? { ...elementos.titulo, lineas: f.lineas.slice(0, lineasTitulo).map((l) => l.trim()) } : null, destello: esSit ? null : elementos.destello };
+        if (!esSit) {
+          jobs.push({
+            preset: "ugc" as const,
+            nombre: f.nombre.trim(),
+            escena: f.escena.trim(),
+            guionA: normalizarGuionUgc(f.guionA),
+            guionB: normalizarGuionUgc(f.guionB),
+            framePath: await subir(f.foto!, "ugc"),
+            model: "veo3.1-fast" as const,
+            elementos: els,
+          });
+        } else {
+          const voz =
+            f.vozModo === "audio"
+              ? { origen: "audio" as const, audioPath: await subir(f.audio!, "voces") }
+              : { origen: "elevenlabs" as const, voiceId: (f.vozModo === "id" ? f.vozId : f.vozConocida).trim() };
+          jobs.push({
+            preset: "situacion" as const,
+            nombre: f.nombre.trim(),
+            elementos: els,
+            situacion: {
+              personaje: f.personaje.trim(),
+              guion: normalizarGuionUgc(f.guion),
+              voz,
+              velocidad: f.velocidad / 100,
+              tomas: f.tomas.map((t) => ({ escena: t.escena.trim(), movimiento: t.movimiento.trim(), tipo: t.tipo, otraPersona: t.otraPersona })),
+              colaSeg: f.colaSeg,
+            },
+          });
+        }
       }
       setEstado({ texto: "Creando los videos…" });
       await createUgcJobsAction({ tenantId, ...(lote ? { batchNombre: `Lote ${new Date().toLocaleDateString("es-PE")}` } : {}), jobs });
@@ -169,8 +263,28 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
 
   return (
     <form onSubmit={enviar} className="space-y-6" key={formKey}>
-      {/* Modo */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Preset y modo */}
+      <div className="space-y-3">
+        <div className="grid gap-2 sm:grid-cols-2" role="group" aria-label="Tipo de video">
+          {PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              aria-pressed={preset === p.id}
+              onClick={() => {
+                setPreset(p.id);
+                setFilas([filaVacia()]);
+              }}
+              className={`rounded-btn border p-3 text-left transition-colors duration-200 ${preset === p.id ? "border-accent bg-accent/10" : "border-line hover:border-fg-3"}`}
+            >
+              <span className="block text-sm font-medium text-fg">
+                {p.label}
+                {p.id === "ugc" && <span className="ml-2 text-xs text-accent-ink">por defecto</span>}
+              </span>
+              <span className="block text-xs text-fg-3">{p.detalle}</span>
+            </button>
+          ))}
+        </div>
         <div className="inline-flex rounded-btn border border-line p-0.5" role="group" aria-label="Modo de producción">
           {[
             { v: false, l: "Un video" },
@@ -187,17 +301,12 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
             </button>
           ))}
         </div>
-        <Field id="ugc-modelo" label="Modelo" className="min-w-56">
-          <select id="ugc-modelo" className={selectClass} value={model} onChange={(e) => setModel(e.target.value)}>
-            {UGC_MODELS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <p className="text-xs text-fg-3">
+          {esSit
+            ? "Modelos: gpt-image-2 (imágenes) + Seedance 1.0 Pro Fast 720p (video) · voz ElevenLabs v3 o tu audio · siempre salen dos versiones: 9:16 y 4:5, con zona segura."
+            : "Modelo: Veo 3.1 fast · tramo de 8 s + extensión con destello · siempre salen dos versiones: 9:16 y 4:5, con zona segura."}
+        </p>
       </div>
-      <p className="-mt-3 text-xs text-fg-3">{UGC_MODELS.find((m) => m.id === model)?.detalle}</p>
 
       {/* Elementos */}
       <div>
@@ -208,17 +317,12 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
             <ChevronDown size={16} className="text-fg-3 transition-transform group-open:rotate-180" aria-hidden="true" />
           </summary>
           <div className="space-y-4 border-t border-line p-3">
-            {GRUPOS.map((g) => (
+            {GRUPOS.filter((g) => !(esSit && g.soloUgc)).map((g) => (
               <fieldset key={g.id} className="space-y-1.5">
                 <legend className="eyebrow mb-1 text-fg-3">{g.titulo}</legend>
                 {UGC_ELEMENTOS_CATALOGO.filter((el) => el.grupo === g.id).map((el) => (
                   <label key={el.clave} className="flex cursor-pointer items-start gap-2.5 rounded-btn p-1.5 hover:bg-surface-2/60">
-                    <input
-                      type="checkbox"
-                      className="mt-1 accent-[var(--accent,#ff5a2b)]"
-                      checked={estaActivo(el.clave, g.id)}
-                      onChange={() => toggleElemento(el.clave, g.id)}
-                    />
+                    <input type="checkbox" className="mt-1" checked={estaActivo(el.clave, g.id)} onChange={() => toggleElemento(el.clave, g.id)} />
                     <span>
                       <span className="block text-sm text-fg">{el.etiqueta}</span>
                       <span className="block text-xs text-fg-3">{el.descripcion}</span>
@@ -230,29 +334,11 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
           </div>
         </details>
 
-        <label className="mt-3 flex cursor-pointer items-start gap-2.5 text-sm text-fg-2">
-          <input type="checkbox" className="mt-1" checked={elementos.zonaSegura} onChange={(e) => setElementos({ ...elementos, zonaSegura: e.target.checked })} />
-          <span>
-            Zona segura de Reels
-            <span className="block text-xs text-fg-3">Elementos más chicos y hacia el centro (títulos al centro, precio y pills dentro del área que no tapan la cabecera ni el botón de Reels).</span>
-          </span>
-        </label>
-
-        {/* Ajustes de los elementos elegidos (compartidos por todo el lote) */}
-        {(elementos.cta || elementos.destello || elementos.titulo) && (
+        {(elementos.cta || (!esSit && elementos.destello) || elementos.titulo) && (
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             {elementos.titulo && (
               <Field id="ugc-tit-dur" label="Duración del título (s)">
-                <input
-                  id="ugc-tit-dur"
-                  type="number"
-                  min={1}
-                  max={6}
-                  step={0.5}
-                  className={inputClass}
-                  value={elementos.tituloDuracion}
-                  onChange={(e) => setElementos({ ...elementos, tituloDuracion: Number(e.target.value) || 3 })}
-                />
+                <input id="ugc-tit-dur" type="number" min={1} max={6} step={0.5} className={inputClass} value={elementos.tituloDuracion} onChange={(e) => setElementos({ ...elementos, tituloDuracion: Number(e.target.value) || 3 })} />
               </Field>
             )}
             {elementos.cta && (
@@ -265,7 +351,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
                 </Field>
               </>
             )}
-            {elementos.destello && (
+            {!esSit && elementos.destello && (
               <Field id="ugc-paleta" label="Paleta del destello">
                 <select id="ugc-paleta" className={selectClass} value={elementos.destello.paleta} onChange={(e) => setElementos({ ...elementos, destello: { paleta: e.target.value as never } })}>
                   {PALETAS_DESTELLO.map((p) => (
@@ -281,87 +367,169 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
       </div>
 
       {/* Videos */}
-      {!lote ? (
-        <div className="space-y-4">
-          <FotoPicker file={filas[0]!.foto} onChange={(f) => setFila(filas[0]!.id, { foto: f })} />
-          <Field id="ugc-nombre" label="Nombre del video" required>
-            <input id="ugc-nombre" className={inputClass} value={filas[0]!.nombre} onChange={(e) => setFila(filas[0]!.id, { nombre: e.target.value })} placeholder="Ej. Mismo número desde el colegio" />
-          </Field>
-          <Field id="ugc-escena" label="Escena (en inglés, para el modelo)" hint="Dónde está y cómo se siente. Ej.: in her bedroom with photos on the wall, warm and nostalgic" required>
-            <input id="ugc-escena" className={inputClass} value={filas[0]!.escena} onChange={(e) => setFila(filas[0]!.id, { escena: e.target.value })} />
-          </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field id="ugc-ga" label={`Guion A — primer tramo (${palabras(filas[0]!.guionA)} palabras, ideal ≤ 20)`} required>
-              <textarea id="ugc-ga" rows={4} className={textareaClass} maxLength={300} value={filas[0]!.guionA} onChange={(e) => setFila(filas[0]!.id, { guionA: e.target.value })} />
-            </Field>
-            <Field id="ugc-gb" label={`Guion B — extensión (${palabras(filas[0]!.guionB)} palabras, ideal ≤ 17)`} hint="Empieza con una palabra corta y prescindible (ej. “Y ahora…”): el arranque de la extensión puede recortarse. El precio se escribe solo como “treintaynueve con noventa”." required>
-              <textarea id="ugc-gb" rows={4} className={textareaClass} maxLength={300} value={filas[0]!.guionB} onChange={(e) => setFila(filas[0]!.id, { guionB: e.target.value })} />
-            </Field>
+      {!esSit && lote && (
+        <details className="rounded-btn border border-line bg-surface">
+          <summary className="cursor-pointer px-3 py-2 text-sm text-fg-2">Pegar una tabla (nombre ; escena ; guion A ; guion B ; línea 1 ; línea 2 ; línea 3)</summary>
+          <div className="space-y-2 border-t border-line p-3">
+            <textarea rows={5} className={textareaClass} value={pegar} onChange={(e) => setPegar(e.target.value)} placeholder="Una fila por video, columnas separadas por ; o tabulador. Las fotos se eligen después, fila por fila." />
+            <Button type="button" variant="secondary" size="sm" onClick={importarTabla} disabled={!pegar.trim()}>
+              Agregar filas
+            </Button>
           </div>
-          {elementos.titulo && (
-            <div className="grid gap-3 sm:grid-cols-3">
-              {Array.from({ length: lineasTitulo }).map((_, i) => (
-                <Field key={i} id={`ugc-lt${i}`} label={`Título — línea ${i + 1}`} required>
-                  <input id={`ugc-lt${i}`} className={inputClass} maxLength={40} value={filas[0]!.lineas[i]} onChange={(e) => setLinea(filas[0]!.id, i, e.target.value)} />
-                </Field>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <details className="rounded-btn border border-line bg-surface">
-            <summary className="cursor-pointer px-3 py-2 text-sm text-fg-2">Pegar una tabla (nombre ; escena ; guion A ; guion B ; línea 1 ; línea 2 ; línea 3)</summary>
-            <div className="space-y-2 border-t border-line p-3">
-              <textarea rows={5} className={textareaClass} value={pegar} onChange={(e) => setPegar(e.target.value)} placeholder="Una fila por video, columnas separadas por ; o tabulador. Las fotos se eligen después, fila por fila." />
-              <Button type="button" variant="secondary" size="sm" onClick={importarTabla} disabled={!pegar.trim()}>
-                Agregar filas
-              </Button>
-            </div>
-          </details>
+        </details>
+      )}
 
-          <div className="space-y-3">
-            {filas.map((f, i) => (
-              <div key={f.id} className="space-y-3 rounded-btn border border-line p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="eyebrow text-fg-3">Video {i + 1}</span>
-                  {filas.length > 1 && (
-                    <button type="button" aria-label={`Quitar el video ${i + 1}`} className="text-fg-3 hover:text-danger" onClick={() => setFilas((fs) => fs.filter((x) => x.id !== f.id))}>
-                      <Trash2 size={15} aria-hidden="true" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid gap-3 md:grid-cols-[180px_1fr_1fr]">
-                  <FotoPicker compacto file={f.foto} onChange={(x) => setFila(f.id, { foto: x })} />
-                  <input aria-label="Nombre" className={inputClass} placeholder="Nombre" value={f.nombre} onChange={(e) => setFila(f.id, { nombre: e.target.value })} />
-                  <input aria-label="Escena en inglés" className={inputClass} placeholder="Escena (inglés): in her kitchen, confident" value={f.escena} onChange={(e) => setFila(f.id, { escena: e.target.value })} />
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <textarea aria-label="Guion A" rows={3} className={textareaClass} maxLength={300} placeholder={`Guion A — primer tramo (${palabras(f.guionA)} palabras)`} value={f.guionA} onChange={(e) => setFila(f.id, { guionA: e.target.value })} />
-                  <textarea aria-label="Guion B" rows={3} className={textareaClass} maxLength={300} placeholder={`Guion B — extensión (${palabras(f.guionB)} palabras)`} value={f.guionB} onChange={(e) => setFila(f.id, { guionB: e.target.value })} />
-                </div>
-                {elementos.titulo && (
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {Array.from({ length: lineasTitulo }).map((_, k) => (
-                      <input key={k} aria-label={`Título línea ${k + 1}`} className={inputClass} placeholder={`Título — línea ${k + 1}`} maxLength={40} value={f.lineas[k]} onChange={(e) => setLinea(f.id, k, e.target.value)} />
-                    ))}
-                  </div>
+      <div className="space-y-4">
+        {visibles.map((f, i) => (
+          <div key={f.id} className={lote ? "space-y-4 rounded-btn border border-line p-3" : "space-y-4"}>
+            {lote && (
+              <div className="flex items-center justify-between gap-2">
+                <span className="eyebrow text-fg-3">Video {i + 1}</span>
+                {filas.length > 1 && (
+                  <button type="button" aria-label={`Quitar el video ${i + 1}`} className="text-fg-3 hover:text-danger" onClick={() => setFilas((fs) => fs.filter((x) => x.id !== f.id))}>
+                    <Trash2 size={15} aria-hidden="true" />
+                  </button>
                 )}
               </div>
-            ))}
+            )}
+
+            <Field id={`n-${f.id}`} label="Nombre del video" required>
+              <input id={`n-${f.id}`} className={inputClass} value={f.nombre} onChange={(e) => setFila(f.id, { nombre: e.target.value })} placeholder={esSit ? "Ej. Taxista sin datos" : "Ej. Mismo número desde el colegio"} />
+            </Field>
+
+            {!esSit ? (
+              <>
+                <FotoPicker file={f.foto} onChange={(x) => setFila(f.id, { foto: x })} />
+                <Field id={`e-${f.id}`} label="Escena (en inglés, para el modelo)" hint="Dónde está y cómo se siente. Ej.: in her bedroom with photos on the wall, warm and nostalgic" required>
+                  <input id={`e-${f.id}`} className={inputClass} value={f.escena} onChange={(e) => setFila(f.id, { escena: e.target.value })} />
+                </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field id={`ga-${f.id}`} label={`Guion A — primer tramo (${palabras(f.guionA)} palabras, ideal ≤ 20)`} required>
+                    <textarea id={`ga-${f.id}`} rows={4} className={textareaClass} maxLength={300} value={f.guionA} onChange={(e) => setFila(f.id, { guionA: e.target.value })} />
+                  </Field>
+                  <Field id={`gb-${f.id}`} label={`Guion B — extensión (${palabras(f.guionB)} palabras, ideal ≤ 17)`} hint="Empieza con una palabra corta y prescindible (“Y ahora…”): el arranque de la extensión puede recortarse. El precio se reescribe solo a “treintaynueve con noventa”." required>
+                    <textarea id={`gb-${f.id}`} rows={4} className={textareaClass} maxLength={300} value={f.guionB} onChange={(e) => setFila(f.id, { guionB: e.target.value })} />
+                  </Field>
+                </div>
+              </>
+            ) : (
+              <>
+                <Field id={`p-${f.id}`} label="Personaje (en inglés)" hint="Ej.: a Peruvian woman in her 50s, hair tied back, apron, owner of a corner grocery store" required>
+                  <input id={`p-${f.id}`} className={inputClass} value={f.personaje} onChange={(e) => setFila(f.id, { personaje: e.target.value })} />
+                </Field>
+
+                <Field id={`g-${f.id}`} label={`Guion de la voz en off (${palabras(f.guion)} palabras, ideal 35–45)`} hint="Con etiquetas de ElevenLabs v3: [worried], [upbeat], [excited], [warmly]… El precio se reescribe solo a “treintaynueve con noventa”. Si subes un audio propio, el texto solo sirve de referencia." required>
+                  <textarea id={`g-${f.id}`} rows={5} className={textareaClass} maxLength={900} value={f.guion} onChange={(e) => setFila(f.id, { guion: e.target.value })} />
+                </Field>
+
+                <div className="space-y-3 rounded-btn border border-line p-3">
+                  <span className={labelClass}>Voz en off</span>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Field id={`vm-${f.id}`} label="Origen">
+                      <select id={`vm-${f.id}`} className={selectClass} value={f.vozModo} onChange={(e) => setFila(f.id, { vozModo: e.target.value as Fila["vozModo"] })}>
+                        <option value="conocida">Voz conocida</option>
+                        <option value="id">Otro ID de ElevenLabs</option>
+                        <option value="audio">Audio ya generado</option>
+                      </select>
+                    </Field>
+                    {f.vozModo === "conocida" && (
+                      <Field id={`vc-${f.id}`} label="Voz">
+                        <select id={`vc-${f.id}`} className={selectClass} value={f.vozConocida} onChange={(e) => setFila(f.id, { vozConocida: e.target.value })}>
+                          {VOCES_CONOCIDAS.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+                    {f.vozModo === "id" && (
+                      <Field id={`vi-${f.id}`} label="ID de voz (voice_id)">
+                        <input id={`vi-${f.id}`} className={inputClass} maxLength={40} value={f.vozId} onChange={(e) => setFila(f.id, { vozId: e.target.value })} placeholder="Ej. aYQAm4rWuigkeuRA5i92" />
+                      </Field>
+                    )}
+                    {f.vozModo === "audio" && (
+                      <div className="sm:col-span-2 sm:pt-6">
+                        <AudioPicker file={f.audio} onChange={(x) => setFila(f.id, { audio: x })} />
+                      </div>
+                    )}
+                    <Field id={`vv-${f.id}`} label="Velocidad (%)" hint="110 = +10 % sin cambiar el tono">
+                      <input id={`vv-${f.id}`} type="number" min={80} max={130} step={1} className={inputClass} value={f.velocidad} onChange={(e) => setFila(f.id, { velocidad: Number(e.target.value) || 100 })} />
+                    </Field>
+                  </div>
+                  <Field id={`vt-${f.id}`} label="Segundos de cola tras la última palabra" hint="0.5 por defecto; 0 = termina justo al acabar la voz">
+                    <input id={`vt-${f.id}`} type="number" min={0} max={2} step={0.05} className={`${inputClass} max-w-40`} value={f.colaSeg} onChange={(e) => setFila(f.id, { colaSeg: Math.max(0, Number(e.target.value) || 0) })} />
+                  </Field>
+                </div>
+
+                <div className="space-y-3">
+                  <span className={labelClass}>Las 4 tomas (se reparten según lo que dice la voz)</span>
+                  {f.tomas.map((t, k) => (
+                    <div key={k} className="space-y-2 rounded-btn border border-line p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-fg-3">Toma {k + 1}</span>
+                        {k > 0 && (
+                          <label className="flex items-center gap-1.5 text-xs text-fg-2">
+                            <input type="checkbox" checked={t.otraPersona} onChange={(e) => setToma(f.id, k, { otraPersona: e.target.checked })} />
+                            Es otra persona (no la de la toma 1)
+                          </label>
+                        )}
+                      </div>
+                      <input aria-label={`Escena de la toma ${k + 1}`} className={inputClass} placeholder="Qué se ve (inglés): behind the counter of her store arranging products…" maxLength={400} value={t.escena} onChange={(e) => setToma(f.id, k, { escena: e.target.value })} />
+                      <input aria-label={`Movimiento de la toma ${k + 1}`} className={inputClass} placeholder="Movimiento (inglés): she arranges cans and turns to the camera; slow push-in" maxLength={300} value={t.movimiento} onChange={(e) => setToma(f.id, k, { movimiento: e.target.value })} />
+                      <select aria-label={`Tipo de la toma ${k + 1}`} className={selectClass} value={t.tipo} onChange={(e) => setToma(f.id, k, { tipo: e.target.value as TipoToma })}>
+                        {TIPOS_TOMA.map((tt) => (
+                          <option key={tt.id} value={tt.id}>
+                            {tt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+                  <p className="text-xs text-fg-3">
+                    Reglas automáticas: nunca se muestra dinero (monedas, billetes, recibos), nadie mueve los labios (es voz en off) y los celulares siguen el tipo de cada toma: de espaldas con funda de color y lentes, o de frente mostrando lo que se fotografía.
+                  </p>
+                </div>
+              </>
+            )}
+
+            {elementos.titulo && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {Array.from({ length: lineasTitulo }).map((_, k) => (
+                  <Field key={k} id={`lt-${f.id}-${k}`} label={`Título — línea ${k + 1}`} required>
+                    <input id={`lt-${f.id}-${k}`} className={inputClass} maxLength={40} value={f.lineas[k]} onChange={(e) => setLinea(f.id, k, e.target.value)} />
+                  </Field>
+                ))}
+              </div>
+            )}
           </div>
+        ))}
+      </div>
+
+      {lote && (
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" size="sm" disabled={filas.length >= 30} onClick={() => setFilas((fs) => [...fs, filaVacia()])}>
             <Plus size={14} aria-hidden="true" /> Agregar video
           </Button>
+          {esSit && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={filas.length >= 30}
+              onClick={() => setFilas((fs) => [...fs, { ...fs[fs.length - 1]!, id: crypto.randomUUID(), nombre: "", audio: null }])}
+            >
+              Duplicar el último
+            </Button>
+          )}
         </div>
       )}
 
       {/* Costo y envío */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <p className="text-sm text-fg-2">
-          {lote ? total : 1} video{(lote ? total : 1) === 1 ? "" : "s"} · costo estimado{" "}
-          <span className="font-medium text-fg">≈ US${((lote ? total : 1) * UGC_COSTO_ESTIMADO_USD).toFixed(2)}</span> en APIMart
-          <span className="text-fg-3"> · se cobra al generar; regenerar cuesta de nuevo</span>
+          {visibles.length} video{visibles.length === 1 ? "" : "s"} · costo estimado <span className="font-medium text-fg">≈ US${(visibles.length * costoUnidad).toFixed(2)}</span> en APIMart
+          <span className="text-fg-3">{esSit ? " (+ la voz en ElevenLabs si no subes audio)" : ""} · se cobra al generar; regenerar cuesta de nuevo</span>
         </p>
         <Button type="submit" pending={ocupado} pendingText="Creando…">
           <Wand2 size={16} aria-hidden="true" /> {lote ? "Generar lote" : "Generar video"}

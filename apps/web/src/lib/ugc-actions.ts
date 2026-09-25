@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { ugcJobInputSchema } from "@pulso/shared/ugc";
+import { jobInputSchema } from "@pulso/shared/ugc";
 import type { Json } from "@pulso/db/types";
 import { createSupabaseServerClient } from "./supabase/server";
 
@@ -10,7 +10,7 @@ const createUgcInput = z.object({
   tenantId: z.string().uuid(),
   /** Presente solo en modo lote: agrupa los videos de una misma tanda. */
   batchNombre: z.string().trim().max(120).optional(),
-  jobs: z.array(ugcJobInputSchema).min(1).max(30),
+  jobs: z.array(jobInputSchema).min(1).max(30),
 });
 
 /**
@@ -23,9 +23,12 @@ export async function createUgcJobsAction(input: z.input<typeof createUgcInput>)
   // RLS ya rechaza un tenant ajeno, pero la ruta es texto libre: sin esto una
   // fila podría apuntar al worker (service_role) a los archivos de otro negocio.
   const prefix = `${parsed.tenantId}/`;
-  if (parsed.jobs.some((j) => !j.framePath.startsWith(prefix))) {
-    throw new Error("la foto de referencia no pertenece a este negocio");
-  }
+  const ajeno = parsed.jobs.some((j) =>
+    j.preset === "situacion"
+      ? j.situacion.voz.origen === "audio" && !j.situacion.voz.audioPath.startsWith(prefix)
+      : !j.framePath.startsWith(prefix),
+  );
+  if (ajeno) throw new Error("un archivo subido no pertenece a este negocio");
 
   const supabase = await createSupabaseServerClient();
   const batchId = parsed.jobs.length > 1 || parsed.batchNombre ? crypto.randomUUID() : null;
@@ -33,17 +36,30 @@ export async function createUgcJobsAction(input: z.input<typeof createUgcInput>)
   const { data: rows, error } = await supabase
     .from("video_ugc_jobs")
     .insert(
-      parsed.jobs.map((j) => ({
-        tenant_id: parsed.tenantId,
-        batch_id: batchId,
-        nombre: j.nombre,
-        model: j.model,
-        frame_path: j.framePath,
-        escena: j.escena,
-        guion_a: j.guionA,
-        guion_b: j.guionB,
-        elementos: j.elementos as unknown as Json,
-      })),
+      parsed.jobs.map((j) =>
+        j.preset === "situacion"
+          ? {
+              tenant_id: parsed.tenantId,
+              batch_id: batchId,
+              nombre: j.nombre,
+              preset: "situacion",
+              model: "seedance-1-0-pro-fast",
+              situacion: j.situacion as unknown as Json,
+              elementos: j.elementos as unknown as Json,
+            }
+          : {
+              tenant_id: parsed.tenantId,
+              batch_id: batchId,
+              nombre: j.nombre,
+              preset: "ugc",
+              model: j.model,
+              frame_path: j.framePath,
+              escena: j.escena,
+              guion_a: j.guionA,
+              guion_b: j.guionB,
+              elementos: j.elementos as unknown as Json,
+            },
+      ),
     )
     .select("id");
   if (error || !rows) throw new Error(error?.message ?? "no se pudieron crear los videos");

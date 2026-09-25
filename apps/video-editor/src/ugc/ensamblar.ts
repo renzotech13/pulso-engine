@@ -81,6 +81,8 @@ export interface EnsamblarOpts {
   tramo1: string;
   extension: string;
   elementos: UgcElementos;
+  /** Segundo en que se corta el primer tramo (para quitar una repetición del guion dentro del tramo A). */
+  tramo1Fin?: number;
   onPaso?: (paso: string, progreso: number) => Promise<void>;
 }
 
@@ -97,7 +99,7 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
   const w2 = await palabras(o.extension, workDir, "t2");
   const d1 = await duracion(o.tramo1);
   const d2 = await duracion(o.extension);
-  const c1 = Math.min((w1.at(-1)?.hasta ?? d1) + 0.12, d1);
+  const c1 = o.tramo1Fin !== undefined ? Math.min(o.tramo1Fin, d1) : Math.min((w1.at(-1)?.hasta ?? d1) + 0.12, d1);
   const c2 = Math.min((w2.at(-1)?.hasta ?? d2) + 0.5, d2);
 
   // 2) Unión de los dos tramos.
@@ -115,6 +117,29 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
     await run("bash", [FLARE_SCRIPT, W("unido.mp4"), W("destello.mp4"), String(c1), "--paleta", el.destello.paleta, "--sin-whoosh"]);
     fuente = W("destello.mp4");
   }
+
+  return componerElementos({ workDir, fuente, elementos: el, ...(o.onPaso ? { onPaso: o.onPaso } : {}) });
+}
+
+export interface ComponerOpts {
+  workDir: string;
+  /** Video ya armado (con su audio) sobre el que se superponen los elementos. */
+  fuente: string;
+  elementos: UgcElementos;
+  onPaso?: (paso: string, progreso: number) => Promise<void>;
+}
+
+/**
+ * Superpone título, precio, CTA y pill de WhatsApp sobre un video con voz. Los tiempos salen de lo
+ * que dice la voz (whisper mide cuándo cae cada palabra). Lo usan el preset UGC (dos tramos de Veo)
+ * y el preset de situaciones con voz en off (tomas + voz de Luisa).
+ */
+export async function componerElementos(o: ComponerOpts): Promise<string> {
+  const { workDir, fuente, elementos: el } = o;
+  const paso = o.onPaso ?? (async () => undefined);
+  const W = (f: string) => path.join(workDir, f);
+  const f45 = el.formato === "4:5";
+  ALTO = f45 ? 1350 : 1920;
 
   // 4) Tiempos de los elementos según lo que dice la voz.
   const dur = await duracion(fuente);

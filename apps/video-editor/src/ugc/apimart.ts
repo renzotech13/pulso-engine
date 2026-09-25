@@ -52,7 +52,7 @@ interface TaskData {
   status: string;
   cost?: number;
   error?: { message?: string };
-  result?: { videos?: { url: string[] }[] };
+  result?: { videos?: { url: string[] }[]; images?: { url: string[] }[] };
 }
 
 async function pollTask(taskId: string, timeoutMs = 12 * 60_000): Promise<TaskData> {
@@ -111,4 +111,49 @@ export async function extenderTramo(model: string, prompt: string, primerTaskId:
   const task = await pollTask(taskId);
   await descargar(task, outPath);
   return { taskId, costoUsd: task.cost ?? 0 };
+}
+
+// ───────── Preset "situación con voz en off": imágenes (gpt-image-2) y video mudo (Seedance 1.0 Pro Fast) ─────────
+
+/** Imagen 9:16 (1024x1536 recortada a 1080x1920). `refUrl` = foto de la misma persona (toma 1) para mantenerla. */
+export async function generarImagenSituacion(prompt: string, outPath: string, refUrl?: string): Promise<{ costoUsd: number }> {
+  const body: Record<string, unknown> = { model: "gpt-image-2", prompt, size: "1024x1536", n: 1 };
+  if (refUrl) body.image_urls = [refUrl];
+  const r = await api<{ data: { task_id: string }[] }>("POST", "/v1/images/generations", body);
+  const taskId = r.data?.[0]?.task_id;
+  if (!taskId) throw new Error("APIMart no devolvió task_id de la imagen");
+  const task = await pollTask(taskId, 8 * 60_000);
+  const url = task.result?.images?.[0]?.url?.[0];
+  if (!url) throw new Error("APIMart no devolvió la imagen");
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`descarga de la imagen falló (${res.status})`);
+  const sharp = (await import("sharp")).default;
+  const buf = Buffer.from(await res.arrayBuffer());
+  const meta = await sharp(buf).metadata();
+  const w = meta.width ?? 1024;
+  const h = meta.height ?? 1536;
+  const tw = Math.round((h * 9) / 16);
+  await sharp(buf)
+    .extract({ left: Math.max(0, Math.floor((w - tw) / 2)), top: 0, width: Math.min(tw, w), height: h })
+    .resize(1080, 1920)
+    .png()
+    .toFile(outPath);
+  return { costoUsd: task.cost ?? 0 };
+}
+
+/** Video de 5 s desde una imagen con Seedance 1.0 Pro Fast 720p (sin audio). */
+export async function generarVideoSeedance(prompt: string, imageUrl: string, outPath: string): Promise<{ costoUsd: number }> {
+  const r = await api<{ data: { task_id: string }[] }>("POST", "/v1/videos/generations", {
+    model: "seedance-1-0-pro-fast",
+    prompt,
+    duration: 5,
+    resolution: "720p",
+    aspect_ratio: "9:16",
+    image_with_roles: [{ url: imageUrl, role: "first_frame" }],
+  });
+  const taskId = r.data?.[0]?.task_id;
+  if (!taskId) throw new Error("APIMart no devolvió task_id del video");
+  const task = await pollTask(taskId);
+  await descargar(task, outPath);
+  return { costoUsd: task.cost ?? 0 };
 }
