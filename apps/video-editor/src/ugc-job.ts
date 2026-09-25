@@ -8,10 +8,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { createServiceRoleClient, createTenantScopedClient } from "@pulso/db/worker";
 import { createLogger } from "@pulso/shared/logger";
-import { construirPromptUgc, normalizarGuionUgc, ugcElementosSchema, UGC_COSTO_ESTIMADO_USD } from "@pulso/shared/ugc";
+import { construirPromptUgc, normalizarGuionUgc, promptPrimerCuadroUgc, ugcElementosSchema, UGC_COSTO_ESTIMADO_USD } from "@pulso/shared/ugc";
 import { ASSETS_BUCKET, OUTPUT_BUCKET, downloadToFile, uploadFile } from "./storage.js";
 import { situacionJob } from "./situacion-job.js";
-import { extenderTramo, generarPrimerTramo, saldoApimart, subirImagen } from "./ugc/apimart.js";
+import { extenderTramo, generarImagenSituacion, generarPrimerTramo, saldoApimart, subirImagen } from "./ugc/apimart.js";
 import { ensamblarUgc } from "./ugc/ensamblar.js";
 
 const logger = createLogger({ agent: "video-editor-ugc" });
@@ -65,7 +65,17 @@ export async function ugcJob({ jobId, tenantId }: UgcJobData): Promise<void> {
     await db.updateVideoUgcJob(jobId, { status: "generando", progress: 5, error_message: null });
     const frame = path.join(workDir, `protagonista${path.extname(job.frame_path) || ".png"}`);
     await downloadToFile(service, ASSETS_BUCKET, job.frame_path, frame);
-    const url = await subirImagen(frame);
+    let url = await subirImagen(frame);
+    const gen = job.situacion as { generarPrimerCuadro?: boolean; ropa?: string } | null;
+    if (gen?.generarPrimerCuadro) {
+      // La foto subida es una REFERENCIA: se genera el primer cuadro (misma persona, ropa y escena nuevas) y ese es el que se anima.
+      await db.updateVideoUgcJob(jobId, { progress: 8 });
+      const generado = path.join(workDir, "primer-cuadro.png");
+      const im = await generarImagenSituacion(promptPrimerCuadroUgc(job.escena, gen.ropa), generado, url);
+      costo += im.costoUsd;
+      url = await subirImagen(generado);
+      await uploadFile(service, OUTPUT_BUCKET, `${tenantId}/ugc/${jobId}-primer-cuadro.png`, generado, "image/png");
+    }
     const r = await generarPrimerTramo(job.model, construirPromptUgc(job.escena, guionA, false), url, tramo1);
     costo += r.costoUsd;
     taskIds.primer = r.taskId;

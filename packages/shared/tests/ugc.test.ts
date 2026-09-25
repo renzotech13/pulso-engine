@@ -83,3 +83,22 @@ describe("subtítulos", () => {
     for (const estilo of ["black-centro", "abajo-az", "aura"]) expect(ugcElementosSchema.parse({ subtitulos: { estilo } }).subtitulos?.estilo).toBe(estilo);
   });
 });
+
+import { promptPrimerCuadroUgc, ugcJobInputSchema } from "../src/ugc.js";
+
+describe("primer cuadro desde referencia", () => {
+  const base = { nombre: "x", escena: "in her kitchen", guionA: "Hola a todos aquí", guionB: "Y ahora sí con Movistar", elementos: {} };
+  it("exige el primer cuadro O la referencia, no ambos ni ninguno", () => {
+    expect(() => ugcJobInputSchema.parse(base)).toThrow();
+    expect(() => ugcJobInputSchema.parse({ ...base, framePath: "a", referenciaPath: "b" })).toThrow();
+    expect(ugcJobInputSchema.parse({ ...base, referenciaPath: "b", ropa: "a red jacket" }).referenciaPath).toBe("b");
+    expect(ugcJobInputSchema.parse({ ...base, framePath: "a" }).framePath).toBe("a");
+  });
+  it("el prompt mantiene a la misma persona, sin manos y con la ropa pedida", () => {
+    const p = promptPrimerCuadroUgc("in a kitchen", "a red jacket");
+    expect(p).toMatch(/SAME person/);
+    expect(p).toMatch(/NO hands/);
+    expect(p).toContain("wearing a red jacket");
+    expect(promptPrimerCuadroUgc("in a kitchen", "")).toMatch(/same outfit as in the reference/);
+  });
+});
