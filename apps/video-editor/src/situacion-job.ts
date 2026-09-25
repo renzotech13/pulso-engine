@@ -103,6 +103,7 @@ export async function situacionJob({ jobId, tenantId }: { jobId: string; tenantI
       titulo,
       precio: elementos.precio?.clave ?? "movistar-precio-ilimitado",
       colaSeg: sit.colaSeg,
+      guion: sit.guion,
       elementos,
       salida: path.join(salidaDir, "video"),
     });

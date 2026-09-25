@@ -79,6 +79,7 @@ const GRUPOS: { id: string; titulo: string; soloUgc?: boolean }[] = [
   { id: "cta", titulo: "CTA con flecha (arriba)" },
   { id: "whatsapp", titulo: "Pill de WhatsApp (abajo)" },
   { id: "destello", titulo: "Transición", soloUgc: true },
+  { id: "subtitulos", titulo: "Subtítulos por palabra (elige uno)" },
 ];
 
 function FotoPicker({ file, onChange }: { file: File | null; onChange: (f: File | null) => void }) {
@@ -128,7 +129,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
   const esSit = preset === "situacion";
   const tituloDef = UGC_ELEMENTOS_CATALOGO.find((e) => e.clave === elementos.titulo?.clave);
   const lineasTitulo = tituloDef?.lineas ?? 0;
-  const activos = [elementos.titulo, elementos.precio, elementos.cta, elementos.whatsapp || null, esSit ? null : elementos.destello].filter(Boolean).length;
+  const activos = [elementos.titulo, elementos.precio, elementos.cta, elementos.whatsapp || null, esSit ? null : elementos.destello, elementos.subtitulos].filter(Boolean).length;
   const visibles = lote ? filas : filas.slice(0, 1);
   const costoUnidad = esSit ? SITUACION_COSTO_ESTIMADO_USD : UGC_COSTO_ESTIMADO_USD;
 
@@ -146,7 +147,11 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
         (grupo === "precio" && prev.precio?.clave === clave) ||
         (grupo === "cta" && prev.cta !== null) ||
         (grupo === "whatsapp" && prev.whatsapp) ||
-        (grupo === "destello" && prev.destello !== null);
+        (grupo === "destello" && prev.destello !== null) ||
+        (grupo === "subtitulos" && prev.subtitulos?.estilo === clave);
+      if (grupo === "subtitulos") {
+        next.subtitulos = activo ? null : { estilo: clave as never, marca: prev.subtitulos?.marca ?? { texto: "", acento: "", colorAcento: "#E3B341" } };
+      }
       if (grupo === "titulo") next.titulo = activo ? null : { clave: clave as never, lineas: prev.titulo?.lineas ?? ["", ""] };
       if (grupo === "precio") next.precio = activo ? null : { clave: clave as never };
       if (grupo === "cta") next.cta = activo ? null : { clave: "movistar-cta-ola", linea1: "ESCRÍBENOS", linea2: "POR WHATSAPP" };
@@ -161,6 +166,7 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
     if (grupo === "precio") return elementos.precio?.clave === clave;
     if (grupo === "cta") return elementos.cta !== null;
     if (grupo === "whatsapp") return elementos.whatsapp;
+    if (grupo === "subtitulos") return elementos.subtitulos?.estilo === clave;
     return elementos.destello !== null;
   }
 
@@ -333,6 +339,29 @@ export function UgcForm({ tenantId }: { tenantId: string }) {
             ))}
           </div>
         </details>
+
+        {elementos.subtitulos && (
+          <div className="mt-3 space-y-2 rounded-btn border border-line p-3">
+            <span className="text-xs text-fg-3">
+              Los subtítulos se ubican en una franja central, entre el título y el precio, y muestran lo que dice la voz (el precio como “39,90”).
+            </span>
+            {elementos.subtitulos.estilo === "black-centro" ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field id="sub-marca" label="Nombre de la marca (debajo)" hint="Ej. @movistarperu. Vacío = sin firma.">
+                  <input id="sub-marca" className={inputClass} maxLength={40} value={elementos.subtitulos.marca.texto} onChange={(e) => setElementos({ ...elementos, subtitulos: { ...elementos.subtitulos!, marca: { ...elementos.subtitulos!.marca, texto: e.target.value } } })} />
+                </Field>
+                <Field id="sub-acento" label="Parte en color (opcional)" hint="Un trozo del nombre. Ej. movistar">
+                  <input id="sub-acento" className={inputClass} maxLength={20} value={elementos.subtitulos.marca.acento} onChange={(e) => setElementos({ ...elementos, subtitulos: { ...elementos.subtitulos!, marca: { ...elementos.subtitulos!.marca, acento: e.target.value } } })} />
+                </Field>
+                <Field id="sub-color" label="Color de esa parte">
+                  <input id="sub-color" type="color" className="h-10 w-full cursor-pointer rounded-btn border border-line bg-surface" value={elementos.subtitulos.marca.colorAcento} onChange={(e) => setElementos({ ...elementos, subtitulos: { ...elementos.subtitulos!, marca: { ...elementos.subtitulos!.marca, colorAcento: e.target.value } } })} />
+                </Field>
+              </div>
+            ) : (
+              <p className="text-xs text-fg-3">Este estilo no lleva nombre de marca.</p>
+            )}
+          </div>
+        )}
 
         {(elementos.cta || (!esSit && elementos.destello) || elementos.titulo) && (
           <div className="mt-3 grid gap-3 sm:grid-cols-3">

@@ -12,6 +12,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { UgcElementos } from "@pulso/shared/ugc";
+import { aplicarSubtitulos } from "./subtitulos.js";
 
 const exec = promisify(execFile);
 
@@ -81,6 +82,8 @@ export interface EnsamblarOpts {
   tramo1: string;
   extension: string;
   elementos: UgcElementos;
+  /** Texto exacto de la voz, para los subtítulos (si hay estilo elegido). */
+  guionSubtitulos?: string;
   /** Segundo en que se corta el primer tramo (para quitar una repetición del guion dentro del tramo A). */
   tramo1Fin?: number;
   onPaso?: (paso: string, progreso: number) => Promise<void>;
@@ -118,7 +121,7 @@ export async function ensamblarUgc(o: EnsamblarOpts): Promise<string> {
     fuente = W("destello.mp4");
   }
 
-  return componerElementos({ workDir, fuente, elementos: el, ...(o.onPaso ? { onPaso: o.onPaso } : {}) });
+  return componerElementos({ workDir, fuente, elementos: el, ...(o.guionSubtitulos ? { guionSubtitulos: o.guionSubtitulos } : {}), ...(o.onPaso ? { onPaso: o.onPaso } : {}) });
 }
 
 export interface ComponerOpts {
@@ -126,6 +129,8 @@ export interface ComponerOpts {
   /** Video ya armado (con su audio) sobre el que se superponen los elementos. */
   fuente: string;
   elementos: UgcElementos;
+  /** Texto exacto de la voz, para los subtítulos (si hay estilo elegido). */
+  guionSubtitulos?: string;
   onPaso?: (paso: string, progreso: number) => Promise<void>;
 }
 
@@ -180,17 +185,17 @@ export async function componerElementos(o: ComponerOpts): Promise<string> {
     const zs = el.zonaSegura;
     if (t.clave === "movistar-titulo-ola") {
       await renderRemotion(
-        { durationSec: dTit, linea1: l1, linea2: l2, linea3: l3 ?? "", posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.74, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5", colorLinea3: "#FFFFFF",
+        { durationSec: dTit, linea1: l1, linea2: l2, linea3: l3 ?? "", posicionYFrac: el.subtitulos ? (f45 ? 0.27 : 0.31) : f45 ? 0.52 : zs ? 0.55 : 0.74, colorLinea1: "#FFFFFF", colorLinea2: "#5FD9F5", colorLinea3: "#FFFFFF",
           tamano1: fit(l1!, zs ? 84 : 112, zs ? 860 : 960), tamano2: fit(l2!, zs ? 128 : 170, zs ? 860 : 960), tamano3: fit(l3 ?? "", zs ? 54 : 70, zs ? 860 : 960), amplitudPx: 7, cicloSeg: 6, escalonSeg: 0.04 },
         W("titulo.mov"), "titulo-olas");
     } else if (t.clave === "movistar-titulo-ola-pill") {
       await renderRemotion(
-        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.0885, colorTexto1: "#FFFFFF", colorTexto2: "#FFFFFF", colorPill: "#3B86E6",
+        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: el.subtitulos ? (f45 ? 0.27 : 0.31) : f45 ? 0.52 : zs ? 0.55 : 0.0885, colorTexto1: "#FFFFFF", colorTexto2: "#FFFFFF", colorPill: "#3B86E6",
           tamano1: fit(l1!, zs ? 80 : 110, zs ? 860 : 960), tamano2: fit(l2!, zs ? 58 : 78, zs ? 740 : 800), amplitudPx: 7, cicloSeg: 6, escalonSeg: 0.04, entradaPillSeg: 0.7 },
         W("titulo.mov"), "titulo-ola-pill");
     } else {
       await renderRemotion(
-        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: f45 ? 0.52 : zs ? 0.55 : 0.0916, desplazamientoXPx: 0, colorFondo: "#2050B9", colorTexto1: "#FFFFFF", colorTexto2: "#4FE3D6",
+        { durationSec: dTit, texto1: l1, texto2: l2, posicionYFrac: el.subtitulos ? (f45 ? 0.27 : 0.31) : f45 ? 0.52 : zs ? 0.55 : 0.0916, desplazamientoXPx: 0, colorFondo: "#2050B9", colorTexto1: "#FFFFFF", colorTexto2: "#4FE3D6",
           colorChispas: "#4FE3D6", tamano1: fit(l1!, zs ? 50 : 64, zs ? 740 : 800, 0.55), tamano2: fit(l2!, zs ? 66 : 84, zs ? 740 : 800, 0.55), chispaArribaPct: 16, chispaAbajoPct: 72 },
         W("titulo.mov"), "titulo-pill");
     }
@@ -241,13 +246,29 @@ export async function componerElementos(o: ComponerOpts): Promise<string> {
   }
 
   await paso("Componiendo el video final", 90);
-  const salida = W("final.mp4");
+  const conElementos = W("con-elementos.mp4");
   if (cadena.length === 0) {
-    await ff(["-i", fuente, "-c", "copy", salida]);
-    return salida;
+    await ff(["-i", fuente, "-c", "copy", conElementos]);
+  } else {
+    await ff([...inputs, "-filter_complex", cadena.join(";"), "-map", `[${actual}]`, "-an", "-t", String(dur), ...ENC, W("mudo.mp4")]);
+    // La voz es la del propio video (Veo): nunca se reemplaza ni se le agrega nada.
+    await ff(["-i", W("mudo.mp4"), "-i", fuente, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", conElementos]);
   }
-  await ff([...inputs, "-filter_complex", cadena.join(";"), "-map", `[${actual}]`, "-an", "-t", String(dur), ...ENC, W("mudo.mp4")]);
-  // La voz es la del propio video (Veo): nunca se reemplaza ni se le agrega nada.
-  await ff(["-i", W("mudo.mp4"), "-i", fuente, "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", salida]);
-  return salida;
+
+  // Subtítulos al final (como en Aura: título → CTA → subtítulos); tienen que ir sobre un video que ya lleva su voz.
+  if (el.subtitulos && o.guionSubtitulos) {
+    await paso("Agregando los subtítulos", 95);
+    const salidaSub = W("final.mp4");
+    await aplicarSubtitulos({
+      workDir,
+      entrada: conElementos,
+      salida: salidaSub,
+      estilo: el.subtitulos.estilo,
+      guion: o.guionSubtitulos,
+      formato: el.formato,
+      marca: el.subtitulos.marca,
+    });
+    return salidaSub;
+  }
+  return conElementos;
 }

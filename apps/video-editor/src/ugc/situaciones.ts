@@ -58,6 +58,8 @@ export interface SituacionOpts {
   elementos?: UgcElementos;
   /** Segundos que dura el video tras la última palabra de la voz (default 0.5). */
   colaSeg?: number;
+  /** Texto de la voz para los subtítulos (puede traer etiquetas [..]; se limpian). */
+  guion?: string;
   /** Carpeta y prefijo de salida: escribe <salida>-9x16.mp4 y <salida>-4x5.mp4 */
   salida: string;
 }
@@ -108,7 +110,7 @@ export async function armarSituacion(o: SituacionOpts): Promise<string[]> {
             formato,
           },
     );
-    const final = await componerElementos({ workDir: wd, fuente: W("base-voz.mp4"), elementos });
+    const final = await componerElementos({ workDir: wd, fuente: W("base-voz.mp4"), elementos, ...(o.guion ? { guionSubtitulos: o.guion } : {}) });
     const dest = `${o.salida}-${formato.replace(":", "x")}.mp4`;
     await run("cp", [final, dest]);
     salidas.push(dest);

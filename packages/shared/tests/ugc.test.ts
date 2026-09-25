@@ -13,6 +13,8 @@ describe("construirPromptUgc", () => {
   it("no lista palabras a pronunciar y marca la continuación", () => {
     const p = construirPromptUgc("in her kitchen", "Hola", true);
     expect(p).not.toMatch(/pronounce/i);
+    expect(p).toMatch(/never to be spoken aloud/);
+    expect(p.trim().endsWith("until the end of the clip; she never says anything else.")).toBe(true);
     expect(p).toMatch(/^Continue the same shot/);
     expect(p).toContain('"Hola"');
   });
@@ -66,5 +68,18 @@ describe("preset situación", () => {
   it("exige 4 tomas y una velocidad razonable", () => {
     expect(() => situacionSchema.parse({ ...sit, tomas: sit.tomas.slice(0, 3) })).toThrow();
     expect(() => situacionSchema.parse({ ...sit, velocidad: 2 })).toThrow();
+  });
+});
+
+describe("subtítulos", () => {
+  it("son opcionales y la marca es editable con color por defecto", () => {
+    expect(ugcElementosSchema.parse({}).subtitulos).toBeNull();
+    const e = ugcElementosSchema.parse({ subtitulos: { estilo: "black-centro", marca: { texto: "@mimarca", acento: "mi" } } });
+    expect(e.subtitulos?.marca.texto).toBe("@mimarca");
+    expect(e.subtitulos?.marca.colorAcento).toBe("#E3B341");
+  });
+  it("solo acepta los tres estilos aprobados", () => {
+    expect(() => ugcElementosSchema.parse({ subtitulos: { estilo: "otro" } })).toThrow();
+    for (const estilo of ["black-centro", "abajo-az", "aura"]) expect(ugcElementosSchema.parse({ subtitulos: { estilo } }).subtitulos?.estilo).toBe(estilo);
   });
 });
