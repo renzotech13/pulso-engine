@@ -213,7 +213,12 @@ export const situacionSchema = z.object({
   /** Texto de la voz en off, con etiquetas expresivas de ElevenLabs v3 ([worried], [excited]…). */
   guion: z.string().trim().min(20).max(900),
   voz: z.discriminatedUnion("origen", [
-    z.object({ origen: z.literal("elevenlabs"), voiceId: z.string().trim().min(10).max(40) }),
+    z.object({
+      origen: z.literal("elevenlabs"),
+      voiceId: z.string().trim().min(10).max(40),
+      /** v3 entiende las etiquetas expresivas; v2 (multilingual) es más estable y las etiquetas se ignoran. */
+      modelo: z.enum(["v3", "v2"]).default("v3"),
+    }),
     /** Audio ya generado, subido por el usuario a video-editor-assets. */
     z.object({ origen: z.literal("audio"), audioPath: z.string().min(1) }),
   ]),
