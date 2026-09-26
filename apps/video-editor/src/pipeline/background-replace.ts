@@ -79,6 +79,19 @@ export interface BackgroundReplaceOptions {
   cutPositionFrac: number;
   /** How much of the frame height the blend band spans — wider reads as a softer, more gradual transition. */
   blendBandFrac: number;
+  /**
+   * Which slice of the background image/video gets kept once it's cropped
+   * down to cover its (usually much shorter than the full frame) visible
+   * zone — 0 keeps the TOP of the source, 1 the bottom, 0.5 (default) the
+   * vertical center, same as before this existed. Matters most for a
+   * vertical (9:16) background clip: center-cropping it to a short zone
+   * grabs the source's own vertical middle, which for a typically-framed
+   * clip (subject centered top-to-bottom in ITS OWN frame) often lands
+   * right around where the presenter's own head starts once placed at the
+   * top of the composite — biasing toward 0 shows more of the source's
+   * upper portion instead, clear of that overlap.
+   */
+  backgroundPositionY?: number;
   /** Frame width to process and output at. Downscaling before matting (RVM is per-frame, not free) is fine — the pipeline's own concatenateSegments scales every segment to the preset's output size anyway. */
   workWidth: number;
   /** Path to an RVM ONNX model (see RVM_MODEL_PATH) — resnet50 for quality, mobilenetv3 for speed. */
@@ -92,6 +105,8 @@ export interface BackgroundReplaceOptions {
    * regardless.
    */
   outputFps?: number;
+  /** Called after each frame is composited, for a caller that wants to report progress (e.g. a queued job). */
+  onProgress?: (frameIndex: number, frameCount: number) => void | Promise<void>;
 }
 
 /** RVM's own documented ONNX convention: a single zero VALUE (not an empty tensor) for the initial recurrent state. */
@@ -104,6 +119,22 @@ function downsampleRatioFor(width: number): number {
   if (width <= 512) return 1;
   if (width <= 720) return 0.6;
   return 512 / width;
+}
+
+/**
+ * How tall the background actually needs to be, in px, to cover every row
+ * the blend gradient below can ever show ANY of it — past
+ * `cutPositionFrac + blendBandFrac/2`, the gradient's own weight for the
+ * new background is already exactly 0 (see the `t` formula in
+ * runMattingAndComposite), so covering further down would be wasted work.
+ * Exported so bg-replace-multi-cli.ts's reel-building can target the SAME
+ * height instead of guessing its own — resizing a background to cover the
+ * full frame height and then having this function shrink it right back
+ * down would upscale it for nothing, then throw that detail away.
+ */
+export function backgroundCoverHeight(frameHeight: number, cutPositionFrac: number, blendBandFrac: number): number {
+  const zoneFrac = Math.min(1, cutPositionFrac + blendBandFrac / 2);
+  return Math.max(1, Math.round(frameHeight * zoneFrac));
 }
 
 async function extractFrames(videoPath: string, framesDir: string, workWidth: number, fps: number): Promise<number> {
@@ -166,11 +197,34 @@ async function runMattingAndComposite(
       backgroundResized.height !== height ||
       backgroundResized.sourcePath !== bgFramePath
     ) {
+      // Only cover down to where the blend gradient can still show any of
+      // it — resizing to the FULL frame height would force e.g. a 16:9
+      // landscape clip to blow up ~2.7x to cover a 9:16 frame top-to-
+      // bottom, when the corte/difuminado actually only ever reveal the
+      // top slice of it. bgCoverHeight is that real, usually much
+      // shorter, height.
+      const bgCoverHeight = backgroundCoverHeight(height, options.cutPositionFrac, options.blendBandFrac);
+      // sharp's own `fit: "cover"` always crops centered — cropping the
+      // scale-to-cover result ourselves is what lets backgroundPositionY
+      // pick a different slice (see its own doc comment on why that
+      // matters for a vertical source). Ceil, not round, on the scaled
+      // size: extract() below needs it to be AT LEAST width×bgCoverHeight,
+      // and a stray round-down would make it 1px short and throw.
+      const srcMeta = await sharp(bgFramePath).metadata();
+      const srcWidth = srcMeta.width ?? width;
+      const srcHeight = srcMeta.height ?? bgCoverHeight;
+      const coverScale = Math.max(width / srcWidth, bgCoverHeight / srcHeight);
+      const scaledWidth = Math.ceil(srcWidth * coverScale);
+      const scaledHeight = Math.ceil(srcHeight * coverScale);
+      const positionY = options.backgroundPositionY ?? 0.5;
+      const top = Math.round(Math.max(0, scaledHeight - bgCoverHeight) * positionY);
+      const left = Math.round(Math.max(0, scaledWidth - width) / 2); // horizontal stays centered — only the vertical slice is configurable
       const resized = await sharp(bgFramePath)
-        .resize(width, height, { fit: "cover" })
+        .resize(scaledWidth, scaledHeight)
+        .extract({ left, top, width, height: bgCoverHeight })
         .raw()
         .toBuffer({ resolveWithObject: true });
-      backgroundResized = { data: resized.data, width, height, sourcePath: bgFramePath };
+      backgroundResized = { data: resized.data, width, height: bgCoverHeight, sourcePath: bgFramePath };
     }
 
     const chw = new Float32Array(3 * width * height);
@@ -199,7 +253,13 @@ async function runMattingAndComposite(
       const t = Math.max(0, Math.min(1, (y / height - bandStart) / options.blendBandFrac));
       for (let x = 0; x < width; x++) {
         const pix = y * width + x;
-        const bgIdx = pix * 3; // background images are opaque RGB (fit: cover)
+        // Clamped, not `pix`: backgroundResized is only bgCoverHeight tall
+        // now, shorter than the frame — rows below it get t=1 anyway (the
+        // gradient already ignores newBg entirely there), so which row
+        // gets read back doesn't affect the output, it just has to stay
+        // in bounds.
+        const bgRow = Math.min(y, backgroundResized.height - 1);
+        const bgIdx = (bgRow * width + x) * 3; // background images are opaque RGB (fit: cover)
         const newBg = [backgroundResized.data[bgIdx]!, backgroundResized.data[bgIdx + 1]!, backgroundResized.data[bgIdx + 2]!];
         const origBg = [srcData[pix * channels]!, srcData[pix * channels + 1]!, srcData[pix * channels + 2]!];
         const alpha = Math.max(0, Math.min(1, pha.data[pix] as number));
@@ -215,6 +275,8 @@ async function runMattingAndComposite(
     await sharp(outBuf, { raw: { width, height, channels: 3 } })
       .png()
       .toFile(path.join(outDir, frameName));
+
+    await options.onProgress?.(i, frameCount);
   }
 }
 
@@ -239,7 +301,7 @@ async function encodeWithOriginalAudio(
         "-i", path.join(framesDir, "frame-%05d.png"),
         "-i", originalVideoPath,
         "-map", "0:v",
-        "-map", "1:a",
+        "-map", "1:a?",
         "-c:v", "libx264",
         "-crf", "16",
         "-pix_fmt", "yuv420p",

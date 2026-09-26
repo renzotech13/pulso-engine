@@ -1,0 +1,80 @@
+{
+  "clave": "movistar-titulo-inicial-este-mes",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Título de apertura vertical 1080x1920 para 'Este mes, no cambies tu número. / Cambia todo / lo demás.': mismo estilo que movistar-titulo-gruesa-serif-izquierda pero 30px más arriba (posicionYFrac 0.264→0.2484), porque con la línea extra 'Este mes,' el bloque crece a 3 líneas arriba y el nivel de abajo tocaba la tarjeta SIM. Va con movistar-subtitulo-negrita-regular debajo.",
+  "aplica": {
+    "texto": "\"Este mes, no cambies tu número. | Cambia todo | lo demás.\"",
+    "flags": [
+      "--duracion",
+      "4.3"
+    ],
+    "pos_y": 0.2484,
+    "origen": "clon de movistar-titulo-gruesa-serif.json: alineacion centro→izquierda en los 3 niveles, bloqueDesplazamientoXPx para pegar el bloque al margen izquierdo, sin el desplazamientoXPx de 'inferior'."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 4.3,
+    "tamano": 88,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.2484,
+    "bloqueDesplazamientoXPx": -210,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.74,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Grift Black"
+        },
+        "tamano": 96,
+        "color": "#0E1F4D",
+        "interlineado": 0.92,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": 10,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": -75,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      }
+    }
+  }
+}

@@ -43,6 +43,28 @@ function getClient(): OpenAI {
   return client;
 }
 
+// LM Studio serves ONE local model on this machine, not a pool — it has no
+// way to actually run five completions in parallel. Letting BullMQ's
+// concurrency (core: 5, render: 2) all reach it at once was making every
+// concurrent request contend for the same GPU/CPU slot, so requests that
+// normally finish in ~180s either 500'd or blew past the 240s timeout —
+// which is exactly what happened every morning at planner-tick/news-tick
+// fan-out (7am/10am), losing that day's slot for whichever tenants lost the
+// race. A tiny promise-chain mutex serializes every call across the whole
+// process (all queues share this module), so LM Studio only ever sees one
+// request at a time — slower per-tenant in the worst case, but nothing times
+// out or gets dropped anymore.
+let lmStudioQueue: Promise<void> = Promise.resolve();
+
+function withLmStudioLock<T>(fn: () => Promise<T>): Promise<T> {
+  const result = lmStudioQueue.then(fn, fn);
+  lmStudioQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
 /**
  * Local models wrap JSON in prose or markdown fences far more often than a
  * hosted frontier model does, even when told not to — pull the first {...}
@@ -100,15 +122,17 @@ async function callLlmStructuredInternal<S extends z.ZodTypeAny>(
       ? `${prompt}\n\nTu respuesta anterior fue rechazada por este motivo: ${lastError}. Corrige exactamente eso y responde de nuevo, solo con el JSON, sin texto adicional ni markdown.`
       : prompt;
 
-    const response = await openai.chat.completions.create({
-      model,
-      temperature: options.temperature ?? 0.2,
-      max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
-      messages: [
-        ...(options.system ? [{ role: "system" as const, content: options.system }] : []),
-        { role: "user" as const, content: userContent },
-      ],
-    });
+    const response = await withLmStudioLock(() =>
+      openai.chat.completions.create({
+        model,
+        temperature: options.temperature ?? 0.2,
+        max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
+        messages: [
+          ...(options.system ? [{ role: "system" as const, content: options.system }] : []),
+          { role: "user" as const, content: userContent },
+        ],
+      }),
+    );
 
     // Free with every response — this is what makes token observability
     // possible without any extra calls to the model.

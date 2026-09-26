@@ -1,0 +1,78 @@
+{
+  "clave": "movistar-titulo-inicial-square",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Variante SOLO para la versión 1080x1080 de movistar-titulo-gruesa-serif — mismo estilo (fuentes, colores, sombra, offset de 'lo demás.') pero con el bloque entero corrido hacia la derecha (bloqueDesplazamientoXPx) para el layout cuadrado. La versión 1080x1920 sigue usando movistar-titulo-gruesa-serif.json sin cambios.",
+  "aplica": {
+    "texto": "\"No cambies tu número. | Cambia todo | lo demás.\"  (idéntico a movistar-titulo-gruesa-serif)",
+    "flags": [
+      "--duracion",
+      "3.2"
+    ],
+    "pos_y": 0.18,
+    "origen": "clon de movistar-titulo-gruesa-serif.json + bloqueDesplazamientoXPx:90 para moverlo a la derecha en el formato cuadrado."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 3.2,
+    "tamano": 88,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.18,
+    "bloqueDesplazamientoXPx": 55,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.74,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Grift Black"
+        },
+        "tamano": 96,
+        "color": "#0E1F4D",
+        "interlineado": 0.92,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": 10,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": -75,
+        "desplazamientoXPx": 105,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      }
+    }
+  }
+}

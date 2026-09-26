@@ -1,0 +1,45 @@
+{
+  "clave": "aura-subtitulos",
+  "tipo": "subtitulos",
+  "marca": "aura",
+  "descripcion": "Subtítulos karaoke por palabra: Georgia 700 blanca de 60 px con contorno negro, palabra activa amarilla (#FFD400) sobre pastilla naranja (#F5A623) de esquinas redondas; abajo con margen seguro de 260 px, 2 líneas máx. y bloques de 5 palabras.",
+  "aplica": {
+    "texto": "guion exacto de la voz (texto o ruta .txt): se alinea con Whisper local",
+    "flags": [],
+    "origen": "config/presets/aura-edits.json → subtitulos (pipeline organico.sh, paso 'subtítulos')"
+  },
+  "subtitulos": {
+    "tamano": 60,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#FFD400",
+    "fuente": {
+      "familia": "Georgia",
+      "peso": 700
+    },
+    "fondoPalabraActiva": {
+      "activo": true,
+      "color": "#F5A623",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "contorno": {
+      "color": "#000000",
+      "grosor": 2
+    },
+    "sombra": {
+      "color": "#00000080",
+      "desplazamiento": 2
+    },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 260,
+    "maxCaracteresPorLinea": 24,
+    "maxLineas": 2,
+    "palabrasPorBloque": 5,
+    "mayusculas": false,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true
+  }
+}

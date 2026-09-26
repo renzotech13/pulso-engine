@@ -5,10 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   loadDefaultPreset,
   loadPreset,
+  presetSchema,
   PresetError,
+  resolveNivelEfecto,
   resolveOutputSpec,
   resolveSubtitleAnimation,
   resolveTitleAnimation,
+  splitTresNivelesTexto,
 } from "../src/pipeline/preset.js";
 
 describe("loadDefaultPreset", () => {
@@ -74,10 +77,63 @@ describe("resolveSubtitleAnimation / resolveTitleAnimation", () => {
   it("passes through a supported value", () => {
     expect(resolveSubtitleAnimation("pop")).toBe("pop");
     expect(resolveTitleAnimation("fadeIn")).toBe("fadeIn");
+    expect(resolveTitleAnimation("wipeVertical")).toBe("wipeVertical");
   });
 
   it("falls back to 'ninguna' for an unsupported value instead of throwing", () => {
     expect(resolveSubtitleAnimation("slide-in-from-mars")).toBe("ninguna");
     expect(resolveTitleAnimation("slide-in-from-mars")).toBe("ninguna");
+  });
+});
+
+describe("splitTresNivelesTexto", () => {
+  it("splits the 3 pipe-delimited lines and trims each one", () => {
+    expect(splitTresNivelesTexto("Blanco Rosa | ROSA | PALO")).toEqual(["Blanco Rosa", "ROSA", "PALO"]);
+  });
+
+  it("fills missing parts with an empty string instead of throwing", () => {
+    expect(splitTresNivelesTexto("Solo superior")).toEqual(["Solo superior", "", ""]);
+    expect(splitTresNivelesTexto("")).toEqual(["", "", ""]);
+  });
+
+  it("ignores any part beyond the 3rd", () => {
+    expect(splitTresNivelesTexto("Uno | Dos | Tres | Cuatro")).toEqual(["Uno", "Dos", "Tres"]);
+  });
+});
+
+describe("tituloSchema — estilo tresNiveles", () => {
+  const nivel = { fuente: { familia: "Inter" }, tamano: 40, color: "#FFFFFF" };
+
+  it("accepts a 'tresNiveles' título with its 3 levels configured", async () => {
+    const preset = await loadDefaultPreset();
+    const withTresNiveles = {
+      ...preset,
+      titulo: {
+        ...preset.titulo,
+        estilo: "tresNiveles",
+        tresNiveles: { superior: nivel, medio: nivel, inferior: nivel },
+      },
+    };
+    const result = presetSchema.safeParse(withTresNiveles);
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects estilo 'tresNiveles' without the per-level config — never silently falls back to 'simple'", async () => {
+    const preset = await loadDefaultPreset();
+    const missingConfig = { ...preset, titulo: { ...preset.titulo, estilo: "tresNiveles" } };
+    const result = presetSchema.safeParse(missingConfig);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("resolveNivelEfecto", () => {
+  it("passes through a supported value", () => {
+    expect(resolveNivelEfecto("mascaraVertical")).toBe("mascaraVertical");
+    expect(resolveNivelEfecto("letrasOla")).toBe("letrasOla");
+    expect(resolveNivelEfecto("letrasJuntan")).toBe("letrasJuntan");
+  });
+
+  it("falls back to 'ninguna' for an unsupported value instead of throwing", () => {
+    expect(resolveNivelEfecto("efecto-inventado")).toBe("ninguna");
   });
 });

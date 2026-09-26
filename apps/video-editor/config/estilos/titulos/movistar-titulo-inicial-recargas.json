@@ -1,0 +1,80 @@
+{
+  "clave": "movistar-titulo-inicial-recargas",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Título de apertura de 2 líneas del guion 'La cuenta de las recargas' (1080x1920), pegado al margen izquierdo: 'superior' Grift Black navy ('¿Recargas 10 soles') y 'medio' script Cherishline celeste ('cada semana?') en UNA sola línea, más grande (140) y a 3px del nivel superior; todo el bloque 20+30+20px más arriba que la variante izquierda base (posicionYFrac 0.2276) y con sombra blanca doble: capa densa y nítida cerca de la letra (grosorPx 14) + halo extendido (blur 70), color #FFFFFFF5. Calibrado a mano con el cliente.",
+  "aplica": {
+    "texto": "\"¿Recargas 10 soles | cada semana?\"  (nivel inferior vacío)",
+    "flags": [
+      "--duracion",
+      "3.2"
+    ],
+    "pos_y": 0.2276,
+    "origen": "clon de movistar-titulo-gruesa-serif-izquierda.json: posicionYFrac 0.264→0.2276, medio.tamano 150→140, medio.margenSuperiorPx 10→3, sombra de ambos niveles reemplazada (blur 46→70, grosorPx 10→14, alfa FF→F5)."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 3.2,
+    "tamano": 88,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.2276,
+    "bloqueDesplazamientoXPx": -210,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.74,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Grift Black"
+        },
+        "tamano": 96,
+        "color": "#0E1F4D",
+        "interlineado": 0.92,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFF5",
+          "desplazamiento": 0,
+          "blur": 70,
+          "halo": true,
+          "grosorPx": 14
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 140,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": 3,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFF5",
+          "desplazamiento": 0,
+          "blur": 70,
+          "halo": true,
+          "grosorPx": 14
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": -75,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      }
+    }
+  }
+}

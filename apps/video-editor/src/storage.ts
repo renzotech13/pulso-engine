@@ -41,6 +41,18 @@ export async function uploadFile(
   if (error) throw new StorageError(`no se pudo subir "${bucket}/${path}"`, error);
 }
 
+/**
+ * Best-effort delete of one or more objects — callers that clean up
+ * intermediate files after a job succeeds (e.g. bg-replace-job.ts) should
+ * treat a failure here as a warning, not a reason to fail the job: the
+ * real output is already safely uploaded by the time cleanup runs.
+ */
+export async function deleteFiles(client: ServiceRoleClient, bucket: string, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await client.storage.from(bucket).remove(paths);
+  if (error) throw new StorageError(`no se pudieron borrar ${paths.length} archivo(s) de "${bucket}"`, error);
+}
+
 export async function uploadBuffer(
   client: ServiceRoleClient,
   bucket: string,

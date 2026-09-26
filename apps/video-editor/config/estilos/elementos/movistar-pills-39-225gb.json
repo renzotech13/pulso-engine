@@ -1,0 +1,28 @@
+{
+  "clave": "movistar-pills-39-225gb",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "precio-card",
+  "descripcion": "Card 'A solo S/39.90 | 225 GB en alta velocidad' (degradado celeste a azul), usada en el video vertical Movistar. Ojo: 'pill 6' se interpretó como esta card; confirmar.",
+  "origen": "apps/render-video/src/compositions/PrecioCard.tsx. Referencia: /Users/renzo/MOVISTAR EDITS/build-movistar-vertical-final.sh",
+  "como_reutilizar": [
+    "Copiar 'props'; cambiar valores.",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov precio-card (apps/render-video); sale con alfa -> overlay."
+  ],
+  "props": {
+    "durationSec": 5,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "etiquetaIzquierda": "A solo",
+    "valorIzquierda": "S/ 39.90",
+    "valorDerecha": "225 GB",
+    "etiquetaDerecha": "en alta velocidad",
+    "colorFondoInicio": "#4FA8E8",
+    "colorFondoFin": "#0D5DA6",
+    "colorTexto": "#FFFFFF",
+    "colorAcento": "#BAE0FD",
+    "posicionYFrac": 0.878,
+    "anchoMaximoFrac": 0.8
+  }
+}

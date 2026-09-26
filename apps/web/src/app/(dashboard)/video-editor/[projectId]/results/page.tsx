@@ -29,7 +29,7 @@ export default async function VideoProjectResultsPage({ params }: { params: Prom
 
   const { data: project } = await supabase
     .from("video_projects")
-    .select("id, nombre, preset_id, tenant_id")
+    .select("id, nombre, preset_id, tenant_id, raw_assets_cleaned_at")
     .eq("id", projectId)
     .eq("tenant_id", ctx.tenantId)
     .maybeSingle();
@@ -105,7 +105,16 @@ export default async function VideoProjectResultsPage({ params }: { params: Prom
               </div>
             )}
 
-            {video.status !== "renderizando" && (presets ?? []).length > 1 && (
+            {video.status !== "renderizando" && project.raw_assets_cleaned_at && (
+              <div className="mt-4 border-t border-line pt-4">
+                <p className="text-xs text-fg-3">
+                  Las tomas originales de este proyecto ya se borraron para liberar espacio (todos sus videos quedaron listos). Para volver a
+                  renderizar con otro preset, creá un proyecto nuevo subiendo las tomas de vuelta.
+                </p>
+              </div>
+            )}
+
+            {video.status !== "renderizando" && !project.raw_assets_cleaned_at && (presets ?? []).length > 1 && (
               <div className="mt-4 border-t border-line pt-4">
                 <p className="eyebrow mb-2 text-fg-3">Re-renderizar con otro preset</p>
                 <div className="flex flex-wrap items-center gap-2">

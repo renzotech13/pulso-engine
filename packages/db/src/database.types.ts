@@ -1247,6 +1247,142 @@ export type Database = {
           },
         ]
       }
+      video_ugc_jobs: {
+        Row: {
+          batch_id: string | null
+          cost_usd: number
+          created_at: string
+          elementos: Json
+          error_message: string | null
+          escena: string | null
+          frame_path: string | null
+          guion_a: string | null
+          guion_b: string | null
+          id: string
+          model: string
+          nombre: string
+          output_path: string | null
+          preset: string
+          progress: number
+          saldo_apimart: number | null
+          situacion: Json | null
+          status: string
+          task_ids: Json
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          batch_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          elementos?: Json
+          error_message?: string | null
+          escena?: string | null
+          frame_path?: string | null
+          guion_a?: string | null
+          guion_b?: string | null
+          id?: string
+          model?: string
+          nombre: string
+          output_path?: string | null
+          preset?: string
+          progress?: number
+          saldo_apimart?: number | null
+          situacion?: Json | null
+          status?: string
+          task_ids?: Json
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string | null
+          cost_usd?: number
+          created_at?: string
+          elementos?: Json
+          error_message?: string | null
+          escena?: string | null
+          frame_path?: string | null
+          guion_a?: string | null
+          guion_b?: string | null
+          id?: string
+          model?: string
+          nombre?: string
+          output_path?: string | null
+          preset?: string
+          progress?: number
+          saldo_apimart?: number | null
+          situacion?: Json | null
+          status?: string
+          task_ids?: Json
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_ugc_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      video_bg_replace_jobs: {
+        Row: {
+          background_path: string
+          blend_band: number
+          created_at: string
+          cut_position: number
+          error_message: string | null
+          id: string
+          nombre: string
+          output_path: string | null
+          progress: number
+          source_path: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          background_path: string
+          blend_band?: number
+          created_at?: string
+          cut_position?: number
+          error_message?: string | null
+          id?: string
+          nombre: string
+          output_path?: string | null
+          progress?: number
+          source_path: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          background_path?: string
+          blend_band?: number
+          created_at?: string
+          cut_position?: number
+          error_message?: string | null
+          id?: string
+          nombre?: string
+          output_path?: string | null
+          progress?: number
+          source_path?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_bg_replace_jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_presets: {
         Row: {
           config: Json
@@ -1366,6 +1502,7 @@ export type Database = {
           nombre: string
           pdf_path: string
           preset_id: string
+          raw_assets_cleaned_at: string | null
           status: string
           tenant_id: string
           updated_at: string
@@ -1378,6 +1515,7 @@ export type Database = {
           nombre: string
           pdf_path: string
           preset_id: string
+          raw_assets_cleaned_at?: string | null
           status?: string
           tenant_id: string
           updated_at?: string
@@ -1390,6 +1528,7 @@ export type Database = {
           nombre?: string
           pdf_path?: string
           preset_id?: string
+          raw_assets_cleaned_at?: string | null
           status?: string
           tenant_id?: string
           updated_at?: string
@@ -1468,6 +1607,14 @@ export type Database = {
       }
       request_creative_publish: {
         Args: { target_creative_id: string }
+        Returns: undefined
+      }
+      request_video_ugc: {
+        Args: { target_job_id: string }
+        Returns: undefined
+      }
+      request_video_bg_replace: {
+        Args: { target_job_id: string }
         Returns: undefined
       }
       request_video_project_processing: {

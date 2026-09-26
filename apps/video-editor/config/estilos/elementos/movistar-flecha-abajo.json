@@ -1,0 +1,26 @@
+{
+  "clave": "movistar-flecha-abajo",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "arrow-down",
+  "descripcion": "3 chevrones celestes (#3EC6FF) apilados, parpadeando en cascada de arriba hacia abajo (lee como una flecha 'bajá' animada). Pensada para ir debajo de un CTA final, indicando scroll/tap.",
+  "origen": "apps/render-video/src/compositions/ArrowDown.tsx — renderizado con precio-card-cli.ts, composición 'arrow-down'. Usado en el CTA final 'Escríbenos | por WhatsApp' (ver movistar-cta-escribenos-whatsapp en config/estilos/ctas/).",
+  "como_reutilizar": [
+    "1. Copiar el bloque 'props' de abajo.",
+    "2. 'posicionYFrac' debe ubicarlo justo debajo del texto del CTA que acompañe (para el CTA de 2 líneas 'Escríbenos/por WhatsApp' con posicionYFrac 0.3265, la flecha quedó bien en 0.44 — recalcular a ojo si el CTA cambia de tamaño o posición).",
+    "3. Renderizar: tsx src/precio-card-cli.ts '<propsJson>' salida.mov arrow-down (desde apps/render-video). Sale con canal alfa — componer con overlay simple: ffmpeg -i base.mp4 -i salida.mov -filter_complex \"[0:v][1:v]overlay=0:0:shortest=1\" ...",
+    "4. 'durationSec' debe cubrir todo el tramo donde el CTA esté visible (no tiene entrada/salida propia más allá del parpadeo continuo de los chevrones)."
+  ],
+  "props": {
+    "durationSec": 5.04,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "color": "#3EC6FF",
+    "posicionXFrac": 0.5,
+    "posicionYFrac": 0.44,
+    "tamano": 90,
+    "cantidadChevrones": 3,
+    "velocidadSeg": 1.1
+  }
+}

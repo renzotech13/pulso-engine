@@ -10,6 +10,8 @@ import type { Database } from "@pulso/db/types";
 import { createLogger } from "@pulso/shared/logger";
 import { startVideoEditorWorker, closeVideoEditorWorker } from "./queue.js";
 import { processProjectJob, renderVideoJob } from "./db-pipeline.js";
+import { bgReplaceJob } from "./bg-replace-job.js";
+import { ugcJob } from "./ugc-job.js";
 
 const logger = createLogger({ agent: "video-editor-main" });
 
@@ -27,6 +29,16 @@ async function processJob(job: Job<EventRow>): Promise<void> {
     case "video.render.requested": {
       const payload = event.payload as { projectId: string; videoId: string };
       await renderVideoJob({ projectId: payload.projectId, tenantId: event.tenant_id, videoId: payload.videoId });
+      return;
+    }
+    case "video.bg_replace.requested": {
+      const payload = event.payload as { jobId: string };
+      await bgReplaceJob({ jobId: payload.jobId, tenantId: event.tenant_id });
+      return;
+    }
+    case "video.ugc.requested": {
+      const payload = event.payload as { jobId: string };
+      await ugcJob({ jobId: payload.jobId, tenantId: event.tenant_id });
       return;
     }
     default:

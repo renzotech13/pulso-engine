@@ -1,0 +1,22 @@
+{
+  "clave": "movistar-pill-whatsapp",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "whatsapp-pill",
+  "descripcion": "Pill verde 'ESCRÍBENOS / POR WHATSAPP' con el ícono de WhatsApp asomando por el borde izquierdo y flecha neón que apunta al pill, brillo pulsante. Entrada con rebote.",
+  "origen": "apps/render-video/src/compositions/WhatsappPill.tsx. Usado al final del guion 'El cuaderno del ahorro'.",
+  "como_reutilizar": [
+    "Copiar 'props'; cambiar texto1/texto2 si hace falta.",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov whatsapp-pill (apps/render-video); sale con alfa -> ffmpeg overlay (setpts=PTS+inicio/TB)."
+  ],
+  "props": {
+    "durationSec": 2.0,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "texto1": "ESCRÍBENOS",
+    "texto2": "POR WHATSAPP",
+    "posicionYFrac": 0.87,
+    "anchoPx": 720
+  }
+}

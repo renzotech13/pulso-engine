@@ -1,0 +1,54 @@
+{
+  "nota": "Extractos que el usuario rescata, en timecode hh;mm;ss;cuadros a 59.94 fps (tiempo = seg + cuadros/59.94). Fuente: cortes-tomas/ (2026-09-25).",
+  "reglas_del_usuario": [
+    "1-2 s por toma es suficiente; lo que se corta es el momento exacto, no un tramo largo",
+    "Si hay un paneo de izquierda a derecha (aunque dure 1-2 s) ese es el corte: termina cuando la cámara llega de A a B; el regreso y lo demás se descartan",
+    "Lo de antes del paneo es 'cuadrando la toma' y no sirve"
+  ],
+  "tramos": [
+    {
+      "video": "C2263.MP4",
+      "tc_inicio": "00;00;08;01",
+      "tc_fin": "00;00;08;44",
+      "inicio_s": 8.017,
+      "fin_s": 8.734,
+      "tipo": "paneo A->B"
+    },
+    {
+      "video": "C2230.MP4",
+      "tc_inicio": "00;00;01;14",
+      "tc_fin": "00;00;03;46",
+      "inicio_s": 1.234,
+      "fin_s": 3.767,
+      "tipo": "cámara fija, acción de manos/cabello",
+      "descripcion": "C2230 1;14 → ~3;46-3;50: movimiento diagonal de arriba-derecha a abajo-izquierda, luego pequeño paneo a la derecha 'regresando' con leve acercamiento; termina al llegar (los timecodes que dio tienen ±4 cuadros de imprecisión)"
+    },
+    {
+      "video": "C2230.MP4",
+      "tc_inicio": "00;00;04;51",
+      "tc_fin": "00;00;06;04",
+      "inicio_s": 4.851,
+      "fin_s": 6.067,
+      "tipo": "cámara fija, acción de manos/cabello",
+      "descripcion": "C2230 4;51 → 6;04: cámara quieta después de llegar, mientras las manos trabajan, hasta que arranca el siguiente movimiento"
+    }
+  ],
+  "descartados": [
+    {
+      "video": "C2263.MP4",
+      "nota": "regreso B->A (~9.0-10 s) y todo antes de 7.9 s"
+    },
+    {
+      "video": "C2230.MP4",
+      "nota": "0-1.2 s, 3.8-4.8 s, desde 6.1 s"
+    },
+    {
+      "video": "C2220.MP4",
+      "nota": "la última toma de la prueba (cortes 3-4) no sirvió"
+    }
+  ],
+  "fases_detectadas": {
+    "C2230": "0.77-1.90 diagonal (+108%,-33%) | 2.23-3.53 regreso con zoom | 3.67-4.97 movimiento (NO tomado) | 4.97-6.23 quieta (tomada)",
+    "C2263": "8.00-8.73 paneo (tomado) | 9.10-9.93 regreso (no tomado) | 2.90-3.50 paneo previo (no tomado)"
+  }
+}

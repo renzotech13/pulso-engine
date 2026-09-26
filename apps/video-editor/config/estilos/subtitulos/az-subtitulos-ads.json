@@ -1,0 +1,45 @@
+{
+  "clave": "az-subtitulos-ads",
+  "tipo": "subtitulos",
+  "marca": "az",
+  "descripcion": "Subtítulos de los ADS y de los videos de tomas de AZ: Georgia 700 blanca de 60 px con contorno negro de 4 px y sombra suave, palabra activa en celeste #BAE0FD sin pastilla; abajo (margen seguro 260 px), máx. 2 líneas de 22 caracteres y bloques de 4 palabras; solo se muestran mientras se habla (sin línea fluida).",
+  "aplica": {
+    "texto": "guion exacto de la voz (texto o ruta .txt): se alinea con Whisper local",
+    "flags": [],
+    "origen": "config/presets/az-ads.json → subtitulos. En producción los ADS usan bloques por tramos de voz reales (--bloques-json)."
+  },
+  "subtitulos": {
+    "tamano": 60,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#BAE0FD",
+    "fuente": {
+      "familia": "Georgia",
+      "peso": 700
+    },
+    "fondoPalabraActiva": {
+      "activo": false,
+      "color": "#BAE0FD",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "contorno": {
+      "color": "#000000",
+      "grosor": 4
+    },
+    "sombra": {
+      "color": "#000000B3",
+      "desplazamiento": 3
+    },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 260,
+    "maxCaracteresPorLinea": 22,
+    "maxLineas": 2,
+    "palabrasPorBloque": 4,
+    "mayusculas": false,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": false
+  }
+}

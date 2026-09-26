@@ -1,0 +1,31 @@
+{
+  "clave": "movistar-titulo-ola-pill",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "titulo-ola-pill",
+  "descripcion": "Título de 2 partes centrado: ARRIBA una línea donde cada letra entra con rebote y luego se mueve como ola lenta constante (misma mecánica y valores de movistar-titulo-ola: escalón 0.04 s, amplitud 7px, ciclo 6 s), Grift Black navy #0A1E3C 110px; ABAJO un pill azul sólido #3B86E6 que entra con rebote (spring) a los 0.7 s con el texto blanco 78px rebotando un poco después. Ej: '¿PAGAS MÁS DE' / 'S/ 50 EN CLARO O ENTEL?'. Aprobado 2026-09-24.",
+  "origen": "apps/render-video/src/compositions/TituloOlaPill.tsx (composición NUEVA 'titulo-ola-pill'). Preview: /Users/renzo/MOVISTAR EDITS/titulo-ola-pill-TEST.mp4",
+  "como_reutilizar": [
+    "Copiar 'props' y cambiar solo texto1 (arriba, mayúsculas) y texto2 (dentro del pill); bajar tamano1/tamano2 si el texto es más largo.",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov titulo-ola-pill (apps/render-video); sale con canal alfa -> ffmpeg overlay.",
+    "posicionYFrac 0.0625 = arriba (subido 168px respecto al 0.15 original; 200px recortaba la línea superior); entradaPillSeg controla cuándo rebota el pill; durationSec debe cubrir el tramo (fade de 10 frames al final)."
+  ],
+  "props": {
+    "durationSec": 5,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "texto1": "¿PAGAS MÁS DE",
+    "texto2": "S/ 50 EN CLARO O ENTEL?",
+    "posicionYFrac": 0.0625,
+    "colorTexto1": "#0A1E3C",
+    "colorTexto2": "#FFFFFF",
+    "colorPill": "#3B86E6",
+    "tamano1": 110,
+    "tamano2": 78,
+    "amplitudPx": 7,
+    "cicloSeg": 6,
+    "escalonSeg": 0.04,
+    "entradaPillSeg": 0.7
+  }
+}

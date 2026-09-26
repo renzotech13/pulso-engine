@@ -1,0 +1,29 @@
+{
+  "clave": "movistar-titulo-pill-bitel",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "titulo-pill",
+  "descripcion": "Título en pill de 2 líneas con rebote: forma escalonada azul SÓLIDO (#2050B9, sin sombras, las dos cajas se funden como una sola), línea 1 blanca 64px ('¿Eres Bitel y quieres', caja más corta) y línea 2 turquesa #4FE3D6 84px ('internet ilimitado?', caja más ancha), alineadas a la izquierda. Dos chispas turquesa a caballo del borde derecho de la línea 2 (mitad dentro, mitad fuera), orientadas en '<'. Entrada con rebote (spring): línea 1, luego línea 2, luego las chispas. Aprobado 2026-09-24.",
+  "origen": "apps/render-video/src/compositions/TituloPill.tsx (composición NUEVA 'titulo-pill'; no toca PillStack/FeatureCards). Preview: /Users/renzo/MOVISTAR EDITS/pill-titulo-TEST.mp4",
+  "como_reutilizar": [
+    "Copiar 'props' y cambiar solo texto1/texto2 (y tamano1/tamano2 si el texto es más largo).",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov titulo-pill (apps/render-video); sale con canal alfa -> ffmpeg overlay sobre el video.",
+    "posicionYFrac / desplazamientoXPx mueven el bloque (0.1958 = 200px más arriba que el 0.3 original); durationSec debe cubrir el tramo donde se ve (al final hace fade de 10 frames)."
+  ],
+  "props": {
+    "durationSec": 4,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "texto1": "¿Eres Bitel y quieres",
+    "texto2": "internet ilimitado?",
+    "posicionYFrac": 0.1958,
+    "desplazamientoXPx": 0,
+    "colorFondo": "#2050B9",
+    "colorTexto1": "#FFFFFF",
+    "colorTexto2": "#4FE3D6",
+    "colorChispas": "#4FE3D6",
+    "tamano1": 64,
+    "tamano2": 84
+  }
+}

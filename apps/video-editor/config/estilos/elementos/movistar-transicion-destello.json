@@ -1,0 +1,14 @@
+{
+  "clave": "movistar-transicion-destello",
+  "tipo": "efecto-transicion",
+  "marca": "movistar",
+  "descripcion": "Destello (lens flare) de paleta FRÍA con el pico blanco exacto en el empalme entre dos tomas, usado en los UGC de Veo para ocultar el salto entre el tramo de 8 s y la extensión (remix). SIN whoosh porque la voz continúa en el corte. Aprobado 2026-09-24 (u20).",
+  "origen": "apps/video-editor/scripts/efectos/flare-transicion.sh (efecto genérico ya instalado, skill efectos-video)",
+  "como_reutilizar": [
+    "Localizar el segundo del empalme (mayor salto entre cuadros cerca de 8.0 s; en los remix de Veo cae en ~7.95-8.0).",
+    "Correr: apps/video-editor/scripts/efectos/flare-transicion.sh entrada.mp4 salida.mp4 <segundo> --paleta frio --sin-whoosh",
+    "Aplicarlo ANTES de superponer títulos/pills (re-codifica el video); necesita 0.6 s antes y 1.1 s después del corte.",
+    "Un solo destello por video."
+  ],
+  "comando": "flare-transicion.sh <in> <out> 8.0 --paleta frio --sin-whoosh"
+}

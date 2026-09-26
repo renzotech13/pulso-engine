@@ -1,0 +1,33 @@
+{
+  "clave": "movistar-cta-ola",
+  "tipo": "cta",
+  "marca": "movistar",
+  "composicion": "cta-ola",
+  "descripcion": "CTA propio de Movistar (reemplaza a los CTA heredados de AZ/Aura: movistar-cta-final-square y movistar-cta-escribenos-whatsapp, que ya no se usan). Réplica de movistar-titulo-ola en SOLO 2 filas: cada letra entra con rebote y luego se mueve como ola lenta constante (escalón 0.04 s, amplitud 7px, ciclo 6 s); fila 1 blanca 96px, fila 2 celeste #5FD9F5 112px, Grift Black mayúsculas. SIEMPRE lleva debajo la flecha movistar-flecha-abajo (chevrones #3EC6FF, 3 chevrones, tamaño 90, velocidad 1.1 s), que aparece 1.1 s después, ya asentado el texto, a 210px del centro del texto. La flecha va DENTRO de la misma composición, no hay que agregarla aparte. Ej: 'ESCRÍBENOS / POR WHATSAPP'.",
+  "origen": "apps/render-video/src/compositions/CtaOla.tsx (composición NUEVA 'cta-ola'; importa ArrowDown sin modificarlo). Preview: /Users/renzo/MOVISTAR EDITS/movistar-cta-ola-TEST.mp4",
+  "como_reutilizar": [
+    "Copiar 'props' y cambiar solo linea1/linea2 (mayúsculas; bajar tamano2 si la fila 2 es larga: 'POR WHATSAPP' a 112px ya ocupa ~90% del ancho).",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov cta-ola (apps/render-video); sale con canal alfa -> ffmpeg overlay sobre el último tramo del video.",
+    "posicionYFrac 0.8 = zona baja; durationSec = duración del tramo del CTA (hace fade de 10 frames al final; para que se quede hasta el último cuadro, extiende el clip un poco más que el video). retrasoFlechaSeg / distanciaFlechaPx mueven la flecha."
+  ],
+  "props": {
+    "durationSec": 5,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "linea1": "ESCRÍBENOS",
+    "linea2": "POR WHATSAPP",
+    "posicionYFrac": 0.8,
+    "colorLinea1": "#FFFFFF",
+    "colorLinea2": "#5FD9F5",
+    "tamano1": 96,
+    "tamano2": 112,
+    "amplitudPx": 7,
+    "cicloSeg": 6,
+    "escalonSeg": 0.04,
+    "colorFlecha": "#3EC6FF",
+    "tamanoFlecha": 90,
+    "retrasoFlechaSeg": 1.1,
+    "distanciaFlechaPx": 210
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "clave": "aura-titulo-inicial",
+  "tipo": "titulo",
+  "marca": "aura",
+  "descripcion": "Título de apertura de 3 niveles: script blanco 'Mrs Hannah' con ola de letras (arriba), palabra clave grande crema 'Scholar' (centro) y línea fina 'Helvetica' en mayúsculas (abajo). Entra a los 0.9 s y sale a los 0.65 s.",
+  "aplica": {
+    "texto": "\"línea superior | LÍNEA MEDIA | línea inferior\"  (3 partes separadas por |)",
+    "flags": [
+      "--pos-y",
+      "0.5",
+      "--duracion",
+      "5"
+    ],
+    "origen": "config/presets/aura-edits.json → titulo (pipeline organico.sh, paso 'título de apertura')"
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 112,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "ajustarAlAncho": true,
+        "tamanoMaximo": 150
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Scholar"
+        },
+        "tamano": 200,
+        "color": "#FDFBC0",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -60
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Helvetica"
+        },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10
+      }
+    }
+  }
+}

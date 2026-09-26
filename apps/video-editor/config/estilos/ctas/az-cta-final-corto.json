@@ -1,0 +1,95 @@
+{
+  "clave": "az-cta-final-corto",
+  "tipo": "cta",
+  "marca": "az",
+  "descripcion": "CTA final de AZ para palabras clave de 4 letras o menos (IDEA): igual que az-cta-final pero con el nivel medio limitado a 340 px, para que la palabra no crezca hasta llenar todo el ancho (con IDEA quedaba enorme y muy separada de los otros niveles).",
+  "aplica": {
+    "texto": "\"escríbeme | SOCIO | y te mando la guía del cambio societario\"",
+    "segundos": "desde que la voz dice 'Escríbeme' (menos 0.05 s) hasta el último cuadro",
+    "flags": [
+      "--llenar-medio",
+      "on",
+      "--ancho-maximo",
+      "0.88",
+      "--espacio-medio",
+      "-70",
+      "--espacio-inferior",
+      "-70",
+      "--tam-superior",
+      "105"
+    ],
+    "pos_y": 0.3265,
+    "velo": false,
+    "origen": "config/presets/cta-referencia-3-niveles-corta.json → titulo (nuevo_formato.py, palabra clave <= 4 letras); flags y sombra fuerte copiados."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.3265,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.88,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 105,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "tamanoMaximo": 145,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Grift ExtBd"
+        },
+        "tamano": 150,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -70,
+        "alineacion": "centro",
+        "ajustarAlAncho": true,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        },
+        "tamanoMaximo": 340
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Grift Light"
+        },
+        "tamano": 76,
+        "color": "#FFFFFF",
+        "trackingPx": 0,
+        "mayusculas": false,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -70,
+        "alineacion": "derecha",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      }
+    }
+  }
+}

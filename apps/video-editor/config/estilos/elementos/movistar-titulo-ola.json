@@ -1,0 +1,32 @@
+{
+  "clave": "movistar-titulo-ola",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "titulo-olas",
+  "descripcion": "Título centrado de 3 líneas donde CADA LETRA se mueve por separado. Entrada: las letras suben con rebote (spring) una tras otra, de izquierda a derecha y línea por línea (escalón 0.04 s por letra). Después, movimiento constante tipo ola de mar, muy lento: cada letra sube/baja 7px y gira ~1° con desfase propio, un ciclo cada 6 s. Grift Black en mayúsculas con sombra suave: 'SEÑAL Y DATOS' blanco 112px, 'ILIMITADOS' celeste #5FD9F5 170px, 'EN TODO EL PERÚ' blanco 70px. Aprobado 2026-09-24.",
+  "origen": "apps/render-video/src/compositions/TituloOlas.tsx (composición NUEVA 'titulo-olas'). Preview: /Users/renzo/MOVISTAR EDITS/titulo-olas-TEST.mp4",
+  "como_reutilizar": [
+    "Copiar 'props' y cambiar solo linea1/linea2/linea3 (y tamano1/2/3 si el texto es más largo; el texto va en mayúsculas).",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov titulo-olas (apps/render-video); sale con canal alfa -> ffmpeg overlay sobre el video.",
+    "durationSec debe cubrir todo el tramo donde se ve (hace fade de 10 frames al final). amplitudPx / cicloSeg / escalonSeg controlan la ola."
+  ],
+  "props": {
+    "durationSec": 5,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "linea1": "SEÑAL Y DATOS",
+    "linea2": "ILIMITADOS",
+    "linea3": "EN TODO EL PERÚ",
+    "posicionYFrac": 0.22,
+    "colorLinea1": "#FFFFFF",
+    "colorLinea2": "#5FD9F5",
+    "colorLinea3": "#FFFFFF",
+    "tamano1": 112,
+    "tamano2": 170,
+    "tamano3": 70,
+    "amplitudPx": 7,
+    "cicloSeg": 6,
+    "escalonSeg": 0.04
+  }
+}

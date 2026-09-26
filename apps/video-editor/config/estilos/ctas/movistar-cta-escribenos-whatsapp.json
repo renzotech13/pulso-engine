@@ -1,0 +1,60 @@
+{
+  "clave": "movistar-cta-escribenos-whatsapp",
+  "tipo": "cta",
+  "marca": "movistar",
+  "descripcion": "CTA final de Movistar para 1080x1920: 'Escríbenos' (Grift ExtBd celeste #BAE0FD) arriba, 'por WhatsApp' (Grift Light blanco) abajo, separación de 10px entre ambos. Clon de movistar-cta-final-square.json (nivel superior vacío, mismo estilo/sombra) pero SIN efecto de salida: duracionSeg se deja deliberadamente altísimo (999) para que el texto entre una vez y se quede fijo en pantalla el resto del clip, en vez de encogerse/desvanecerse cerca del final — pensado para ir sobre la última toma del video junto con movistar-flecha-abajo debajo.",
+  "aplica": {
+    "texto": "\"| Escríbenos | por WhatsApp\"  (nivel superior vacío)",
+    "segundos": "duracionSeg=999 en el JSON ya fuerza 'sin salida' — NO pasar --duracion al invocar titulo-cli.ts, o si se pasa, usar igualmente un número mucho más grande que el clip real (el true duracionSeg no importa mientras sea mayor a la duración del video: solo se usa para calcular cuándo debería empezar a desaparecer, que así nunca llega).",
+    "pos_y": 0.3265,
+    "origen": "clon de movistar-cta-final-square.json: texto 'Dale clic|en el anuncio' → 'Escríbenos|por WhatsApp'; inferior.margenSuperiorPx -50→10 (el -50 original hacía que el nivel de abajo quedara pegado/superpuesto al de arriba); titulo.duracionSeg 5→999 para eliminar la animación de salida (letrasJuntan/mascaraVertical de cada nivel siempre animan su propia salida cerca de duracionSeg, sin importar el animacionSalida general — extender duracionSeg muy por encima de la duración real del clip es la forma de desactivarla sin tocar código)."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 999,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.3265,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.8,
+    "tresNiveles": {
+      "superior": {
+        "fuente": { "familia": "Mrs Hannah" },
+        "tamano": 105,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "tamanoMaximo": 145,
+        "alineacion": "centro",
+        "sombra": { "color": "#000000A0", "desplazamiento": 4, "blur": 8, "halo": true }
+      },
+      "medio": {
+        "fuente": { "familia": "Grift ExtBd" },
+        "tamano": 110,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -50,
+        "alineacion": "centro",
+        "ajustarAlAncho": false,
+        "sombra": { "color": "#000000A0", "desplazamiento": 4, "blur": 8, "halo": true }
+      },
+      "inferior": {
+        "fuente": { "familia": "Grift Light" },
+        "tamano": 56,
+        "color": "#FFFFFF",
+        "trackingPx": 0,
+        "mayusculas": false,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": 10,
+        "alineacion": "centro",
+        "sombra": { "color": "#000000A0", "desplazamiento": 4, "blur": 8, "halo": true }
+      }
+    }
+  }
+}

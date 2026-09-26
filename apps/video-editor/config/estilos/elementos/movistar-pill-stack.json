@@ -1,0 +1,35 @@
+{
+  "clave": "movistar-pill-stack",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "pill-stack",
+  "descripcion": "Bloque de 3 pills pegados (sin espacio entre niveles) que entran en cascada. TODO APROBADO (2026-09-24), no tocar. NIVEL 1: pill blanco 'Cámbiate a Movistar' con la M de Movistar animada dentro del círculo con borde celeste + chevrón, padding 16px 25px, SIN líneas decorativas; se ajusta a su contenido y define el ancho del bloque. NIVEL 2: pill azul #0D5DA6 del mismo ancho que el nivel 1 pero más alto (padding 26px 30px), ícono de wifi 164px corrido -20px a la izquierda, divisor, 'Internet' blanco 58px y 'ilimitado' turquesa #4FE3D6 76px. NIVEL 3: pill blanco de precio al 85% del ancho, centrado, con borde celeste de 5px (colorAcento), 'S/39.90' todo del mismo tamaño (118px) en Grift Black (~72% del ancho del pill), 'Solo otras líneas' en bold 36px con margin-top -15px; 4 líneas celestes (41x10px) FUERA del pill, en diagonal apuntando hacia él (> a la izquierda, < a la derecha).",
+  "origen": "apps/render-video/src/compositions/PillStack.tsx (composición 'pill-stack'). Los tamaños/paddings de los niveles están dentro del componente, no en props: NO cambiar PillStack.tsx para otro video sin crear una variante. La M se pasa como data URI base64 en 'logoMUrl' (Chromium no carga file://). Referencia de uso: guion 'El cuaderno del ahorro' (guion-cuaderno-ahorro/), arriba al final, posicionYFrac 0.17.",
+  "como_reutilizar": [
+    "Copiar 'props', agregar logoMUrl = 'data:image/png;base64,'+base64 de /Users/renzo/MOVISTAR EDITS/tomas/logo-m.png.",
+    "Cambiar solo textoCta, textoWifiPrincipal/Secundario, valorPrecio y etiquetaPrecio.",
+    "Renderizar: tsx src/precio-card-cli.ts '<props>' salida.mov pill-stack (apps/render-video); componer con ffmpeg overlay (tiene canal alfa). Ajustar durationSec al tramo donde debe verse."
+  ],
+  "props": {
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "anchoMaximoFrac": 0.8074,
+    "separacionPx": 0,
+    "colorAcento": "#3EC6FF",
+    "colorCtaFondo": "#FFFFFF",
+    "colorCtaTexto": "#0E1F4D",
+    "textoCta": "Cámbiate a Movistar",
+    "colorWifiFondo": "#0D5DA6",
+    "colorWifiTexto": "#FFFFFF",
+    "colorWifiAcento": "#4FE3D6",
+    "textoWifiPrincipal": "Internet",
+    "textoWifiSecundario": "ilimitado",
+    "colorPrecioFondo": "#FFFFFF",
+    "colorPrecioTexto": "#0E1F4D",
+    "valorPrecio": "S/ 39.90",
+    "etiquetaPrecio": "Solo otras líneas",
+    "durationSec": 5.0,
+    "posicionYFrac": 0.17
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "clave": "movistar-titulo-gruesa-serif",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Título de apertura de Movistar, usa los 3 niveles: superior 'Grift Black' azul marino que envuelve a 2 líneas por ancho angosto (anchoMaximoFrac 0.74, tamaño 96, interlineado 0.92 apretado); medio+inferior comparten 'Cherishline Demo' (script manuscrita, con acentos español) azul medio tamaño 150 — 'inferior' es la 2da línea ('lo demás.') como nivel aparte para poder moverla sola: margenSuperiorPx -80 (bien pegada a la de arriba) y desplazamientoXPx 40 (corrida a la derecha, vía CSS translate para no empujar el ancho/wrap). Sombra blanca halo grande (blur 30) detrás de las 3 líneas para que resalten sobre fondos claros. 1080x1920.",
+  "aplica": {
+    "texto": "\"No cambies tu número. | Cambia todo | lo demás.\"  (3 partes: superior navy 2 líneas, medio y inferior comparten la fuente/color script, 'lo demás.' con su propio offset)",
+    "flags": [
+      "--duracion",
+      "3.2"
+    ],
+    "pos_y": 0.42,
+    "origen": "copiado de az-titulo-tomas.json y adaptado: se quita 'ajustarAlAncho'/'reducirAlAncho' de los 2 niveles usados para que el texto envuelva naturalmente a 2 líneas dentro de anchoMaximoFrac, en vez de escalarse a 1 sola línea."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 3.2,
+    "tamano": 88,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.264,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.74,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Grift Black"
+        },
+        "tamano": 96,
+        "color": "#0E1F4D",
+        "interlineado": 0.92,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": 10,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Cherishline Demo"
+        },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": -75,
+        "desplazamientoXPx": 105,
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        }
+      }
+    }
+  }
+}

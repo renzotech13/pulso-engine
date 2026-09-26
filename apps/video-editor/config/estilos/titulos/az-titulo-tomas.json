@@ -1,0 +1,75 @@
+{
+  "clave": "az-titulo-tomas",
+  "tipo": "titulo",
+  "marca": "az",
+  "descripcion": "Título de apertura de 3 niveles de AZ para tomas y ADS: script blanco 'Mrs Hannah' con ola de letras (arriba, ajustado al ancho), palabra clave 'Scholar' en celeste #BAE0FD (centro, 170 px) y línea 'Helvetica' en mayúsculas con tracking (abajo, 40 px). Sombra ligera. Posición vertical 0.6 (centro-bajo). Entra a los 0.9 s y sale a los 0.65 s; dura 5 s.",
+  "aplica": {
+    "texto": "\"Tu socio se fue, | SIGUE SIENDO DUEÑO | hasta que firma su salida\"  (3 partes separadas por |)",
+    "flags": [
+      "--duracion",
+      "5"
+    ],
+    "pos_y": 0.6,
+    "origen": "config/presets/az-tomas-3-niveles.json → titulo, con los valores que usaba batch.py / render_ads.py (--llenar-superior on, --ancho-maximo 0.78, --tam-medio 170, --tam-inferior 40, --espacio-medio -25, --espacio-inferior -10, --color-medio #BAE0FD, --pos-y 0.6, --sombra on) ya copiados a la sección"
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 112,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "ajustarAlAncho": true,
+        "tamanoMaximo": 150,
+        "sombra": {
+          "color": "#00000066",
+          "desplazamiento": 2
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Scholar"
+        },
+        "tamano": 170,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -25,
+        "sombra": {
+          "color": "#00000066",
+          "desplazamiento": 2
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Helvetica"
+        },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10,
+        "sombra": {
+          "color": "#00000066",
+          "desplazamiento": 2
+        }
+      }
+    }
+  }
+}

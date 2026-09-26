@@ -1,0 +1,33 @@
+{
+  "clave": "movistar-precio-ilimitado",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "precio-card-plan",
+  "descripcion": "Card de precio 'Plan desde S/39.90 | ∞ Internet ilimitado' con efecto de luz viajera en el borde (dos cometas girando en sentido horario que se van agrandando hasta iluminar todo el borde). Versión APROBADA por el cliente — el archivo ya renderizado está guardado en disco, no hace falta re-renderizar la composición salvo que cambie el texto/precio.",
+  "origen": "apps/render-video/src/compositions/PrecioCardPlan.tsx. Archivo ya renderizado y aprobado: /Users/renzo/MOVISTAR EDITS/precio-card-plan-borde-luz-TEST.mp4 (5.04s, 1080x1920, fondo sólido #202020 SIN canal alfa — hay que quitarle el fondo con chroma key al componerlo, ver abajo).",
+  "como_reutilizar": [
+    "CASO A — mismo texto/precio (lo más común): usar directamente el archivo ya renderizado, no volver a renderizar.",
+    "  1. Componer sobre el video base con chroma key (el fondo es un gris sólido 0x202020, no transparencia real):",
+    "     ffmpeg -i base.mp4 -i precio-card-plan-borde-luz-TEST.mp4 -filter_complex \"[1:v]colorkey=0x202020:0.12:0.08[keyed];[0:v][keyed]overlay=0:<offsetY>\" salida.mp4",
+    "  2. El card internamente ya trae su propia entrada + SALIDA (se achica y desaparece) dentro de esos 5.04s. Si el card debe quedarse visible más tiempo del que dura el clip (p. ej. porque el tramo de video es más largo), NO extender repitiendo el clip entero (se ve el 'fantasma' de la salida a medio animar) — en vez de eso: cortar el clip real en el segundo ~2.5s (antes de que arranque la salida, se ve fijo el card completo), congelar ese frame (ffmpeg -ss 2.5 -update 1 -vframes 1) y extenderlo con ese frame congelado (ffmpeg -loop 1 -framerate <fps del video> -i frame.png -t <segundos que faltan>) concatenado después del recorte real. El brillo del borde queda congelado en la posición donde estaba en ese frame (no sigue girando) — es la única limitación conocida de este método.",
+    "CASO B — cambia el precio o el texto: hay que re-renderizar la composición 'precio-card-plan' con precio-card-cli.ts (apps/render-video) usando el bloque 'props' de abajo como base, cambiando 'valorIzquierda' y/o 'textoDerecha'. El resultado sale CON canal alfa (prores 4444, .mov) — en ese caso el paso de chroma key no hace falta, se compone directo con overlay."
+  ],
+  "props": {
+    "durationSec": 5,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "etiquetaIzquierda": "Plan desde",
+    "valorIzquierda": "S/ 39.90",
+    "iconoDerecha": "infinito",
+    "textoDerecha": "Internet | ilimitado",
+    "colorFondoInicio": "#4FA8E8",
+    "colorFondoFin": "#0D5DA6",
+    "colorTexto": "#FFFFFF",
+    "colorBorde": "#FFFFFF",
+    "bordeGrosorPx": 4,
+    "bordeVelocidadSeg": 3.2,
+    "posicionYFrac": 0.82,
+    "anchoMaximoFrac": 0.9
+  }
+}

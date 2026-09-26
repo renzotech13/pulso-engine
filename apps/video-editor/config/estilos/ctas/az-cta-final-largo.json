@@ -1,0 +1,94 @@
+{
+  "clave": "az-cta-final-largo",
+  "tipo": "cta",
+  "marca": "az",
+  "descripcion": "CTA final de 3 niveles de AZ para palabras clave de 9 letras o más (IMPUESTOS, EMPRENDER): 'escríbeme' en script blanco 'Mrs Hannah' (105 px, alineado a la izquierda), palabra clave grande 'Grift ExtBd' en celeste #BAE0FD al centro y remate 'Grift Light' a la derecha; sombra fuerte. Entre niveles queda -36 px (se abre para palabras más largas porque la clave sale más chica). Sin velo oscuro: se apoya en la sombra.",
+  "aplica": {
+    "texto": "\"escríbeme | SOCIO | y te mando la guía del cambio societario\"",
+    "segundos": "desde que la voz dice 'Escríbeme' (menos 0.05 s) hasta el último cuadro",
+    "flags": [
+      "--llenar-medio",
+      "on",
+      "--ancho-maximo",
+      "0.88",
+      "--espacio-medio",
+      "-36",
+      "--espacio-inferior",
+      "-36",
+      "--tam-superior",
+      "105"
+    ],
+    "pos_y": 0.3265,
+    "velo": false,
+    "origen": "config/presets/cta-referencia-3-niveles.json → titulo (nuevo_formato.py, NF_SUBS=black); los valores de las banderas y la sombra fuerte ya están copiados a la sección. NOTA: `estilo cta` usa bin/cta-sostenido.sh, que siempre pone el velo oscuro de Aura; AZ no lleva velo (velo=false)."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.3265,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.88,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 105,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "tamanoMaximo": 145,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Grift ExtBd"
+        },
+        "tamano": 150,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -36,
+        "alineacion": "centro",
+        "ajustarAlAncho": true,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Grift Light"
+        },
+        "tamano": 76,
+        "color": "#FFFFFF",
+        "trackingPx": 0,
+        "mayusculas": false,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -36,
+        "alineacion": "derecha",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      }
+    }
+  }
+}

@@ -80,6 +80,10 @@ type VideoProjectVideoRow = Database["public"]["Tables"]["video_project_videos"]
 type VideoProjectVideoInsert = Database["public"]["Tables"]["video_project_videos"]["Insert"];
 type VideoProjectVideoUpdate = Database["public"]["Tables"]["video_project_videos"]["Update"];
 type VideoPresetRow = Database["public"]["Tables"]["video_presets"]["Row"];
+type VideoBgReplaceJobRow = Database["public"]["Tables"]["video_bg_replace_jobs"]["Row"];
+type VideoBgReplaceJobUpdate = Database["public"]["Tables"]["video_bg_replace_jobs"]["Update"];
+type VideoUgcJobRow = Database["public"]["Tables"]["video_ugc_jobs"]["Row"];
+type VideoUgcJobUpdate = Database["public"]["Tables"]["video_ugc_jobs"]["Update"];
 
 /**
  * Tenant-scoped handle for agent code. Since service_role bypasses RLS,
@@ -187,6 +191,10 @@ export interface TenantScopedClient {
   updateVideoProjectVideo(id: string, patch: Omit<VideoProjectVideoUpdate, "tenant_id">): Promise<void>;
   /** Tenant's own preset if the id belongs to them, else the global one (tenant_id null) — same "override or global" shape as getAgentRegistration. */
   getVideoPreset(id: string): Promise<VideoPresetRow | null>;
+  getVideoBgReplaceJob(id: string): Promise<VideoBgReplaceJobRow | null>;
+  updateVideoBgReplaceJob(id: string, patch: Omit<VideoBgReplaceJobUpdate, "tenant_id">): Promise<void>;
+  getVideoUgcJob(id: string): Promise<VideoUgcJobRow | null>;
+  updateVideoUgcJob(id: string, patch: Omit<VideoUgcJobUpdate, "tenant_id">): Promise<void>;
 }
 
 export function createTenantScopedClient(
@@ -821,6 +829,47 @@ export function createTenantScopedClient(
       if (!data) return null;
       if (data.tenant_id !== null && data.tenant_id !== tenantId) return null;
       return data;
+    },
+
+    async getVideoBgReplaceJob(id) {
+      const { data, error } = await client
+        .from("video_bg_replace_jobs")
+        .select("*")
+        .eq("id", id)
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+
+      if (error) {
+        throw new TenantIsolationError(`failed to get video_bg_replace_job ${id} for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async getVideoUgcJob(id) {
+      const { data, error } = await client.from("video_ugc_jobs").select("*").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+      if (error) {
+        throw new TenantIsolationError(`failed to get video_ugc_job ${id} for tenant ${tenantId}`, error);
+      }
+      return data;
+    },
+
+    async updateVideoUgcJob(id, patch) {
+      const { error } = await client.from("video_ugc_jobs").update(patch).eq("id", id).eq("tenant_id", tenantId);
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_ugc_job ${id} for tenant ${tenantId}`, error);
+      }
+    },
+
+    async updateVideoBgReplaceJob(id, patch) {
+      const { error } = await client
+        .from("video_bg_replace_jobs")
+        .update(patch)
+        .eq("id", id)
+        .eq("tenant_id", tenantId);
+
+      if (error) {
+        throw new TenantIsolationError(`failed to update video_bg_replace_job ${id} for tenant ${tenantId}`, error);
+      }
     },
   };
 }

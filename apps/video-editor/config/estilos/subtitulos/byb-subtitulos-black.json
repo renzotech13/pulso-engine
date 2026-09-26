@@ -1,0 +1,49 @@
+{
+  "clave": "byb-subtitulos-black",
+  "tipo": "subtitulos",
+  "marca": "byb",
+  "descripcion": "Subtítulos Black de B&B School (ads Star Beauty): igual que az-subtitulos-black (UNA fila, máx. 3 palabras, 'Grift Black' 74 px en mayúsculas, blancos con sombra, centrados, sin parpadeo) pero con la palabra activa en dorado #E3B341 y la firma fija '@bybschool' ('byb' en dorado #E3B341).",
+  "aplica": {
+    "texto": "guion exacto de la voz (texto o ruta .txt): se alinea con Whisper local",
+    "flags": [],
+    "origen": "copia de az-subtitulos-black con firma y color de B&B School"
+  },
+  "subtitulos": {
+    "tamano": 74,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#E3B341",
+    "fuente": {
+      "familia": "Grift Black",
+      "peso": 900
+    },
+    "fondoPalabraActiva": {
+      "activo": false,
+      "color": "#E3B341",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "sombra": {
+      "color": "#000000D9",
+      "desplazamiento": 5
+    },
+    "posicion": "centro",
+    "margenSeguroInferiorPx": 0,
+    "maxCaracteresPorLinea": 26,
+    "maxLineas": 1,
+    "palabrasPorBloque": 3,
+    "mayusculas": true,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true,
+    "marca": {
+      "texto": "@bybschool",
+      "tamano": 40,
+      "color": "#FFFFFF",
+      "colorAcento": "#E3B341",
+      "acento": "byb",
+      "margenSuperiorPx": -6
+    }
+  }
+}

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { withFeedback } from "./flash";
 import { createSupabaseServerClient } from "./supabase/server";
 import type { Json } from "@pulso/db/types";
@@ -80,6 +81,52 @@ export async function createVideoProjectAction(input: {
 
   revalidatePath("/video-editor");
   return { projectId: project.id };
+}
+
+const bgReplaceJobInput = z.object({
+  tenantId: z.string().uuid(),
+  nombre: z.string().trim().min(1).max(200),
+  sourcePath: z.string().min(1),
+  backgroundPath: z.string().min(1),
+  cutPosition: z.number().min(0).max(1),
+  blendBand: z.number().gt(0).max(1),
+});
+
+/**
+ * Same "upload first, then call as a plain function" flow as
+ * createVideoProjectAction — the two files are already in Storage by the
+ * time this runs (bg-replace-form.tsx).
+ */
+export async function createBgReplaceJobAction(input: z.input<typeof bgReplaceJobInput>): Promise<{ jobId: string }> {
+  const parsed = bgReplaceJobInput.parse(input);
+  // RLS on video_bg_replace_jobs already rejects a foreign tenant_id, but
+  // the paths are free text: without this, a row could point the worker
+  // (service_role) at another tenant's uploads.
+  const tenantPrefix = `${parsed.tenantId}/`;
+  if (!parsed.sourcePath.startsWith(tenantPrefix) || !parsed.backgroundPath.startsWith(tenantPrefix)) {
+    throw new Error("las rutas de los archivos no pertenecen a este negocio");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: job, error: insertError } = await supabase
+    .from("video_bg_replace_jobs")
+    .insert({
+      tenant_id: parsed.tenantId,
+      nombre: parsed.nombre,
+      source_path: parsed.sourcePath,
+      background_path: parsed.backgroundPath,
+      cut_position: parsed.cutPosition,
+      blend_band: parsed.blendBand,
+    })
+    .select("id")
+    .single();
+  if (insertError || !job) throw new Error(insertError?.message ?? "no se pudo crear el trabajo");
+
+  const { error: rpcError } = await supabase.rpc("request_video_bg_replace", { target_job_id: job.id });
+  if (rpcError) throw new Error(rpcError.message);
+
+  revalidatePath("/video-editor/fondo");
+  return { jobId: job.id };
 }
 
 async function saveVideoReviewActionImpl(formData: FormData): Promise<void> {

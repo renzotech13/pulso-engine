@@ -1,0 +1,75 @@
+{
+  "clave": "aura-cta-final",
+  "tipo": "cta",
+  "marca": "aura",
+  "descripcion": "CTA final de 3 niveles: script 'Day Dreaming' a la izquierda, palabra clave 'Grift ExtBd' grande y crema en el centro, remate 'Grift Light' a la derecha. Con velo oscuro arriba (entra en 0.5 s) y sostenido hasta el último cuadro, sin animación de salida.",
+  "aplica": {
+    "texto": "\"escríbeme | CLAVE | y te mando la guía\"",
+    "segundos": "últimos N s del video (en organico.sh entra 0.5 s antes de que la voz diga 'Escríbeme')",
+    "flags": [
+      "--sombra",
+      "on",
+      "--llenar-medio",
+      "on",
+      "--ancho-maximo",
+      "0.88",
+      "--espacio-medio",
+      "-30",
+      "--espacio-inferior",
+      "-10"
+    ],
+    "pos_y": 0.3,
+    "velo": true,
+    "origen": "config/presets/cta-aura-3-niveles.json → titulo + _herramientas/cta-final-sostenido.sh"
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Day Dreaming"
+        },
+        "tamano": 135,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "tamanoMaximo": 145,
+        "alineacion": "izquierda"
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Grift ExtBd"
+        },
+        "tamano": 150,
+        "color": "#FFF3B8",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -18,
+        "alineacion": "centro"
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Grift Light"
+        },
+        "tamano": 76,
+        "color": "#FFFFFF",
+        "trackingPx": 0,
+        "mayusculas": false,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -4,
+        "alineacion": "derecha"
+      }
+    }
+  }
+}

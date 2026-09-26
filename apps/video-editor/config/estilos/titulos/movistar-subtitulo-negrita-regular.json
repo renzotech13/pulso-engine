@@ -1,0 +1,88 @@
+{
+  "clave": "movistar-subtitulo-negrita-regular",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Título SECUNDARIO de 3 líneas, más chico (52px), que va DEBAJO del título inicial (movistar-titulo-inicial-este-mes), pegado al mismo margen izquierdo. Tipografía Grift: la línea de arriba en NEGRITA (peso 700, 'Pásate a Movistar') y las dos de abajo en REGULAR (peso 400), navy #0E1F4D con halo blanco. Cada nivel va en UNA línea (reducirAlAncho); posicionYFrac 0.425 lo deja justo bajo 'lo demás.'. En la referencia del cliente la 'y' cierra la primera línea; aquí abre la segunda porque cada nivel admite una sola tipografía. Con el título inicial se aplican en dos pasadas de titulo-cli.ts (primero el inicial, luego este sobre la salida).",
+  "aplica": {
+    "texto": "\"Pásate a Movistar | y disfruta más beneficios, | al mismo precio o menos.\"",
+    "flags": [
+      "--duracion",
+      "4.3"
+    ],
+    "pos_y": 0.425,
+    "origen": "nuevo, sobre la base de movistar-titulo-gruesa-serif-izquierda (animación fadeIn/fadeOut, halo blanco); fuentes Grift Bold/Regular en vez de Grift Black/Cherishline."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 4.3,
+    "tamano": 52,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.425,
+    "bloqueDesplazamientoXPx": -190,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.9,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Grift",
+          "peso": 700
+        },
+        "tamano": 52,
+        "color": "#0E1F4D",
+        "interlineado": 1.0,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        },
+        "reducirAlAncho": true
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Grift",
+          "peso": 400
+        },
+        "tamano": 52,
+        "color": "#0E1F4D",
+        "interlineado": 1.0,
+        "margenSuperiorPx": -4,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        },
+        "reducirAlAncho": true
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Grift",
+          "peso": 400
+        },
+        "tamano": 52,
+        "color": "#0E1F4D",
+        "interlineado": 1.0,
+        "margenSuperiorPx": -4,
+        "alineacion": "izquierda",
+        "sombra": {
+          "color": "#FFFFFFFF",
+          "desplazamiento": 0,
+          "blur": 46,
+          "halo": true,
+          "grosorPx": 10
+        },
+        "reducirAlAncho": true
+      }
+    }
+  }
+}

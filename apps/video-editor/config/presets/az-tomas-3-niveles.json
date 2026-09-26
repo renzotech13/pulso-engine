@@ -1,0 +1,102 @@
+{
+  "id": "az-tomas-3-niveles",
+  "nombre": "AZ Estudio Contable — tomas compiladas, título 3 niveles (#BAE0FD)",
+  "fuente": {
+    "familia": "Inter",
+    "peso": 700
+  },
+  "subtitulos": {
+    "tamano": 60,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#BAE0FD",
+    "fuente": {
+      "familia": "Georgia",
+      "peso": 700
+    },
+    "fondoPalabraActiva": {
+      "activo": false,
+      "color": "#BAE0FD",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "contorno": {
+      "color": "#000000",
+      "grosor": 4
+    },
+    "sombra": {
+      "color": "#000000B3",
+      "desplazamiento": 3
+    },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 260,
+    "maxCaracteresPorLinea": 24,
+    "maxLineas": 2,
+    "palabrasPorBloque": 5,
+    "mayusculas": false,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 112,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "ajustarAlAncho": true,
+        "tamanoMaximo": 150
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Scholar"
+        },
+        "tamano": 200,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -60
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Helvetica"
+        },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10
+      }
+    }
+  },
+  "musica": {
+    "volumenDb": -18,
+    "ducking": true,
+    "fadeInSeg": 1,
+    "fadeOutSeg": 2
+  },
+  "salida": {
+    "formato": "conservar-origen",
+    "resolucion": "1080x1920",
+    "fps": 30,
+    "crf": 18
+  }
+}

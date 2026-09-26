@@ -1,0 +1,53 @@
+{
+  "clave": "movistar-titulo-gruesa-serif-izquierda",
+  "tipo": "titulo",
+  "marca": "movistar",
+  "descripcion": "Variante SOLO para la versión vertical 1080x1920 de movistar-titulo-gruesa-serif — mismo estilo/altura (posicionYFrac 0.264 sin cambios) pero pegado al margen izquierdo en vez de centrado: los 3 niveles pasan a alineacion izquierda y el bloque entero se corre con bloqueDesplazamientoXPx para que 'No cambies'/'Cambia todo'/'lo demás.' arranquen todos desde el mismo margen izquierdo (~50px), a la par del logo horizontal y los cards en columna que también van a la izquierda en esta versión. Se quita el desplazamientoXPx:105 de 'inferior' (compensaba el centrado; con alineacion izquierda ya no hace falta). La versión centrada (movistar-titulo-gruesa-serif.json) sigue intacta para quien la use.",
+  "aplica": {
+    "texto": "\"No cambies tu número. | Cambia todo | lo demás.\"  (idéntico a movistar-titulo-gruesa-serif, solo cambia la alineación/posición horizontal)",
+    "flags": ["--duracion", "3.2"],
+    "pos_y": 0.264,
+    "origen": "clon de movistar-titulo-gruesa-serif.json: alineacion centro→izquierda en los 3 niveles, bloqueDesplazamientoXPx para pegar el bloque al margen izquierdo, sin el desplazamientoXPx de 'inferior'."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 3.2,
+    "tamano": 88,
+    "color": "#0E1F4D",
+    "posicion": "centro",
+    "posicionYFrac": 0.264,
+    "bloqueDesplazamientoXPx": -210,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "fadeIn",
+    "animacionSalida": "fadeOut",
+    "entradaSeg": 0.25,
+    "salidaSeg": 0.25,
+    "anchoMaximoFrac": 0.74,
+    "tresNiveles": {
+      "superior": {
+        "fuente": { "familia": "Grift Black" },
+        "tamano": 96,
+        "color": "#0E1F4D",
+        "interlineado": 0.92,
+        "alineacion": "izquierda",
+        "sombra": { "color": "#FFFFFFFF", "desplazamiento": 0, "blur": 46, "halo": true, "grosorPx": 10 }
+      },
+      "medio": {
+        "fuente": { "familia": "Cherishline Demo" },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": 10,
+        "alineacion": "izquierda",
+        "sombra": { "color": "#FFFFFFFF", "desplazamiento": 0, "blur": 46, "halo": true, "grosorPx": 10 }
+      },
+      "inferior": {
+        "fuente": { "familia": "Cherishline Demo" },
+        "tamano": 150,
+        "color": "#2C6FEF",
+        "margenSuperiorPx": -75,
+        "alineacion": "izquierda",
+        "sombra": { "color": "#FFFFFFFF", "desplazamiento": 0, "blur": 46, "halo": true, "grosorPx": 10 }
+      }
+    }
+  }
+}

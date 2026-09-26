@@ -1,0 +1,49 @@
+{
+  "clave": "az-subtitulos-black",
+  "tipo": "subtitulos",
+  "marca": "az",
+  "descripcion": "Subtítulos Black de AZ (formato de 45 s): UNA sola fila, máx. 3 palabras, 'Grift Black' de 74 px en mayúsculas, blancos con sombra oscura y palabra activa en celeste #BAE0FD, centrados en la pantalla (línea fluida sin parpadeo), con la firma fija '@azestudiocontable' pegada debajo ('az' en dorado #E3B341).",
+  "aplica": {
+    "texto": "guion exacto de la voz (texto o ruta .txt): se alinea con Whisper local",
+    "flags": [],
+    "origen": "config/presets/az-subs-black.json → subtitulos (incluye `marca`, que requiere el cambio de preset.ts/Overlay.tsx que la soporta). En producción los tiempos vienen de ElevenLabs with-timestamps (--bloques-json, máx. 3 palabras, puente de 0.7 s) en nuevo_formato.py."
+  },
+  "subtitulos": {
+    "tamano": 74,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#BAE0FD",
+    "fuente": {
+      "familia": "Grift Black",
+      "peso": 900
+    },
+    "fondoPalabraActiva": {
+      "activo": false,
+      "color": "#BAE0FD",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "sombra": {
+      "color": "#000000D9",
+      "desplazamiento": 5
+    },
+    "posicion": "centro",
+    "margenSeguroInferiorPx": 0,
+    "maxCaracteresPorLinea": 26,
+    "maxLineas": 1,
+    "palabrasPorBloque": 3,
+    "mayusculas": true,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true,
+    "marca": {
+      "texto": "@azestudiocontable",
+      "tamano": 40,
+      "color": "#FFFFFF",
+      "colorAcento": "#E3B341",
+      "acento": "az",
+      "margenSuperiorPx": -6
+    }
+  }
+}

@@ -7,7 +7,8 @@ import { replaceBackgroundSplit } from "./pipeline/background-replace.js";
 function usageError(): never {
   console.error(
     "uso: tsx src/bg-replace-cli.ts <video-origen> <imagen-o-video-fondo> <video-salida> " +
-      "[--corte 0.5] [--difuminado 0.15] [--ancho 1080] [--fps 30] [--modelo ruta.onnx]",
+      "[--corte 0.5] [--difuminado 0.15] [--ancho 1080] [--fps 30] [--modelo ruta.onnx] " +
+      "[--fondo-posicion-y 0.5]",
   );
   process.exit(1);
 }
@@ -36,6 +37,11 @@ async function main() {
       workWidth: Number(flag("ancho", "1080")),
       outputFps: Number(flag("fps", "30")),
       modelPath,
+      // Qué franja de la toma de fondo se conserva al recortarla — 0 el
+      // borde de arriba, 1 el de abajo, 0.5 (default) el centro. Con una
+      // toma vertical, subir esto (ej. 0.2) evita que el centro de la toma
+      // caiga justo donde arranca la cabeza de la persona.
+      backgroundPositionY: Number(flag("fondo-posicion-y", "0.5")),
     },
     output,
   );

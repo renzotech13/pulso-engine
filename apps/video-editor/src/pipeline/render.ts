@@ -17,9 +17,9 @@ import { renderLocal } from "@pulso/render-video/render";
 import { AppError } from "@pulso/shared/errors";
 import { computeSegmentStartOffsets, sceneKeyForFile } from "./alignment.js";
 import { denoiseAudio } from "./denoise.js";
-import { extractAudioForDenoise, FfmpegNotFoundError, InvalidMediaError } from "./ffmpeg.js";
+import { extractAudioForDenoise, FfmpegNotFoundError, InvalidMediaError, probeAsset } from "./ffmpeg.js";
 import { mixAudio } from "./music.js";
-import { resolveSubtitleAnimation, resolveTitleAnimation, type Preset } from "./preset.js";
+import { resolveNivelEfecto, resolveSubtitleAnimation, resolveTitleAnimation, splitTresNivelesTexto, type Preset } from "./preset.js";
 import type { Edl, ScriptVideo, SubtitleTrack } from "./types.js";
 
 const run = promisify(execFile);
@@ -263,6 +263,33 @@ async function concatenateSegmentsWithTransitions(
   return offsets[offsets.length - 1]! + (last.fin - last.inicio);
 }
 
+/** fadeIn only ever makes sense as an entrance — an unresolved/wrong-direction value collapses to "ninguna", same "degrada de forma explícita" rule as resolveTitleAnimation itself. */
+function resolveTituloEntrada(value: string): "fadeIn" | "wipeVertical" | "ninguna" {
+  const resolved = resolveTitleAnimation(value);
+  return resolved === "fadeIn" || resolved === "wipeVertical" ? resolved : "ninguna";
+}
+
+function resolveTituloSalida(value: string): "fadeOut" | "wipeVertical" | "ninguna" {
+  const resolved = resolveTitleAnimation(value);
+  return resolved === "fadeOut" || resolved === "wipeVertical" ? resolved : "ninguna";
+}
+
+/** Only present when the preset actually opted into the 3-tier título template (see tituloSchema's refine — tt.tresNiveles is guaranteed set whenever estilo is "tresNiveles"). */
+function buildTresNivelesProp(tt: Preset["titulo"], tituloTexto: string) {
+  if (tt.estilo !== "tresNiveles" || !tt.tresNiveles) return undefined;
+  const [superior, medio, inferior] = splitTresNivelesTexto(tituloTexto);
+  const buildNivel = (texto: string, nivel: NonNullable<Preset["titulo"]["tresNiveles"]>["superior"]) => ({
+    texto,
+    ...nivel,
+    efecto: resolveNivelEfecto(nivel.efecto),
+  });
+  return {
+    superior: buildNivel(superior, tt.tresNiveles.superior),
+    medio: buildNivel(medio, tt.tresNiveles.medio),
+    inferior: buildNivel(inferior, tt.tresNiveles.inferior),
+  };
+}
+
 function buildOverlayProps(
   preset: Preset,
   scriptVideo: ScriptVideo,
@@ -290,12 +317,16 @@ function buildOverlayProps(
       contorno: s.contorno,
       sombra: s.sombra,
       fondo: s.fondo,
+      fuente: s.fuente,
+      fondoPalabraActiva: s.fondoPalabraActiva,
       posicion: s.posicion,
       margenSeguroInferiorPx: s.margenSeguroInferiorPx,
       maxCaracteresPorLinea: s.maxCaracteresPorLinea,
       maxLineas: s.maxLineas,
       mayusculas: s.mayusculas,
       resaltarPalabraActiva: s.resaltarPalabraActiva,
+      lineaUnicaFluida: s.lineaUnicaFluida,
+      marca: s.marca,
       animacion: resolveSubtitleAnimation(s.animacion),
     },
     // Absent entirely (not just empty text) when the script says not to show
@@ -311,11 +342,16 @@ function buildOverlayProps(
             color: tt.color,
             fondo: tt.fondo,
             posicion: tt.posicion,
+            posicionYFrac: tt.posicionYFrac,
+            bloqueDesplazamientoXPx: tt.bloqueDesplazamientoXPx,
+            anchoMaximoFrac: tt.anchoMaximoFrac,
             margenSeguroPx: tt.margenSeguroPx,
-            animacionEntrada: resolveTitleAnimation(tt.animacionEntrada) === "fadeIn" ? ("fadeIn" as const) : ("ninguna" as const),
-            animacionSalida: resolveTitleAnimation(tt.animacionSalida) === "fadeOut" ? ("fadeOut" as const) : ("ninguna" as const),
+            animacionEntrada: resolveTituloEntrada(tt.animacionEntrada),
+            animacionSalida: resolveTituloSalida(tt.animacionSalida),
             entradaSeg: tt.entradaSeg,
             salidaSeg: tt.salidaSeg,
+            estilo: tt.estilo,
+            tresNiveles: buildTresNivelesProp(tt, scriptVideo.titulo),
           }
         : undefined,
   };
@@ -430,6 +466,107 @@ export async function renderProject(
 
     await compositeOverlay(concatenatedPath, overlayPath, mixedAudioPath, spec, outputMp4Path);
     return { outputMp4Path };
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+export interface OverlayTituloOptions {
+  /** Overrides preset.titulo.duracionSeg for this one call — handy for a quick "make it 5s" without hand-editing the preset file. */
+  duracionSeg?: number;
+}
+
+/**
+ * Standalone sibling of renderProject for a video that already went through
+ * its own editing pass OUTSIDE the guion pipeline (e.g. bg-replace-multi's
+ * own output) and just needs a título on top — no transcription, no EDL, no
+ * subtitles, no music mixing. The overlay is fully transparent once
+ * titulo.duracionSeg elapses (same showTitle gate every other overlay in
+ * this pipeline already uses), so the source keeps playing untouched after
+ * that — nothing here re-encodes or cuts the rest of the video's content,
+ * only composites a título layer on top of it start-to-finish.
+ */
+export async function overlayTituloSobreVideo(
+  inputVideoPath: string,
+  outputVideoPath: string,
+  preset: Preset,
+  tituloTexto: string,
+  options: OverlayTituloOptions = {},
+): Promise<void> {
+  const probe = await probeAsset(inputVideoPath);
+  const spec: OutputSpec = { width: probe.width, height: probe.height, fps: probe.fps, crf: preset.salida.crf };
+  const scriptVideo: ScriptVideo = {
+    id: "standalone",
+    titulo: tituloTexto,
+    mostrarTitulo: true,
+    guion: "",
+    carpetaTomas: null,
+    escenas: [],
+    necesitaRevision: false,
+  };
+  const subtitleTrack: SubtitleTrack = { videoId: "standalone", bloques: [] };
+  const effectivePreset: Preset =
+    options.duracionSeg !== undefined
+      ? { ...preset, titulo: { ...preset.titulo, duracionSeg: options.duracionSeg } }
+      : preset;
+
+  const workDir = await mkdtemp(path.join(tmpdir(), "pulso-titulo-overlay-"));
+  try {
+    const overlayBuffer = await renderOverlay(effectivePreset, scriptVideo, subtitleTrack, probe.durationSec, spec);
+    const overlayPath = path.join(workDir, "overlay.mov");
+    await writeFile(overlayPath, overlayBuffer);
+    // inputVideoPath doubles as both the picture AND the audio source (no
+    // separate mixed-audio step exists here) — compositeOverlay just reads
+    // whichever file is passed for each role, so passing the same path twice
+    // keeps its own original audio untouched.
+    await compositeOverlay(inputVideoPath, overlayPath, inputVideoPath, spec, outputVideoPath);
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
+export interface OverlaySubtitulosOptions {
+  /** Shows a título on top of the subtitles for this many seconds, same as overlayTituloSobreVideo — omit for subtitles only. */
+  tituloTexto?: string;
+  duracionTituloSeg?: number;
+}
+
+/**
+ * Standalone sibling of overlayTituloSobreVideo for a video whose word-level
+ * subtitleTrack was already built OUTSIDE the guion pipeline (no EDL, no
+ * multi-take matching — see subtitulos-cli.ts) and just needs those words
+ * burned in as karaoke captions. Same transparent-overlay-then-composite
+ * shape as every other standalone entry point here.
+ */
+export async function overlaySubtitulosSobreVideo(
+  inputVideoPath: string,
+  outputVideoPath: string,
+  preset: Preset,
+  subtitleTrack: SubtitleTrack,
+  options: OverlaySubtitulosOptions = {},
+): Promise<void> {
+  const probe = await probeAsset(inputVideoPath);
+  const spec: OutputSpec = { width: probe.width, height: probe.height, fps: probe.fps, crf: preset.salida.crf };
+  const scriptVideo: ScriptVideo = {
+    id: "standalone",
+    titulo: options.tituloTexto ?? "",
+    mostrarTitulo: options.tituloTexto !== undefined,
+    guion: "",
+    carpetaTomas: null,
+    escenas: [],
+    necesitaRevision: false,
+  };
+  const effectivePreset: Preset =
+    options.duracionTituloSeg !== undefined
+      ? { ...preset, titulo: { ...preset.titulo, duracionSeg: options.duracionTituloSeg } }
+      : preset;
+
+  const workDir = await mkdtemp(path.join(tmpdir(), "pulso-subtitulos-overlay-"));
+  try {
+    const overlayBuffer = await renderOverlay(effectivePreset, scriptVideo, subtitleTrack, probe.durationSec, spec);
+    const overlayPath = path.join(workDir, "overlay.mov");
+    await writeFile(overlayPath, overlayBuffer);
+    await compositeOverlay(inputVideoPath, overlayPath, inputVideoPath, spec, outputVideoPath);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }

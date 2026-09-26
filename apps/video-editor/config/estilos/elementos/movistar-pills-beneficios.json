@@ -1,0 +1,62 @@
+{
+  "clave": "movistar-pills-beneficios",
+  "tipo": "elemento-remotion",
+  "marca": "movistar",
+  "composicion": "feature-cards",
+  "descripcion": "Los 4 pills de beneficios (única versión vigente; la clave anterior 'movistar-pills-beneficios-celeste' se eliminó el 2026-09-24) con los pills ALTOS: alturaTarjeta 100→130 (+15px arriba y +15px abajo) y el círculo del ícono con la MISMA altura que el pill (circuloPx 130, el ícono crece proporcionalmente). anchoTarjetaPx 335→347 para compensar que el texto se corre 12px a la derecha con el círculo más grande (el margen derecho del texto sigue igual). Todo lo demás igual: ícono celeste con borde animado, texto navy. bloqueDesplazamientoXPx -190→-146 (44px más a la derecha) para que el borde izquierdo de los círculos quede alineado con el margen izquierdo de los títulos movistar-titulo-inicial-este-mes y movistar-subtitulo-negrita-regular.",
+  "origen": "apps/render-video/src/compositions/FeatureCards.tsx — renderizado con precio-card-cli.ts, composición 'feature-cards'. El brillo del borde del ícono se agregó en esta sesión (props bordeIconoAnimado / bordeIconoVelocidadSeg, ver el commit/diff de FeatureCards.tsx).",
+  "como_reutilizar": [
+    "1. Copiar el bloque 'props' de abajo tal cual.",
+    "2. Cambiar SOLO 'items[].texto' (separado por '|' = líneas dentro del pill) y, si hace falta, 'items[].icono' (chip | casa | delivery | cobertura).",
+    "3. Ajustar 'durationSec' para que cubra todo el tramo de video donde debe verse (no tiene animación de salida propia: se queda fijo en pantalla el resto de esa duración una vez que entraron los 4).",
+    "4. Si el primer texto cambia y es más largo/corto que 'tu mismo número', puede hacer falta recalcular 'anchoTarjetaPx' (ver nota abajo) para que el margen derecho del primer pill se mantenga en ~10px.",
+    "5. Renderizar: tsx src/precio-card-cli.ts '<propsJson>' salida.mov feature-cards (desde apps/render-video). Sale con canal alfa (prores 4444) — para componer sobre un video real: ffmpeg -i base.mp4 -i salida.mov -filter_complex \"[0:v][1:v]overlay=0:0:shortest=1\" ...",
+    "6. Posición: bloqueDesplazamientoXPx=-190 lo deja pegado al margen izquierdo (mismo margen que el título inicial con bloqueDesplazamientoXPx=-210). posicionYFrac es el centro vertical del bloque de 4 pills como fracción de la altura del frame — recalcular si el video no es 1080x1920."
+  ],
+  "nota_ancho": "anchoTarjetaPx=335 y paddingDerechoPx=27 fueron calibrados a mano (por prueba visual, no hay fórmula exacta por las fuentes custom) para el texto 'tu mismo número' a tamanoTexto=30. Si el texto más largo cambia mucho, volver a probar con anchoTarjetaPx en pasos de ~10px hasta que el margen derecho se vea bien.",
+  "props": {
+    "durationSec": 10.0833,
+    "fps": 30,
+    "width": 1080,
+    "height": 1920,
+    "items": [
+      {
+        "icono": "chip",
+        "texto": "Conserva | tu mismo número"
+      },
+      {
+        "icono": "casa",
+        "texto": "Recibe tu | chip gratis | en casa"
+      },
+      {
+        "icono": "delivery",
+        "texto": "Delivery gratis | en menos de | 3 horas"
+      },
+      {
+        "icono": "cobertura",
+        "texto": "Cobertura | en todo el Perú"
+      }
+    ],
+    "colorTarjeta": "#FFFFFF",
+    "colorTexto": "#0E1F4D",
+    "colorIcono": "#3EC6FF",
+    "colorBordeIcono": "#3EC6FF",
+    "bordeIconoAnimado": true,
+    "bordeIconoVelocidadSeg": 3.2,
+    "posicionYFrac": 0.6065,
+    "anchoMaximoFrac": 0.62,
+    "tamanoTexto": 30,
+    "alturaTarjeta": 130,
+    "radioTarjeta": 24,
+    "separacionPx": 16,
+    "columnas": 1,
+    "separacionColPx": 16,
+    "margenDerechoGridPx": 0,
+    "paddingVerticalPx": 0,
+    "desplazamientoFilaSuperiorPx": 0,
+    "bloqueDesplazamientoXPx": -146,
+    "paddingDerechoPx": 27,
+    "anchoTarjetaPx": 347,
+    "circuloPx": 130
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "aura-edits",
+  "nombre": "AURA EDITS — título 3 niveles",
+  "fuente": { "familia": "Inter", "peso": 700 },
+  "subtitulos": {
+    "tamano": 60,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#FFD400",
+    "fuente": { "familia": "Georgia", "peso": 700 },
+    "fondoPalabraActiva": { "activo": true, "color": "#F5A623", "colorTexto": "#000000", "radio": 10, "paddingX": 12, "paddingY": 4 },
+    "contorno": { "color": "#000000", "grosor": 2 },
+    "sombra": { "color": "#00000080", "desplazamiento": 2 },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 260,
+    "maxCaracteresPorLinea": 24,
+    "maxLineas": 2,
+    "palabrasPorBloque": 5,
+    "mayusculas": false,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": { "fuente": { "familia": "Mrs Hannah" }, "tamano": 112, "color": "#FFFFFF", "efecto": "letrasOla", "ajustarAlAncho": true, "tamanoMaximo": 150 },
+      "medio": {
+        "fuente": { "familia": "Scholar" },
+        "tamano": 200,
+        "color": "#FDFBC0",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -60
+      },
+      "inferior": {
+        "fuente": { "familia": "Helvetica" },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10
+      }
+    }
+  },
+  "musica": { "volumenDb": -18, "ducking": true, "fadeInSeg": 1, "fadeOutSeg": 2 },
+  "salida": { "formato": "conservar-origen", "resolucion": "1080x1920", "fps": 30, "crf": 18 }
+}

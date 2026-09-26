@@ -1,0 +1,81 @@
+{
+  "clave": "az-titulo-tomas-black",
+  "tipo": "titulo",
+  "marca": "az",
+  "descripcion": "Mismo título de AZ (Mrs Hannah / Scholar celeste #BAE0FD / Helvetica) pero para el formato de 45 s con subtítulos Black centrados: va en la zona alta (posición 0.3, bajo el logo) y lleva sombra 'fuerte' (negro 63 %, 4 px, blur 8 con halo) para que se lea sobre fondos claros.",
+  "aplica": {
+    "texto": "\"Tu socio se fue, | SIGUE SIENDO DUEÑO | hasta que firma su salida\"  (3 partes separadas por |)",
+    "flags": [
+      "--duracion",
+      "5"
+    ],
+    "pos_y": 0.3,
+    "origen": "nuevo_formato.py con NF_SUBS=black (título con --pos-y 0.3 --sombra fuerte); la sombra fuerte ya está copiada a cada nivel"
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.3,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 112,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "ajustarAlAncho": true,
+        "tamanoMaximo": 150,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Scholar"
+        },
+        "tamano": 170,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -25,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Helvetica"
+        },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      }
+    }
+  }
+}

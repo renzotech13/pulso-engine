@@ -10,7 +10,12 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createServiceRoleClient, createTenantScopedClient } from "@pulso/db/worker";
+import {
+  createServiceRoleClient,
+  createTenantScopedClient,
+  type ServiceRoleClient,
+  type TenantScopedClient,
+} from "@pulso/db/worker";
 import type { Json } from "@pulso/db/types";
 import { createLogger } from "@pulso/shared/logger";
 import { probeAsset, detectSilences } from "./pipeline/ffmpeg.js";
@@ -21,7 +26,7 @@ import { buildSubtitleTrack, toSrt } from "./pipeline/subtitles.js";
 import { renderProject } from "./pipeline/render.js";
 import { presetSchema, resolveOutputSpec } from "./pipeline/preset.js";
 import { edlSchema, subtitleTrackSchema, type AudioAnalysis, type Edl, type ScriptVideo, type SubtitleTrack } from "./pipeline/types.js";
-import { ASSETS_BUCKET, OUTPUT_BUCKET, downloadToFile, uploadFile } from "./storage.js";
+import { ASSETS_BUCKET, OUTPUT_BUCKET, deleteFiles, downloadToFile, uploadFile } from "./storage.js";
 
 export interface ProcessProjectJobData {
   projectId: string;
@@ -149,6 +154,44 @@ export async function processProjectJob({ projectId, tenantId }: ProcessProjectJ
   }
 }
 
+/**
+ * Once EVERY video a project's guion describes has rendered successfully,
+ * nothing reads the raw takes or music again — transcription, EDL and
+ * subtitles already live as JSONB on video_project_videos. Deleting them
+ * here is what keeps a steady trickle of new projects from quietly filling
+ * the bucket forever. `raw_assets_cleaned_at` guards it to run once per
+ * project; a failed cleanup only logs a warning, since the render itself
+ * already succeeded by the time this runs.
+ *
+ * Trade-off worth knowing: this is also what the raw takes' storage
+ * objects "Re-renderizar con otro preset" (results/page.tsx) depends on —
+ * once this has run, that action can no longer re-download them. The
+ * results page checks `raw_assets_cleaned_at` and hides that option once
+ * it's set, explaining why instead of failing on a missing file.
+ */
+async function cleanupRawAssetsIfProjectDone(
+  db: TenantScopedClient,
+  service: ServiceRoleClient,
+  project: NonNullable<Awaited<ReturnType<TenantScopedClient["getVideoProject"]>>>,
+  projectId: string,
+): Promise<void> {
+  if (project.raw_assets_cleaned_at) return;
+
+  const videos = await db.listVideoProjectVideos(projectId);
+  const allDone = videos.length > 0 && videos.every((v) => v.status === "listo");
+  if (!allDone) return;
+
+  try {
+    const assets = await db.listVideoAssets(projectId);
+    const paths = assets.map((a) => a.path);
+    if (project.music_path) paths.push(project.music_path);
+    await deleteFiles(service, ASSETS_BUCKET, paths);
+    await db.updateVideoProject(projectId, { raw_assets_cleaned_at: new Date().toISOString() });
+  } catch (err) {
+    logger.warn({ projectId, err }, "no se pudieron borrar las tomas crudas del proyecto");
+  }
+}
+
 export async function renderVideoJob({ projectId, tenantId, videoId }: RenderVideoJobData): Promise<void> {
   const service = createServiceRoleClient();
   const db = createTenantScopedClient(tenantId, service);
@@ -228,6 +271,9 @@ export async function renderVideoJob({ projectId, tenantId, videoId }: RenderVid
         output_srt_path: outputSrtPath,
       });
     });
+
+    await cleanupRawAssetsIfProjectDone(db, service, project, projectId);
+
     logger.info({ projectId, videoId, tenantId, durationMs: Date.now() - startedAt }, "renderVideoJob completado");
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

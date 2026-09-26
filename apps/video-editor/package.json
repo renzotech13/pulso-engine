@@ -13,6 +13,9 @@
     "test": "vitest run",
     "process": "tsx src/cli.ts",
     "bg-replace": "tsx src/bg-replace-cli.ts",
+    "bg-replace-multi": "tsx src/bg-replace-multi-cli.ts",
+    "titulo": "tsx src/titulo-cli.ts",
+    "lote": "tsx src/lote-cli.ts",
     "b-roll": "tsx src/b-roll-cli.ts",
     "seed-preset": "tsx src/seed-default-preset.ts"
   },

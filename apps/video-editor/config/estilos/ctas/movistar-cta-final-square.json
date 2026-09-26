@@ -1,0 +1,79 @@
+{
+  "clave": "movistar-cta-final-square",
+  "tipo": "cta",
+  "marca": "movistar",
+  "descripcion": "CTA final de Movistar SOLO para la versión 1080x1080 — clon de az-cta-final adaptado para 'Dale clic | en el anuncio' (sin el nivel superior 'escríbeme'): 'medio' ya NO se auto-escala a todo el ancho (ajustarAlAncho:false) y baja de tamaño, 'inferior' pasa de alineación derecha a centro — en az-cta-final ambas cosas asumían la pareja 'escríbeme'+palabra-clave corta de AZ, que en el formato cuadrado empujaba 'Dale clic'/'en el anuncio' visiblemente hacia la derecha. La versión 1080x1920 sigue usando az-cta-final sin cambios.",
+  "aplica": {
+    "texto": "\"| Dale clic | en el anuncio\"  (nivel superior vacío)",
+    "origen": "clon de az-cta-final.json: medio ajustarAlAncho true→false y tamano 150→110; inferior alineacion derecha→centro y tamano 76→56; anchoMaximoFrac 0.88→0.8 para más margen lateral."
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.3265,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.8,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 105,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "tamanoMaximo": 145,
+        "alineacion": "centro",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Grift ExtBd"
+        },
+        "tamano": 110,
+        "color": "#BAE0FD",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -50,
+        "alineacion": "centro",
+        "ajustarAlAncho": false,
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Grift Light"
+        },
+        "tamano": 56,
+        "color": "#FFFFFF",
+        "trackingPx": 0,
+        "mayusculas": false,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -50,
+        "alineacion": "centro",
+        "sombra": {
+          "color": "#000000A0",
+          "desplazamiento": 4,
+          "blur": 8,
+          "halo": true
+        }
+      }
+    }
+  }
+}

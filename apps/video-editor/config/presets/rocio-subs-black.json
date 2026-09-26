@@ -1,0 +1,106 @@
+{
+  "id": "rocio-subs-black",
+  "nombre": "Rocío inmobiliaria — Subtítulos Black en una fila (máx. 3 palabras), centrados, highlight dorado, firma @rocioescobarq",
+  "fuente": {
+    "familia": "Inter",
+    "peso": 700
+  },
+  "subtitulos": {
+    "tamano": 74,
+    "color": "#FFFFFF",
+    "colorPalabraActiva": "#E3B341",
+    "fuente": {
+      "familia": "Grift Black",
+      "peso": 900
+    },
+    "fondoPalabraActiva": {
+      "activo": false,
+      "color": "#E3B341",
+      "colorTexto": "#000000",
+      "radio": 10,
+      "paddingX": 12,
+      "paddingY": 4
+    },
+    "sombra": {
+      "color": "#000000D9",
+      "desplazamiento": 5
+    },
+    "posicion": "inferior",
+    "margenSeguroInferiorPx": 870,
+    "maxCaracteresPorLinea": 26,
+    "maxLineas": 1,
+    "palabrasPorBloque": 3,
+    "mayusculas": true,
+    "resaltarPalabraActiva": true,
+    "animacion": "ninguna",
+    "lineaUnicaFluida": true,
+    "marca": {
+      "texto": "@rocioescobarq",
+      "tamano": 40,
+      "color": "#FFFFFF",
+      "colorAcento": "#E3B341",
+      "acento": "rocio",
+      "margenSuperiorPx": -6
+    }
+  },
+  "titulo": {
+    "modo": "superpuesto",
+    "duracionSeg": 5,
+    "tamano": 88,
+    "color": "#FFFFFF",
+    "posicion": "centro",
+    "posicionYFrac": 0.6,
+    "estilo": "tresNiveles",
+    "animacionEntrada": "ninguna",
+    "animacionSalida": "ninguna",
+    "entradaSeg": 0.9,
+    "salidaSeg": 0.65,
+    "anchoMaximoFrac": 0.78,
+    "tresNiveles": {
+      "superior": {
+        "fuente": {
+          "familia": "Mrs Hannah"
+        },
+        "tamano": 112,
+        "color": "#FFFFFF",
+        "efecto": "letrasOla",
+        "ajustarAlAncho": true,
+        "tamanoMaximo": 150
+      },
+      "medio": {
+        "fuente": {
+          "familia": "Scholar"
+        },
+        "tamano": 200,
+        "color": "#E3B341",
+        "efecto": "letrasJuntan",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -60
+      },
+      "inferior": {
+        "fuente": {
+          "familia": "Helvetica"
+        },
+        "tamano": 40,
+        "color": "#FFFFFF",
+        "trackingPx": 8,
+        "mayusculas": true,
+        "efecto": "mascaraVertical",
+        "reducirAlAncho": true,
+        "margenSuperiorPx": -10
+      }
+    }
+  },
+  "musica": {
+    "volumenDb": -18,
+    "ducking": true,
+    "fadeInSeg": 1,
+    "fadeOutSeg": 2
+  },
+  "salida": {
+    "formato": "conservar-origen",
+    "resolucion": "1080x1920",
+    "fps": 30,
+    "crf": 18
+  }
+}

@@ -68,6 +68,7 @@ export function RemotionRoot() {
             mayusculas: true,
             resaltarPalabraActiva: true,
             animacion: "pop",
+            lineaUnicaFluida: false,
           },
         }}
         calculateMetadata={({ props }) => ({
